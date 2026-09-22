@@ -1,0 +1,155 @@
+name: Release Userscript
+
+# Triggered by tags shaped `<id>-v<version>` (e.g. h1dl-v1.1.0).
+# `<id>` must match the USERSCRIPT_ID exported by one package's vite.config.ts.
+# The tag is the single source of truth for the version: it is injected as
+# USERSCRIPT_VERSION at build time, so package.json never needs version bumps.
+# Git refs cannot contain ':', so '<id>-v<version>' is used.
+# Examples: h1dl-v1.1.0, youtube-dl-v0.3.2
+on:
+  push:
+    tags:
+      - "[a-z0-9]+-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (id-vX.Y.Z)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Resolve release tag
+        id: tag
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Releasing tag: $TAG"
+
+      - name: Resolve target package
+        id: pkg
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.tag.outputs.tag }}"
+          # Tag format: <id>-v<version>, e.g. h1dl-v1.1.0.
+          # Split on the LAST '-v' so ids containing hyphens (my-script-v1.0.0)
+          # still resolve correctly.
+          if [[ ! "$TAG" =~ ^([a-z0-9][a-z0-9-]*)-v([0-9].*)$ ]]; then
+            echo "Tag '$TAG' does not match '<id>-v<version>' — skipping."
+            exit 0
+          fi
+          ID="${BASH_REMATCH[1]}"
+          VERSION="${BASH_REMATCH[2]}"
+          echo "userscript-id=$ID" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          # Find the package whose vite.config.ts exports USERSCRIPT_ID === $ID.
+          # vite.config.ts is the single source of truth — package.json carries
+          # no id field, so this reads the same constant the build uses.
+          FOUND=""
+          for pkgdir in packages/*/; do
+            [ -d "$pkgdir" ] || continue
+            [ -f "$pkgdir/vite.config.ts" ] || continue
+            PKG_ID=$(bun -e "
+              const config = await import('./$pkgdir/vite.config.ts');
+              process.stdout.write(config.USERSCRIPT_ID ?? '');
+            " 2>/dev/null || true)
+            if [ "$PKG_ID" = "$ID" ]; then
+              FOUND="$pkgdir"
+              break
+            fi
+          done
+          if [ -z "$FOUND" ]; then
+            echo "No package with USERSCRIPT_ID='$ID' (tag: $TAG) — skipping."
+            echo "match=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "match=true" >> "$GITHUB_OUTPUT"
+          # Derive the release name from the package name (no version field in
+          # package.json anymore — name only).
+          PKG_NAME=$(bun -e "
+            const p = await Bun.file('./$FOUND/package.json').json();
+            process.stdout.write(p.name);
+          ")
+          echo "dir=$FOUND" >> "$GITHUB_OUTPUT"
+          echo "name=$PKG_NAME" >> "$GITHUB_OUTPUT"
+          echo "Releasing $PKG_NAME (id=$ID) at $VERSION"
+
+      - name: Install dependencies
+        if: steps.pkg.outputs.match == 'true'
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        if: steps.pkg.outputs.match == 'true'
+        working-directory: ${{ steps.pkg.outputs.dir }}
+        run: bun run typecheck
+
+      - name: Build
+        if: steps.pkg.outputs.match == 'true'
+        working-directory: ${{ steps.pkg.outputs.dir }}
+        # The tag is the single source of truth for the version — inject it so
+        # vite.config.ts stamps the released @version without package.json edits.
+        env:
+          USERSCRIPT_VERSION: ${{ steps.pkg.outputs.version }}
+        run: bun run build
+
+      - name: Collect artifacts
+        id: artifacts
+        if: steps.pkg.outputs.match == 'true'
+        working-directory: ${{ steps.pkg.outputs.dir }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/artifacts"
+          shopt -s nullglob
+          COPIED=0
+          for f in dist/*.user.js dist/*.meta.js; do
+            cp "$f" "$RUNNER_TEMP/artifacts/"
+            COPIED=$((COPIED+1))
+          done
+          if [ "$COPIED" -eq 0 ]; then
+            echo "::error::No .user.js produced by build"
+            exit 1
+          fi
+          echo "count=$COPIED" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        if: steps.pkg.outputs.match == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.pkg.outputs.name }} ${{ steps.pkg.outputs.version }}
+          body: |
+            ## ${{ steps.pkg.outputs.name }} ${{ steps.pkg.outputs.version }}
+
+            Built from tag \`${{ steps.tag.outputs.tag }}\`.
+
+            ### Install
+            Download the `.user.js` file below and open it — your userscript
+            manager (Violentmonkey / Tampermonkey) will prompt to install.
+
+            The built script carries `@updateURL` pointing at the released
+            `meta.js`, so future tags of the same id deliver in-manager updates.
+          files: |
+            ${{ runner.temp }}/artifacts/*.user.js
+            ${{ runner.temp }}/artifacts/*.meta.js
+          generate_release_notes: true
