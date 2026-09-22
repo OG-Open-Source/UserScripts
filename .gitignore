@@ -146,7 +146,9 @@ dist
 ### UserScripts project ###
 
 # Build output of vite-plugin-monkey lives in packages/*/dist (already ignored
-# by the `dist` rule above) — keep it out of git; CI rebuilds per release.
+# by the `dist` rule above) — local builds stay out of git. The release
+# workflow force-adds only dist/*.user.js and dist/*.meta.js to main so
+# @updateURL / @downloadURL (raw.githubusercontent.com) resolve.
 
 # bun lockfile IS tracked (bun.lock) — only ignore its caches if any appear.
 .bun/

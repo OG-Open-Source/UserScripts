@@ -158,6 +158,7 @@ UserScripts/
 1. 解析 tag（正則 `^([a-z0-9][a-z0-9-]*)-v([0-9].*)$`，在最後一個 `-v` 處分割）→ 找到 `USERSCRIPT_ID` 匹配的 `vite.config.ts` 所在套件；找不到則跳過
 2. 以 `USERSCRIPT_VERSION`=<版本> 環境變數執行 `bun install --frozen-lockfile` → `typecheck` → `build`
 3. 將 `dist/*.user.js` 與 `dist/*.meta.js` 作為 GitHub Release 附件發布
+4. 將成品強制推送（force-add）至 `main` 分支的 `dist/` — `@updateURL`／`@downloadURL` 指向 raw.githubusercontent.com，檔案必須存在於 `main` 才能解析，否則已安裝的腳本每次檢查更新都會 404
 
 ```ts
 // vite.config.ts — id 與版本的唯一定義處

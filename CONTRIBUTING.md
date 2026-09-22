@@ -126,6 +126,9 @@ Tag 格式為 `<id>-v<version>`（如 `h1dl-v1.1.0`）。工作流會：
 2. 找到 `USERSCRIPT_ID` 匹配的 `vite.config.ts` 所在套件
 3. 以 `USERSCRIPT_VERSION` 環境變數執行 `bun install` → `typecheck` → `build`
 4. 將 `dist/*.user.js` 與 `dist/*.meta.js` 作為 Release 附件發布
+5. 將成品 force-add 至 `main` 分支的 `dist/` — `@updateURL`／`@downloadURL` 指向 raw.githubusercontent.com，檔案必須存在於 `main` 才能解析
+
+> 注意：`dist/` 依舊列於 `.gitignore`，僅 CI 以 `git add -f` 提交 Release 成品；本機 `bun run build` 的產出永遠不會進入 git。
 
 ### 更新機制
 

@@ -147,9 +147,36 @@ jobs:
             Download the `.user.js` file below and open it — your userscript
             manager (Violentmonkey / Tampermonkey) will prompt to install.
 
-            The built script carries `@updateURL` pointing at the released
-            `meta.js`, so future tags of the same id deliver in-manager updates.
+            The built script carries `@updateURL` pointing at the `meta.js`
+            published to the repo's main branch, so future tags of the same id
+            deliver in-manager updates.
           files: |
             ${{ runner.temp }}/artifacts/*.user.js
             ${{ runner.temp }}/artifacts/*.meta.js
           generate_release_notes: true
+
+      - name: Publish artifacts to main
+        if: steps.pkg.outputs.match == 'true'
+        working-directory: ${{ steps.pkg.outputs.dir }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # @updateURL / @downloadURL point at raw.githubusercontent.com on
+          # main, so the built files must exist there — otherwise installed
+          # scripts 404 on every update check. Runs after the GitHub Release
+          # so a push problem never blocks the release itself. The artifacts
+          # in $RUNNER_TEMP survive the checkout switch below.
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          # -f: discard the tag's working tree (untracked dist/ and any
+          # locally modified tracked dist files from a previous release).
+          git checkout -f -B main origin/main
+          mkdir -p dist
+          cp -f "$RUNNER_TEMP"/artifacts/*.user.js \
+                "$RUNNER_TEMP"/artifacts/*.meta.js dist/
+          # dist/ stays .gitignored — force-add only the release artifacts.
+          git add -f dist/*.user.js dist/*.meta.js
+          git commit -m "chore(release): publish ${{ steps.pkg.outputs.name }} ${{ steps.pkg.outputs.version }} artifacts" \
+            || echo "Nothing to commit — artifacts already up to date"
+          git push origin main
