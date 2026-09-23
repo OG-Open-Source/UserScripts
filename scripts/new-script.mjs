@@ -126,13 +126,8 @@ export const USERSCRIPT_ID = '${id}';
 
 /**
  * Injected into the script and published as a DOM annotation, which is how the
- * manager page learns the script exists. Do not keep a second copy.
- *
- * \`feature\` is one capability. \`aio\` bundles several and conflicts with any
- * script listing one of them.
+ * settings pages learn the script exists. Do not keep a second copy.
  */
-export const USERSCRIPT_KIND = 'feature' as const;
-export const USERSCRIPT_CAPABILITIES = ['${id}:main'] as const;
 export const USERSCRIPT_NAME = '${titleName}';
 export const USERSCRIPT_DESCRIPTION = '${titleName} userscript.';
 export const USERSCRIPT_MATCH = ['*://example.com/*'];

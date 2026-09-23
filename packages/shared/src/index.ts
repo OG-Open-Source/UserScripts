@@ -2,8 +2,6 @@
  * @userscripts/shared — common utilities and types for all userscripts.
  */
 
-export { claimCapabilities } from "./capability";
-export type { ClaimResult, ScriptClaim, ScriptKind } from "./capability";
 export {
   configureGmApi,
   gmDownload,
@@ -12,7 +10,6 @@ export {
   gmMenuCommand,
   gmSet,
   MANAGER_URL,
-  openSettings,
 } from "./gm";
 export type {
   GMApi,

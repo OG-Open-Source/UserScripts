@@ -14,12 +14,9 @@ import {
   GM_xmlhttpRequest,
 } from "$";
 import {
-  claimCapabilities,
   configureGmApi,
   createI18n,
-  gmMenuCommand,
   gmSet,
-  openSettings,
   probeTheme,
   publishPresence,
 } from "@userscripts/shared";
@@ -33,15 +30,13 @@ import { injectStyles } from "./styles";
 // Hosts mirrored from hosts.json (userscripts cannot read local files).
 const HOSTS = ["hanime1.com", "hanime1.me", "hanimeone.com", "hanimeone.me"];
 
-// locales.json, id, kind and capabilities are injected from vite.config.ts —
+// locales.json, id, name and description are injected from vite.config.ts —
 // the only place those values are written. `vite dev` points the locale URL
 // at the dev server so the raw URL is not needed before the first release.
 declare const __LOCALE_URL__: string;
 declare const __SCRIPT_ID__: string;
 declare const __SCRIPT_NAME__: string;
 declare const __SCRIPT_DESCRIPTION__: string;
-declare const __SCRIPT_KIND__: "feature" | "aio";
-declare const __SCRIPT_CAPABILITIES__: string[];
 
 // Wire the GM API into @userscripts/shared's dependency-injected helpers.
 configureGmApi({
@@ -58,15 +53,10 @@ publishPresence({
   id: __SCRIPT_ID__,
   name: __SCRIPT_NAME__,
   description: __SCRIPT_DESCRIPTION__,
-  kind: __SCRIPT_KIND__,
-  capabilities: [...__SCRIPT_CAPABILITIES__],
   localeUrl: __LOCALE_URL__,
 });
 
-// Fixed Settings command. Opens this script's section of the manager page.
-gmMenuCommand("Settings", () => openSettings(__SCRIPT_ID__));
-
-// The manager page applies a choice by broadcasting it. Each script writes
+// The settings pages apply a choice by broadcasting it. Each script writes
 // the value into its own GM storage — storage is not shared between scripts.
 window.addEventListener("userscript:settings", (event: Event) => {
   const lang = (event as CustomEvent<{ lang?: string }>).detail?.lang;
@@ -85,18 +75,7 @@ if (ON_MANAGER) {
   boot();
 }
 
-// One capability per script. An all-in-one script that also provides
-// hanime1:download would overlap this one, so only the first to run injects.
 function boot(): void {
-  const claim = claimCapabilities({
-    id: __SCRIPT_ID__,
-    kind: __SCRIPT_KIND__,
-    capabilities: [...__SCRIPT_CAPABILITIES__],
-  });
-  if (!claim.ok) {
-    console.warn(`[h1dl] not injecting: ${claim.conflict?.id} already provides hanime1:download`);
-    throw new Error("[h1dl] capability already claimed");
-  }
   void start();
 }
 

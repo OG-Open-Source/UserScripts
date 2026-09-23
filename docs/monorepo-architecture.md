@@ -177,28 +177,25 @@ const VERSION = process.env.USERSCRIPT_VERSION ?? pkg.version ?? "0.0.0-dev";
 // packages/<name>/locales.json
 {
   "id": "h1dl",
-  "default": "en",
+  "default": "en-US",
   "languages": [
-    { "code": "en", "name": "English" },
-    { "code": "zh-TW", "name": "繁體中文", "messages": { "download": "下載" } }
+    { "code": "en-US", "name": "English (United States)" },
+    { "code": "zh-Hant-TW", "name": "臺灣繁體中文", "messages": { "download": "下載" } }
   ]
 }
 ```
 
-預設語言的字串打包在腳本內，檔案裡不重複。缺鍵回退英文，檔案讀取失敗時維持英文。翻譯修正只改這一個檔案，已安裝的腳本下次執行自行取得，不必重新發版。Release 會把 `dist/locales.json` 一併推上 `main`。
+語言代碼使用 BCP 47，英文以 `en-US` 為準。未設定時依頁面 `<html lang>` 判斷，不看瀏覽器語言。預設語言的字串打包在腳本內，檔案裡不重複。缺鍵回退英文，檔案讀取失敗時維持英文。翻譯修正只改這一個檔案，已安裝的腳本下次執行自行取得，不必重新發版。Release 會把 `dist/locales.json` 一併推上 `main`。
 
-## 功能類型
+選單只呈現狀態，例如 `Language: 臺灣繁體中文 (zh-Hant-TW)`，點選開啟對應的設定頁，不在選單內切換。
 
-一個腳本提供一類功能，capability 以 `<site>:<feature>` 命名。
+## 設定頁面
 
-| kind      | 說明                                                             |
-| --------- | ---------------------------------------------------------------- |
-| `feature` | 單一功能。多個 feature 腳本互不衝突，可同時安裝                  |
-| `aio`     | 合併多個功能。與任何共享同一 capability 的腳本衝突，含另一個 aio |
+每種設定是 `settings/<name>/` 下的獨立頁面，根目錄 `index.html` 只列出入口。新增一種設定就是新增一個目錄。
 
-`USERSCRIPT_KIND` 與 `USERSCRIPT_CAPABILITIES` 只寫在 `vite.config.ts`。建置注入腳本，`claimCapabilities()` 在啟動時宣告。同頁已有涵蓋相同功能的 AIO 時，後啟動者停止注入。
+每個腳本以 `publishPresence()` 把 `id`、`name`、`localeUrl` 寫進頁面的 DOM 註解，設定頁讀取它。套用時頁面廣播 `userscript:settings`，各腳本把值寫進自己的 GM 儲存。
 
-沒有 `catalog.json`。每個腳本以 `publishPresence()` 把 `id`、`kind`、`capabilities` 寫進頁面的 DOM 註解，`index.html` 讀取它列出已安裝的腳本、標出衝突，語言清單則取自各腳本的 `locales.json`。
+腳本之間不互斥，沒有 feature／aio 的區分。兩個腳本做同一件事時，由使用者在設定站自行取捨。
 
 ## 共享工具：@userscripts/shared
 
@@ -208,7 +205,7 @@ const VERSION = process.env.USERSCRIPT_VERSION ?? pkg.version ?? "0.0.0-dev";
 // packages/shared/src/i18n.ts
 import { GM_getValue, GM_setValue, GM_registerMenuCommand } from "$";
 
-export type LangCode = "zh-TW" | "zh-CN" | "en";
+export type LangCode = "zh-Hant-TW" | "zh-Hans-CN" | "en";
 
 /**
  * 建立多語言選單：每個語言註冊一個 GM_registerMenuCommand，

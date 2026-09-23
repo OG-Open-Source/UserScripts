@@ -105,27 +105,28 @@ icon.textContent = "download";
 
 ### 語言（Language）
 
-腳本本體只使用英文。`==UserScript==` 元數據註解不受此限（`@name`、`@description` 可維持現況）。語言選單上的語言名稱（如「繁體中文」）保留該語言原文，否則使用者無法辨識自己的語言。
+腳本本體只使用英文。`==UserScript==` 元數據註解不受此限（`@name`、`@description` 可維持現況）。語言名稱保留該語言原文，否則使用者無法辨識自己的語言。
 
-翻譯固定在一個檔案：`locales.json`。新增語言是新增一筆，不是新增一個檔案。腳本首次執行時抓取這個檔案，取得可用語言與目前語言的字串：
+語言代碼一律使用 BCP 47，英文以美式為準：`en-US`、`zh-Hant-TW`、`zh-Hans-CN`。未設定時依頁面的 `<html lang>` 判斷，不看瀏覽器語言：`zh-Hant`／`zh-TW` 對應 `zh-Hant-TW`，`zh-Hans`／`zh-CN` 對應 `zh-Hans-CN`，其餘英文對應 `en-US`。
+
+翻譯固定在一個檔案：`locales.json`。新增語言是新增一筆，不是新增一個檔案。腳本首次執行時抓取這個檔案：
 
 1. 英文文案寫在 `src/i18n.ts`，作為預設與回退，不重複寫進 `locales.json`
 2. `locales.json` 的 `languages` 列出每個語言；非預設語言帶 `messages`
 3. 讀到的檔案快取在 GM 儲存。之後的執行先用快取，背景再重新抓取，有變動才重載
 4. 缺少的翻譯鍵回退英文。檔案讀取失敗時腳本維持英文，下次執行再試
 
+選單只呈現狀態，例如 `Language: 臺灣繁體中文 (zh-Hant-TW)`，點選開啟 `settings/language/`，不在選單內切換。
+
 > 注意：新增或修正翻譯只改 `locales.json`，不必改腳本。已安裝的腳本在下次執行時自行取得，不需要重新發版。Release 會把 `dist/locales.json` 發布到 `main`。
 
-### 功能類型（Capability）
+### 設定頁面（Settings）
 
-一個腳本提供一類功能，以 capability 命名（如 `hanime1:download`）。
+每種設定是 `settings/<name>/` 下的獨立頁面，根目錄的 `index.html` 只列出它們。新增一種設定就是新增一個目錄，不改既有頁面。
 
-- **feature** — 單一功能。多個 feature 腳本互不衝突，可同時安裝
-- **aio** — 把多個功能合在一支腳本。它與任何提供相同 capability 的腳本衝突，無論對方是 feature 還是另一個 aio
+腳本以 `publishPresence()` 在頁面上宣告自己（`id`、`name`、`localeUrl`），設定頁讀取這些宣告。套用時頁面廣播 `userscript:settings`，各腳本把值寫進自己的 GM 儲存。
 
-`kind` 與 `capabilities` 只寫在 `vite.config.ts`（`USERSCRIPT_KIND`、`USERSCRIPT_CAPABILITIES`）。建置把它們注入腳本，啟動時以 `claimCapabilities()` 宣告。同頁已有涵蓋相同功能的 AIO 時，後啟動的腳本停止注入，避免同一功能被掛上兩次。
-
-沒有 `catalog.json`。腳本在每個執行頁面（含管理頁）把 `id`、`kind`、`capabilities` 寫進 DOM 註解，`index.html` 讀這些註解得知已安裝的腳本。語言清單則來自各腳本自己的 `locales.json`。
+腳本之間不互斥，也不再標記 feature／aio。兩個腳本做同一件事時，由使用者在設定站自行取捨。
 
 ## 發布
 

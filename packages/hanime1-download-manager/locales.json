@@ -1,11 +1,11 @@
 {
   "id": "h1dl",
-  "default": "en",
+  "default": "en-US",
   "languages": [
-    { "code": "en", "name": "English" },
+    { "code": "en-US", "name": "English (United States)" },
     {
-      "code": "zh-TW",
-      "name": "繁體中文",
+      "code": "zh-Hant-TW",
+      "name": "臺灣繁體中文",
       "messages": {
         "download": "下載",
         "fetching": "解析中",
@@ -15,14 +15,14 @@
         "noQualities": "無可下載畫質",
         "selectAll": "全選",
         "selectNone": "全不選",
-        "downloadSelected": "下載已選取項目",
-        "chooseBatchQuality": "選擇批量下載畫質（不足時自動降級）",
+        "downloadSelected": "下載所選選項",
+        "chooseBatchQuality": "選擇批次下載畫質（不足時自動降級）",
         "downgradeNotice": "畫質降級："
       }
     },
     {
-      "code": "zh-CN",
-      "name": "简体中文",
+      "code": "zh-Hans-CN",
+      "name": "大陆简体中文",
       "messages": {
         "download": "下载",
         "fetching": "解析中",

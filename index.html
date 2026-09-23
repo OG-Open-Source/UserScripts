@@ -1,19 +1,6 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <!--
-==UserScript==
-@name         UserScripts Manager
-@namespace    Violentmonkey Scripts
-@version      1.0.0
-@description  Shared settings for OG-Open-Source/UserScripts. Sets the language used by every installed script.
-@match        https://og-open-source.github.io/UserScripts/
-@match        https://og-open-source.github.io/UserScripts/index.html
-@grant        GM_setValue
-@grant        GM_getValue
-@noframes
-==/UserScript==
-		-->
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>UserScripts</title>
@@ -24,8 +11,6 @@
         --fg: #1a1a1a;
         --muted: #666;
         --line: #e4e4e4;
-        --warn: #8a4b00;
-        --warn-bg: #fff6e8;
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -33,13 +18,11 @@
           --fg: #ededed;
           --muted: #9a9a9a;
           --line: #2c2c2c;
-          --warn: #f0b45a;
-          --warn-bg: #2a2116;
         }
       }
       body {
         margin: 0 auto;
-        max-width: 760px;
+        max-width: 640px;
         padding: 2.5rem 1.25rem 4rem;
         background: var(--bg);
         color: var(--fg);
@@ -47,281 +30,38 @@
           15px/1.55 system-ui,
           sans-serif;
       }
-      h1 {
-        font-size: 1.4rem;
-        font-weight: 600;
-        margin: 0 0 0.25rem;
+      a {
+        color: inherit;
       }
-      h2 {
-        font-size: 1rem;
-        font-weight: 600;
-        margin: 2.25rem 0 0.75rem;
-      }
-      p.lead {
-        color: var(--muted);
-        margin: 0 0 1.5rem;
-      }
-      .script {
-        border-top: 1px solid var(--line);
-        padding: 0.9rem 0;
-      }
-      .script header {
-        display: flex;
-        gap: 0.6rem;
-        align-items: baseline;
-        flex-wrap: wrap;
-      }
-      .script h3 {
-        font-size: 1rem;
-        font-weight: 600;
-        margin: 0;
-      }
-      .badge {
-        font-size: 0.72rem;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        padding: 0 0.5rem;
-      }
-      .script .desc {
-        color: var(--muted);
-        margin: 0.25rem 0 0.5rem;
-      }
-      .caps {
-        display: flex;
-        gap: 0.4rem;
-        flex-wrap: wrap;
-        margin: 0 0 0.6rem;
-      }
-      .caps code {
-        font-size: 0.8rem;
-        background: var(--line);
-        border-radius: 4px;
-        padding: 0 0.35rem;
-      }
-      a.install {
-        font-size: 0.9rem;
-      }
-      .warn {
-        background: var(--warn-bg);
-        color: var(--warn);
-        border-radius: 6px;
-        padding: 0.6rem 0.8rem;
-        margin: 0 0 1rem;
-        font-size: 0.9rem;
-      }
-      label {
-        display: block;
-        margin-bottom: 0.4rem;
-      }
-      select {
-        font: inherit;
-        padding: 0.3rem 0.4rem;
-      }
+      .lead,
       .note {
         color: var(--muted);
-        font-size: 0.85rem;
+      }
+      ul {
+        padding: 0;
+        list-style: none;
+      }
+      li {
+        border-top: 1px solid var(--line);
+      }
+      li a {
+        display: block;
+        padding: 0.7rem 0;
+        text-decoration: none;
+      }
+      li a:hover {
+        text-decoration: underline;
       }
     </style>
   </head>
   <body>
     <h1>UserScripts</h1>
-    <p class="lead">
-      Scripts distributed by OG-Open-Source/UserScripts. One script provides one kind of feature. An
-      all-in-one script bundles several and cannot be installed alongside the single scripts it
-      covers.
+    <p class="lead">Settings for the scripts distributed by OG-Open-Source/UserScripts.</p>
+    <ul>
+      <li><a href="./settings/language/">Language</a></li>
+    </ul>
+    <p class="note">
+      Each setting lives on its own page, so a script's menu can open exactly the one it shows.
     </p>
-
-    <div id="conflicts"></div>
-    <section id="scripts"></section>
-
-    <h2>Language</h2>
-    <label for="lang">Preferred language for every script</label>
-    <select id="lang"></select>
-    <p>
-      <button id="apply" type="button">Apply to installed scripts</button>
-    </p>
-    <p class="note" id="lang-note"></p>
-
-    <script type="module">
-      const LANG_KEY = "userscripts:lang";
-      const REGISTRY_ID = "userscript-registry";
-
-      // Each installed script writes its own annotation into this element.
-      // There is no catalog file: a script the manager cannot see is one that
-      // is not installed.
-      function readScripts() {
-        const el = document.getElementById(REGISTRY_ID);
-        if (!el?.textContent) return [];
-        try {
-          return JSON.parse(el.textContent);
-        } catch {
-          return [];
-        }
-      }
-
-      function waitForScripts(ms) {
-        return new Promise((resolve) => {
-          const seen = readScripts();
-          if (seen.length) {
-            resolve(seen);
-            return;
-          }
-          const timer = setTimeout(() => {
-            window.removeEventListener("userscript:presence", done);
-            resolve(readScripts());
-          }, ms);
-          const done = () => {
-            clearTimeout(timer);
-            window.removeEventListener("userscript:presence", done);
-            resolve(readScripts());
-          };
-          window.addEventListener("userscript:presence", done);
-        });
-      }
-
-      // Broadcast the choice. Every installed script hears it and writes the
-      // value into its own GM storage — storage is not shared between scripts.
-      function applyLanguage(code) {
-        window.dispatchEvent(new CustomEvent("userscript:settings", { detail: { lang: code } }));
-        return readScripts().length > 0;
-      }
-
-      const scripts = await waitForScripts(2000);
-
-      const locales = new Map();
-      await Promise.all(
-        scripts.map(async (script) => {
-          if (!script.localeUrl) return;
-          try {
-            const file = await fetch(script.localeUrl).then((res) => res.json());
-            locales.set(script.id, file);
-          } catch {
-            locales.set(script.id, null);
-          }
-        }),
-      );
-
-      renderConflicts(scripts);
-      renderScripts(scripts);
-      renderLanguage(scripts);
-
-      function conflictsOf(scripts) {
-        const found = [];
-        for (let i = 0; i < scripts.length; i++) {
-          for (let j = i + 1; j < scripts.length; j++) {
-            const a = scripts[i];
-            const b = scripts[j];
-            const shared = a.capabilities.filter((item) => b.capabilities.includes(item));
-            if (!shared.length) continue;
-            if (a.kind === "aio" || b.kind === "aio") {
-              found.push({ a, b, shared });
-            }
-          }
-        }
-        return found;
-      }
-
-      function renderConflicts(scripts) {
-        const conflicts = conflictsOf(scripts);
-        const root = document.getElementById("conflicts");
-        if (!conflicts.length) return;
-        for (const { a, b, shared } of conflicts) {
-          const note = document.createElement("div");
-          note.className = "warn";
-          note.textContent = `${a.name ?? a.id} and ${b.name ?? b.id} both provide ${shared.join(
-            ", ",
-          )}. Keep one of them, not both.`;
-          root.append(note);
-        }
-      }
-
-      function renderScripts(scripts) {
-        const root = document.getElementById("scripts");
-        if (!scripts.length) {
-          const empty = document.createElement("p");
-          empty.className = "note";
-          empty.textContent =
-            "No installed scripts announced themselves. Open this page through your userscript manager.";
-          root.append(empty);
-          return;
-        }
-        for (const script of scripts) {
-          const block = document.createElement("article");
-          block.className = "script";
-          block.id = script.id;
-
-          const header = document.createElement("header");
-          const title = document.createElement("h3");
-          title.textContent = script.name ?? script.id;
-          const badge = document.createElement("span");
-          badge.className = "badge";
-          badge.textContent = script.kind === "aio" ? "all-in-one" : "single";
-          header.append(title, badge);
-
-          const desc = document.createElement("p");
-          desc.className = "desc";
-          desc.textContent = script.description ?? "";
-
-          const caps = document.createElement("div");
-          caps.className = "caps";
-          for (const capability of script.capabilities ?? []) {
-            const code = document.createElement("code");
-            code.textContent = capability;
-            caps.append(code);
-          }
-
-          block.append(header, desc, caps);
-          root.append(block);
-        }
-      }
-
-      function renderLanguage(scripts) {
-        const languages = new Map();
-        for (const script of scripts) {
-          const file = locales.get(script.id);
-          if (!file) continue;
-          for (const language of file.languages) {
-            if (!languages.has(language.code)) {
-              languages.set(language.code, language.name);
-            }
-          }
-        }
-
-        const select = document.getElementById("lang");
-        const saved = localStorage.getItem(LANG_KEY);
-        for (const [code, name] of languages) {
-          const option = document.createElement("option");
-          option.value = code;
-          option.textContent = name;
-          if (code === saved) option.selected = true;
-          select.append(option);
-        }
-
-        const note = document.getElementById("lang-note");
-        const describe = (code) =>
-          typeof GM_setValue === "function"
-            ? `Applies "${code}" to every installed script. Each one reads it on its next run.`
-            : "Open this page through your userscript manager to apply the choice. Until then it is only remembered here.";
-
-        note.textContent = saved
-          ? describe(saved)
-          : "Leave unset and each script follows your browser language.";
-
-        select.addEventListener("change", () => {
-          localStorage.setItem(LANG_KEY, select.value);
-          note.textContent = describe(select.value);
-        });
-
-        document.getElementById("apply").addEventListener("click", () => {
-          localStorage.setItem(LANG_KEY, select.value);
-          const applied = applyLanguage(select.value);
-          note.textContent = applied
-            ? `Applied "${select.value}" to ${readScripts().length} installed script(s). Reload the target pages to see it.`
-            : "No installed script heard this page, so nothing was applied.";
-        });
-      }
-    </script>
   </body>
 </html>

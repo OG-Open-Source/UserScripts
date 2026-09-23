@@ -16,16 +16,6 @@ const pkg = JSON.parse(readFileSync(resolve(__dirname, "./package.json"), "utf8"
  */
 export const USERSCRIPT_ID = "h1dl";
 
-/**
- * What this script is.
- *
- * `feature` is one capability. `aio` bundles several and conflicts with any
- * script that lists one of them. Declared here so the runtime claim, the
- * presence annotation and the metadata cannot drift apart.
- */
-export const USERSCRIPT_KIND = "feature" as const;
-export const USERSCRIPT_CAPABILITIES = ["hanime1:download"] as const;
-
 /** Written only here and injected into the script. */
 export const USERSCRIPT_NAME = "Hanime1 Download Manager";
 export const USERSCRIPT_DESCRIPTION =
@@ -90,8 +80,6 @@ export default defineConfig(({ command }) => ({
     __SCRIPT_ID__: JSON.stringify(USERSCRIPT_ID),
     __SCRIPT_NAME__: JSON.stringify(USERSCRIPT_NAME),
     __SCRIPT_DESCRIPTION__: JSON.stringify(USERSCRIPT_DESCRIPTION),
-    __SCRIPT_KIND__: JSON.stringify(USERSCRIPT_KIND),
-    __SCRIPT_CAPABILITIES__: JSON.stringify(USERSCRIPT_CAPABILITIES),
   },
   plugins: [
     localesPlugin(),
@@ -105,9 +93,10 @@ export default defineConfig(({ command }) => ({
         description: USERSCRIPT_DESCRIPTION,
         match: [
           ...USERSCRIPT_MATCH,
-          // Also runs on the manager page, only to publish its presence.
+          // Also runs on the settings pages, only to publish its presence and
+          // receive the choices made there.
           "https://og-open-source.github.io/UserScripts/",
-          "https://og-open-source.github.io/UserScripts/*",
+          "https://og-open-source.github.io/UserScripts/settings/*",
         ],
         connect: [
           "hanime1.com",

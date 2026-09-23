@@ -131,7 +131,7 @@ if (inplace) {
 鍵值對持久化儲存，跨頁面保留狀態：
 
 ```javascript
-GM_setValue("lang", "zh-TW");
+GM_setValue("lang", "zh-Hant-TW");
 const lang = GM_getValue("lang", null); // 第二參數為預設值
 ```
 

@@ -9,15 +9,15 @@
  * Same-page discovery uses `globalThis` so scripts see each other even before
  * the DOM annotation is written; the DOM copy is what the manager reads.
  */
-import type { ScriptClaim } from "./capability";
-
 /** What a script publishes about itself. The manager page reads this. */
-export interface ScriptPresence extends ScriptClaim {
+export interface ScriptPresence {
+  /** Userscript id, e.g. "h1dl". */
+  id: string;
   /** Display name. */
   name: string;
   /** One-line description. */
   description: string;
-  /** Absolute URL of the script's locales.json. The page builds its language list from these. */
+  /** Absolute URL of the script's locales.json. */
   localeUrl: string;
 }
 

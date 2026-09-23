@@ -10,11 +10,11 @@
  * The file is the standard. Scripts read it; they do not each keep their own
  * copy of the language list.
  */
-import { gmFetch, gmGet, gmMenuCommand, gmSet } from "./gm";
+import { gmFetch, gmGet, gmMenuCommand, gmSet, MANAGER_URL } from "./gm";
 
 /** One language inside locales.json. */
 export interface LocaleEntry {
-  /** BCP-47-ish code, e.g. "en", "zh-TW". */
+  /** BCP-47-ish code, e.g. "en", "zh-Hant-TW". */
   code: string;
   /** Name shown in the language menu, in that language. */
   name: string;
@@ -93,10 +93,11 @@ export interface I18nInstance<TKey extends string> {
 }
 
 /**
- * Build an i18n instance and register one menu command per available language.
+ * Build an i18n instance.
  *
  * The language list comes from the script's `locales.json`, fetched on first
- * run and cached after. Switching language stores the code and reloads.
+ * run and cached after. The menu shows the current language as a status and
+ * links to its settings page; it does not switch language itself.
  */
 export async function createI18n<TKey extends string>(
   options: I18nOptions<TKey>,
@@ -107,8 +108,8 @@ export async function createI18n<TKey extends string>(
 
   let file: LocaleFile = {
     id: source.scriptId,
-    default: "en",
-    languages: [{ code: "en", name: "English" }],
+    default: "en-US",
+    languages: [{ code: "en-US", name: "English (United States)" }],
   };
 
   try {
@@ -126,22 +127,28 @@ export async function createI18n<TKey extends string>(
     return entry?.messages?.[key] ?? fallback[key] ?? key;
   };
 
-  for (const item of file.languages) {
-    gmMenuCommand(item.name + (item.code === lang ? " ✓" : ""), () => {
-      if (item.code === lang) return;
-      gmSet(storageKey, item.code);
-      location.reload();
-    });
-  }
+  const current = file.languages.find((item) => item.code === lang);
+  gmMenuCommand(`Language: ${current?.name ?? lang} (${lang})`, () => {
+    window.open(`${MANAGER_URL}/settings/language/`, "_blank");
+  });
 
   return { lang, languages: file.languages, t };
 }
 
-/** Best language for the browser, before the locale file is known. */
+/**
+ * Language to use before one is chosen.
+ *
+ * Reads the page's own `lang`, not the browser: a site that declares itself
+ * Traditional Chinese should not follow a Simplified Chinese browser.
+ * Codes are BCP 47, and English means American English.
+ */
 export function detectLang(): string {
-  const nav = (navigator.language || "en").toLowerCase();
-  if (nav.startsWith("zh")) {
-    return nav.includes("tw") || nav.includes("hk") || nav.includes("hant") ? "zh-TW" : "zh-CN";
+  const page = (document.documentElement.lang || "en").toLowerCase();
+  if (page.startsWith("zh")) {
+    const traditional =
+      page.includes("hant") || page.includes("tw") || page.includes("hk") || page.includes("mo");
+    return traditional ? "zh-Hant-TW" : "zh-Hans-CN";
   }
-  return nav.split("-")[0] || "en";
+  if (page === "en" || page.startsWith("en-")) return "en-US";
+  return "en-US";
 }

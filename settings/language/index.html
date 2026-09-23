@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!--
+==UserScript==
+@name         UserScripts Language
+@namespace    Violentmonkey Scripts
+@version      1.0.0
+@description  Sets the language used by every installed OG-Open-Source/UserScripts script.
+@match        https://og-open-source.github.io/UserScripts/settings/language/
+@match        https://og-open-source.github.io/UserScripts/settings/language/index.html
+@noframes
+==/UserScript==
+		-->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Language — UserScripts</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #fff;
+        --fg: #1a1a1a;
+        --muted: #666;
+        --line: #e4e4e4;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #161616;
+          --fg: #ededed;
+          --muted: #9a9a9a;
+          --line: #2c2c2c;
+        }
+      }
+      body {
+        margin: 0 auto;
+        max-width: 640px;
+        padding: 2.5rem 1.25rem 4rem;
+        background: var(--bg);
+        color: var(--fg);
+        font:
+          15px/1.55 system-ui,
+          sans-serif;
+      }
+      a {
+        color: inherit;
+      }
+      .lead,
+      .note {
+        color: var(--muted);
+      }
+      label {
+        display: block;
+        margin-bottom: 0.4rem;
+      }
+      select,
+      button {
+        font: inherit;
+        padding: 0.3rem 0.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <p><a href="../../">UserScripts</a></p>
+    <h1>Language</h1>
+    <p class="lead">
+      Applies to every installed script. The list is the languages those scripts actually ship.
+    </p>
+
+    <label for="lang">Language</label>
+    <select id="lang"></select>
+    <p>
+      <button id="apply" type="button">Apply</button>
+    </p>
+    <p class="note" id="note"></p>
+
+    <script type="module">
+      const KEY = "userscripts:lang";
+      const REGISTRY_ID = "userscript-registry";
+
+      // Installed scripts write their own annotation into this element.
+      function readScripts() {
+        const el = document.getElementById(REGISTRY_ID);
+        if (!el?.textContent) return [];
+        try {
+          return JSON.parse(el.textContent);
+        } catch {
+          return [];
+        }
+      }
+
+      function waitForScripts(ms) {
+        return new Promise((resolve) => {
+          if (readScripts().length) {
+            resolve(readScripts());
+            return;
+          }
+          const timer = setTimeout(done, ms);
+          function done() {
+            clearTimeout(timer);
+            window.removeEventListener("userscript:presence", done);
+            resolve(readScripts());
+          }
+          window.addEventListener("userscript:presence", done);
+        });
+      }
+
+      const scripts = await waitForScripts(2000);
+
+      const languages = new Map();
+      await Promise.all(
+        scripts.map(async (script) => {
+          if (!script.localeUrl) return;
+          try {
+            const file = await fetch(script.localeUrl).then((res) => res.json());
+            for (const language of file.languages ?? []) {
+              if (!languages.has(language.code)) languages.set(language.code, language.name);
+            }
+          } catch {
+            // A script whose locale file is unreachable simply offers nothing.
+          }
+        }),
+      );
+
+      const select = document.getElementById("lang");
+      const saved = localStorage.getItem(KEY);
+      if (!languages.size) {
+        const option = document.createElement("option");
+        option.textContent = "No installed script announced a language";
+        select.append(option);
+        select.disabled = true;
+      }
+      for (const [code, name] of languages) {
+        const option = document.createElement("option");
+        option.value = code;
+        option.textContent = `${name} (${code})`;
+        if (code === saved) option.selected = true;
+        select.append(option);
+      }
+
+      const note = document.getElementById("note");
+      note.textContent = scripts.length
+        ? "Each script stores the choice itself and reads it on its next run."
+        : "Open this page through your userscript manager so installed scripts can be seen.";
+
+      document.getElementById("apply").addEventListener("click", () => {
+        localStorage.setItem(KEY, select.value);
+        // Broadcast: GM storage is per script, so each one writes its own copy.
+        window.dispatchEvent(
+          new CustomEvent("userscript:settings", { detail: { lang: select.value } }),
+        );
+        note.textContent = scripts.length
+          ? `Applied "${select.value}" to ${scripts.length} installed script(s). Reload the target pages to see it.`
+          : "No installed script heard this page, so nothing was applied.";
+      });
+    </script>
+  </body>
+</html>

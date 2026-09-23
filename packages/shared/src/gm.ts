@@ -96,10 +96,5 @@ export function gmMenuCommand(caption: string, onClick: () => void): void {
   getApi().GM_registerMenuCommand(caption, onClick);
 }
 
-/** Manager page every script links to from its Settings menu command. */
+/** Root of the hosted settings pages. */
 export const MANAGER_URL = "https://og-open-source.github.io/UserScripts";
-
-/** Open this script's page on the manager, e.g. /#h1dl. */
-export function openSettings(id: string): void {
-  window.open(`${MANAGER_URL}/#${id}`, "_blank");
-}
