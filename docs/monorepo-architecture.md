@@ -48,15 +48,16 @@ UserScripts/
 │       ├── src/
 │       │   ├── main.ts            # 入口：vite-plugin-monkey entry
 │       │   ├── api.ts             # 品質查詢與 videoId 解析
-│       │   ├── i18n.ts            # 語言字串
+│       │   ├── i18n.ts            # 英文文案（唯一打包進腳本的語言）
 │       │   ├── batch.ts           # 批量下載與進度條
 │       │   ├── download.ts        # 按鈕狀態機與單一下載
 │       │   ├── menu.ts            # 畫質選單
 │       │   ├── inject.ts          # 頁面注入（watch / listing）
 │       │   └── styles.ts          # 樣式注入
-│       ├── dist/                  # 建置產出（.user.js / .meta.js）
-│       ├── vite.config.ts         # 元數據 + updateURL/downloadURL
-│       ├── package.json           # userscript.id
+│       ├── locales.json           # 全部翻譯，單一檔案，執行時抓取
+│       ├── dist/                  # 建置產出（.user.js / .meta.js / locales.json）
+│       ├── vite.config.ts         # id、功能類型、元數據的唯一定義處
+│       ├── package.json
 │       ├── tsconfig.json
 │       └── vite-env.d.ts
 ├── scripts/                       # 倉庫腳本
@@ -158,7 +159,7 @@ UserScripts/
 1. 解析 tag（正則 `^([a-z0-9][a-z0-9-]*)-v([0-9].*)$`，在最後一個 `-v` 處分割）→ 找到 `USERSCRIPT_ID` 匹配的 `vite.config.ts` 所在套件；找不到則跳過
 2. 以 `USERSCRIPT_VERSION`=<版本> 環境變數執行 `bun install --frozen-lockfile` → `typecheck` → `build`
 3. 將 `dist/*.user.js` 與 `dist/*.meta.js` 作為 GitHub Release 附件發布
-4. 將成品強制推送（force-add）至 `main` 分支的 `dist/` — `@updateURL`／`@downloadURL` 指向 raw.githubusercontent.com，檔案必須存在於 `main` 才能解析，否則已安裝的腳本每次檢查更新都會 404
+4. 將成品與 `dist/locales.json` 強制推送（force-add）至 `main` 分支的 `dist/` — `@updateURL`、`@downloadURL` 與翻譯檔都指向 raw.githubusercontent.com，檔案必須存在於 `main` 才能解析
 
 ```ts
 // vite.config.ts — id 與版本的唯一定義處
@@ -167,6 +168,37 @@ const VERSION = process.env.USERSCRIPT_VERSION ?? pkg.version ?? "0.0.0-dev";
 ```
 
 `vite.config.ts` 會自動注入 `@author`、`@updateURL`（指向 `.meta.js`）與 `@downloadURL`，安裝後的腳本可由腳本管理器自動更新。
+
+## 多語言
+
+腳本本體只含英文，`==UserScript==` 元數據註解不受此限。翻譯固定在一個檔案，語言數量不改變檔案數量。腳本首次執行時抓取 `locales.json`，之後用 GM 快取，背景再更新，有變動才重載。
+
+```json
+// packages/<name>/locales.json
+{
+  "id": "h1dl",
+  "default": "en",
+  "languages": [
+    { "code": "en", "name": "English" },
+    { "code": "zh-TW", "name": "繁體中文", "messages": { "download": "下載" } }
+  ]
+}
+```
+
+預設語言的字串打包在腳本內，檔案裡不重複。缺鍵回退英文，檔案讀取失敗時維持英文。翻譯修正只改這一個檔案，已安裝的腳本下次執行自行取得，不必重新發版。Release 會把 `dist/locales.json` 一併推上 `main`。
+
+## 功能類型
+
+一個腳本提供一類功能，capability 以 `<site>:<feature>` 命名。
+
+| kind      | 說明                                                             |
+| --------- | ---------------------------------------------------------------- |
+| `feature` | 單一功能。多個 feature 腳本互不衝突，可同時安裝                  |
+| `aio`     | 合併多個功能。與任何共享同一 capability 的腳本衝突，含另一個 aio |
+
+`USERSCRIPT_KIND` 與 `USERSCRIPT_CAPABILITIES` 只寫在 `vite.config.ts`。建置注入腳本，`claimCapabilities()` 在啟動時宣告。同頁已有涵蓋相同功能的 AIO 時，後啟動者停止注入。
+
+沒有 `catalog.json`。每個腳本以 `publishPresence()` 把 `id`、`kind`、`capabilities` 寫進頁面的 DOM 註解，`index.html` 讀取它列出已安裝的腳本、標出衝突，語言清單則取自各腳本的 `locales.json`。
 
 ## 共享工具：@userscripts/shared
 

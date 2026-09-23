@@ -147,8 +147,10 @@ dist
 
 # Build output of vite-plugin-monkey lives in packages/*/dist (already ignored
 # by the `dist` rule above) — local builds stay out of git. The release
-# workflow force-adds only dist/*.user.js and dist/*.meta.js to main so
-# @updateURL / @downloadURL (raw.githubusercontent.com) resolve.
+# workflow force-adds dist/*.user.js, dist/*.meta.js and dist/locales.json to
+# main so @updateURL, @downloadURL and the runtime locale fetch
+# (raw.githubusercontent.com) resolve. Source translations live in
+# packages/*/locales.json and ARE tracked.
 
 # bun lockfile IS tracked (bun.lock) — only ignore its caches if any appear.
 .bun/

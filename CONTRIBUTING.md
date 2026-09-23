@@ -11,6 +11,7 @@
 - [目錄結構](#目錄結構)
 - [新增腳本](#新增腳本)
 - [設計規範](#設計規範)
+- [語言](#語言language)
 - [發布](#發布)
 - [框架選擇指引](#框架選擇指引)
 - [文檔](#文檔)
@@ -102,6 +103,30 @@ icon.textContent = "download";
 
 > 注意：顏色**永不硬編碼**。透過 `@userscripts/shared` 的 `probeTheme()` 讀取網站 computed style，注入為 CSS 變數。
 
+### 語言（Language）
+
+腳本本體只使用英文。`==UserScript==` 元數據註解不受此限（`@name`、`@description` 可維持現況）。語言選單上的語言名稱（如「繁體中文」）保留該語言原文，否則使用者無法辨識自己的語言。
+
+翻譯固定在一個檔案：`locales.json`。新增語言是新增一筆，不是新增一個檔案。腳本首次執行時抓取這個檔案，取得可用語言與目前語言的字串：
+
+1. 英文文案寫在 `src/i18n.ts`，作為預設與回退，不重複寫進 `locales.json`
+2. `locales.json` 的 `languages` 列出每個語言；非預設語言帶 `messages`
+3. 讀到的檔案快取在 GM 儲存。之後的執行先用快取，背景再重新抓取，有變動才重載
+4. 缺少的翻譯鍵回退英文。檔案讀取失敗時腳本維持英文，下次執行再試
+
+> 注意：新增或修正翻譯只改 `locales.json`，不必改腳本。已安裝的腳本在下次執行時自行取得，不需要重新發版。Release 會把 `dist/locales.json` 發布到 `main`。
+
+### 功能類型（Capability）
+
+一個腳本提供一類功能，以 capability 命名（如 `hanime1:download`）。
+
+- **feature** — 單一功能。多個 feature 腳本互不衝突，可同時安裝
+- **aio** — 把多個功能合在一支腳本。它與任何提供相同 capability 的腳本衝突，無論對方是 feature 還是另一個 aio
+
+`kind` 與 `capabilities` 只寫在 `vite.config.ts`（`USERSCRIPT_KIND`、`USERSCRIPT_CAPABILITIES`）。建置把它們注入腳本，啟動時以 `claimCapabilities()` 宣告。同頁已有涵蓋相同功能的 AIO 時，後啟動的腳本停止注入，避免同一功能被掛上兩次。
+
+沒有 `catalog.json`。腳本在每個執行頁面（含管理頁）把 `id`、`kind`、`capabilities` 寫進 DOM 註解，`index.html` 讀這些註解得知已安裝的腳本。語言清單則來自各腳本自己的 `locales.json`。
+
 ## 發布
 
 版本號與腳本 id 皆由 **tag 統一管理**，`vite.config.ts` 是唯一真實來源（single source of truth）：
@@ -126,7 +151,7 @@ Tag 格式為 `<id>-v<version>`（如 `h1dl-v1.1.0`）。工作流會：
 2. 找到 `USERSCRIPT_ID` 匹配的 `vite.config.ts` 所在套件
 3. 以 `USERSCRIPT_VERSION` 環境變數執行 `bun install` → `typecheck` → `build`
 4. 將 `dist/*.user.js` 與 `dist/*.meta.js` 作為 Release 附件發布
-5. 將成品 force-add 至 `main` 分支的 `dist/` — `@updateURL`／`@downloadURL` 指向 raw.githubusercontent.com，檔案必須存在於 `main` 才能解析
+5. 將成品與 `dist/locales.json` force-add 至 `main` 分支的 `dist/` — `@updateURL`／`@downloadURL` 與翻譯檔都指向 raw.githubusercontent.com，檔案必須存在於 `main` 才能解析
 
 > 注意：`dist/` 依舊列於 `.gitignore`，僅 CI 以 `git add -f` 提交 Release 成品；本機 `bun run build` 的產出永遠不會進入 git。
 

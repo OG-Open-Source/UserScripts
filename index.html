@@ -145,27 +145,57 @@
     <p class="note" id="lang-note"></p>
 
     <script type="module">
-      const RAW = "https://raw.githubusercontent.com/OG-Open-Source/UserScripts/main";
       const LANG_KEY = "userscripts:lang";
+      const REGISTRY_ID = "userscript-registry";
 
-      // Hands the chosen language to an installed script through its own
-      // GM storage. The manager only exposes this to a script whose
-      // metadata matches the page, so this file is also a userscript.
-      function applyLanguage(code) {
-        if (typeof GM_setValue !== "function") return false;
-        GM_setValue("lang", code);
-        return true;
+      // Each installed script writes its own annotation into this element.
+      // There is no catalog file: a script the manager cannot see is one that
+      // is not installed.
+      function readScripts() {
+        const el = document.getElementById(REGISTRY_ID);
+        if (!el?.textContent) return [];
+        try {
+          return JSON.parse(el.textContent);
+        } catch {
+          return [];
+        }
       }
 
-      const catalog = await fetch("./catalog.json").then((res) => res.json());
+      function waitForScripts(ms) {
+        return new Promise((resolve) => {
+          const seen = readScripts();
+          if (seen.length) {
+            resolve(seen);
+            return;
+          }
+          const timer = setTimeout(() => {
+            window.removeEventListener("userscript:presence", done);
+            resolve(readScripts());
+          }, ms);
+          const done = () => {
+            clearTimeout(timer);
+            window.removeEventListener("userscript:presence", done);
+            resolve(readScripts());
+          };
+          window.addEventListener("userscript:presence", done);
+        });
+      }
+
+      // Broadcast the choice. Every installed script hears it and writes the
+      // value into its own GM storage — storage is not shared between scripts.
+      function applyLanguage(code) {
+        window.dispatchEvent(new CustomEvent("userscript:settings", { detail: { lang: code } }));
+        return readScripts().length > 0;
+      }
+
+      const scripts = await waitForScripts(2000);
 
       const locales = new Map();
       await Promise.all(
-        catalog.scripts.map(async (script) => {
+        scripts.map(async (script) => {
+          if (!script.localeUrl) return;
           try {
-            const file = await fetch(`${RAW}/${script.package}/dist/locales.json`).then((res) =>
-              res.json(),
-            );
+            const file = await fetch(script.localeUrl).then((res) => res.json());
             locales.set(script.id, file);
           } catch {
             locales.set(script.id, null);
@@ -173,9 +203,9 @@
         }),
       );
 
-      renderConflicts(catalog.scripts);
-      renderScripts(catalog.scripts);
-      renderLanguage(catalog.scripts);
+      renderConflicts(scripts);
+      renderScripts(scripts);
+      renderLanguage(scripts);
 
       function conflictsOf(scripts) {
         const found = [];
@@ -200,22 +230,31 @@
         for (const { a, b, shared } of conflicts) {
           const note = document.createElement("div");
           note.className = "warn";
-          note.textContent = `${a.name} and ${b.name} both provide ${shared.join(
+          note.textContent = `${a.name ?? a.id} and ${b.name ?? b.id} both provide ${shared.join(
             ", ",
-          )}. Install one of them, not both.`;
+          )}. Keep one of them, not both.`;
           root.append(note);
         }
       }
 
       function renderScripts(scripts) {
         const root = document.getElementById("scripts");
+        if (!scripts.length) {
+          const empty = document.createElement("p");
+          empty.className = "note";
+          empty.textContent =
+            "No installed scripts announced themselves. Open this page through your userscript manager.";
+          root.append(empty);
+          return;
+        }
         for (const script of scripts) {
           const block = document.createElement("article");
           block.className = "script";
+          block.id = script.id;
 
           const header = document.createElement("header");
           const title = document.createElement("h3");
-          title.textContent = script.name;
+          title.textContent = script.name ?? script.id;
           const badge = document.createElement("span");
           badge.className = "badge";
           badge.textContent = script.kind === "aio" ? "all-in-one" : "single";
@@ -223,22 +262,17 @@
 
           const desc = document.createElement("p");
           desc.className = "desc";
-          desc.textContent = script.description;
+          desc.textContent = script.description ?? "";
 
           const caps = document.createElement("div");
           caps.className = "caps";
-          for (const capability of script.capabilities) {
+          for (const capability of script.capabilities ?? []) {
             const code = document.createElement("code");
             code.textContent = capability;
             caps.append(code);
           }
 
-          const install = document.createElement("a");
-          install.className = "install";
-          install.href = `${RAW}/${script.package}/dist/${script.file}`;
-          install.textContent = "Install";
-
-          block.append(header, desc, caps, install);
+          block.append(header, desc, caps);
           root.append(block);
         }
       }
@@ -284,8 +318,8 @@
           localStorage.setItem(LANG_KEY, select.value);
           const applied = applyLanguage(select.value);
           note.textContent = applied
-            ? `Applied "${select.value}". Reload the target pages to see it.`
-            : "No userscript manager handled this page, so nothing was applied.";
+            ? `Applied "${select.value}" to ${readScripts().length} installed script(s). Reload the target pages to see it.`
+            : "No installed script heard this page, so nothing was applied.";
         });
       }
     </script>
