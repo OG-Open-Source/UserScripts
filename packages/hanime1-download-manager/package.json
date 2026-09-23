@@ -1,18 +1,20 @@
 {
-	"name":"@userscripts/hanime1-download-manager",
-	"private":true,
-	"description":"Replace download links with a native-style quality menu, batch download mode, and in-page downloads on hanime1.",
-	"type":"module",
-	"scripts":{
-		"dev":"vite",
-		"build":"vite build",
-		"typecheck":"tsc --noEmit"
-	},
-	"dependencies":{"@userscripts/shared":"*"},
-	"devDependencies":{
-		"@types/node":"^22.0.0",
-		"typescript":"^5.9.0",
-		"vite":"^7.1.0",
-		"vite-plugin-monkey":"^5.0.0"
-	}
+  "name": "@userscripts/hanime1-download-manager",
+  "private": true,
+  "description": "Replace download links with a native-style quality menu, batch download mode, and in-page downloads on hanime1.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@userscripts/shared": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.1.0",
+    "vite-plugin-monkey": "^5.0.0"
+  }
 }

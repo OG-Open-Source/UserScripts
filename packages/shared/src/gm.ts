@@ -25,16 +25,16 @@ let api: GMApi | null = null;
  * below, so callers never have to reconcile manager-specific signatures.
  */
 export function configureGmApi(gm: unknown): void {
-	api = gm as GMApi;
+  api = gm as GMApi;
 }
 
 function getApi(): GMApi {
-	if (!api) {
-		throw new Error(
-			"[@userscripts/shared] GM API not configured — call configureGmApi() at script entry.",
-		);
-	}
-	return api;
+  if (!api) {
+    throw new Error(
+      "[@userscripts/shared] GM API not configured — call configureGmApi() at script entry.",
+    );
+  }
+  return api;
 }
 
 /**
@@ -44,54 +44,62 @@ function getApi(): GMApi {
  * @param timeout Request timeout in milliseconds (default 20s).
  */
 export function gmFetch(url: string, timeout = 20000): Promise<string> {
-	return new Promise<string>((resolve, reject) => {
-		const details: GMXHRDetails = {
-			method: "GET",
-			url,
-			timeout,
-			onload: (res) => {
-				if (res.status >= 200 && res.status < 400) resolve(res.responseText);
-				else reject(new Error("HTTP " + res.status));
-			},
-			onerror: () => reject(new Error("network error")),
-			ontimeout: () => reject(new Error("timeout")),
-		};
-		getApi().GM_xmlhttpRequest(details);
-	});
+  return new Promise<string>((resolve, reject) => {
+    const details: GMXHRDetails = {
+      method: "GET",
+      url,
+      timeout,
+      onload: (res) => {
+        if (res.status >= 200 && res.status < 400) resolve(res.responseText);
+        else reject(new Error("HTTP " + res.status));
+      },
+      onerror: () => reject(new Error("network error")),
+      ontimeout: () => reject(new Error("timeout")),
+    };
+    getApi().GM_xmlhttpRequest(details);
+  });
 }
 
 /** Wrap GM_download into a promise that resolves on load, rejects on error. */
 export function gmDownload(details: GMDownloadDetails): Promise<void> {
-	return new Promise<void>((resolve, reject) => {
-		getApi().GM_download({
-			...details,
-			onload: () => {
-				details.onload?.();
-				resolve();
-			},
-			onerror: (err) => {
-				details.onerror?.(err);
-				reject(new Error("download error"));
-			},
-			ontimeout: () => {
-				details.ontimeout?.();
-				reject(new Error("download timeout"));
-			},
-		});
-	});
+  return new Promise<void>((resolve, reject) => {
+    getApi().GM_download({
+      ...details,
+      onload: () => {
+        details.onload?.();
+        resolve();
+      },
+      onerror: (err) => {
+        details.onerror?.(err);
+        reject(new Error("download error"));
+      },
+      ontimeout: () => {
+        details.ontimeout?.();
+        reject(new Error("download timeout"));
+      },
+    });
+  });
 }
 
 /** Read a stored value, falling back to the default. */
 export function gmGet<T>(key: string, defaultValue: T): T {
-	return getApi().GM_getValue<T>(key, defaultValue);
+  return getApi().GM_getValue<T>(key, defaultValue);
 }
 
 /** Store a value. */
 export function gmSet(key: string, value: unknown): void {
-	getApi().GM_setValue(key, value);
+  getApi().GM_setValue(key, value);
 }
 
 /** Register a Violentmonkey/Tampermonkey popup menu command. */
 export function gmMenuCommand(caption: string, onClick: () => void): void {
-	getApi().GM_registerMenuCommand(caption, onClick);
+  getApi().GM_registerMenuCommand(caption, onClick);
+}
+
+/** Manager page every script links to from its Settings menu command. */
+export const MANAGER_URL = "https://og-open-source.github.io/UserScripts";
+
+/** Open this script's page on the manager, e.g. /#h1dl. */
+export function openSettings(id: string): void {
+  window.open(`${MANAGER_URL}/#${id}`, "_blank");
 }

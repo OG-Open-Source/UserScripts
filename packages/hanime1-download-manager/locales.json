@@ -1,0 +1,41 @@
+{
+  "id": "h1dl",
+  "default": "en",
+  "languages": [
+    { "code": "en", "name": "English" },
+    {
+      "code": "zh-TW",
+      "name": "繁體中文",
+      "messages": {
+        "download": "下載",
+        "fetching": "解析中",
+        "done": "完成",
+        "error": "失敗",
+        "loadingQualities": "載入畫質…",
+        "noQualities": "無可下載畫質",
+        "selectAll": "全選",
+        "selectNone": "全不選",
+        "downloadSelected": "下載已選取項目",
+        "chooseBatchQuality": "選擇批量下載畫質（不足時自動降級）",
+        "downgradeNotice": "畫質降級："
+      }
+    },
+    {
+      "code": "zh-CN",
+      "name": "简体中文",
+      "messages": {
+        "download": "下载",
+        "fetching": "解析中",
+        "done": "完成",
+        "error": "失败",
+        "loadingQualities": "加载画质…",
+        "noQualities": "无可下载画质",
+        "selectAll": "全选",
+        "selectNone": "全不选",
+        "downloadSelected": "下载已选取项目",
+        "chooseBatchQuality": "选择批量下载画质（不足时自动降级）",
+        "downgradeNotice": "画质降级："
+      }
+    }
+  ]
+}

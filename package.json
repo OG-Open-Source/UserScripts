@@ -1,22 +1,26 @@
 {
-	"name":"userscripts",
-	"private":true,
-	"version":"1.0.0",
-	"description":"Userscripts that blend into the sites they enhance.",
-	"type":"module",
-	"scripts":{
-		"dev":"bun run --filter '*' dev",
-		"dev:hanime1":"bun run --filter '@userscripts/hanime1-download-manager' dev",
-		"build":"bun run --filter '*' build",
-		"build:hanime1":"bun run --filter '@userscripts/hanime1-download-manager' build",
-		"typecheck":"bun run --filter '*' typecheck",
-		"new-script":"bun run scripts/new-script.mjs"
-	},
-	"workspaces":["packages/*"],
-	"devDependencies":{
-		"typescript":"^5.9.0",
-		"vite":"^7.1.0",
-		"vite-plugin-monkey":"^5.0.0"
-	},
-	"engines":{"bun":">=1.2.0"}
+  "name": "userscripts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Userscripts that blend into the sites they enhance.",
+  "workspaces": [
+    "packages/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --filter '*' dev",
+    "dev:hanime1": "bun run --filter '@userscripts/hanime1-download-manager' dev",
+    "build": "bun run --filter '*' build",
+    "build:hanime1": "bun run --filter '@userscripts/hanime1-download-manager' build",
+    "typecheck": "bun run --filter '*' typecheck",
+    "new-script": "bun run scripts/new-script.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vite": "^7.1.0",
+    "vite-plugin-monkey": "^5.0.0"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
+  }
 }

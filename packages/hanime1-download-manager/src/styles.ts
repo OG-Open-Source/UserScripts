@@ -21,8 +21,8 @@ export const NATIVE_ITEM_CLASS = "more-horiz-item";
 
 /** Build the <style> element and append it to <head>. */
 export function injectStyles(theme: NativeTheme): HTMLStyleElement {
-	const style = document.createElement("style");
-	style.textContent = `
+  const style = document.createElement("style");
+  style.textContent = `
 :root {
   --h1dl-panel-bg: ${theme.panelBg};
   --h1dl-panel-color: ${theme.panelColor};
@@ -69,6 +69,6 @@ export function injectStyles(theme: NativeTheme): HTMLStyleElement {
   }
 }
 `;
-	document.head.appendChild(style);
-	return style;
+  document.head.appendChild(style);
+  return style;
 }
