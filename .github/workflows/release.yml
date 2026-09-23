@@ -126,6 +126,11 @@ jobs:
             cp "$f" "$RUNNER_TEMP/artifacts/"
             COPIED=$((COPIED+1))
           done
+          # locales.json is one file, fetched at runtime, not part of the
+          # bundle. The build copies it into dist/ so it can be published.
+          if [ -f dist/locales.json ]; then
+            cp -f dist/locales.json "$RUNNER_TEMP/artifacts/"
+          fi
           if [ "$COPIED" -eq 0 ]; then
             echo "::error::No .user.js produced by build"
             exit 1
@@ -175,8 +180,15 @@ jobs:
           mkdir -p dist
           cp -f "$RUNNER_TEMP"/artifacts/*.user.js \
                 "$RUNNER_TEMP"/artifacts/*.meta.js dist/
-          # dist/ stays .gitignored — force-add only the release artifacts.
+          if [ -f "$RUNNER_TEMP/artifacts/locales.json" ]; then
+            cp -f "$RUNNER_TEMP"/artifacts/locales.json dist/
+          fi
+          # dist/ stays .gitignored — force-add only the release artifacts,
+          # including the one locales.json the script fetches.
           git add -f dist/*.user.js dist/*.meta.js
+          if [ -f dist/locales.json ]; then
+            git add -f dist/locales.json
+          fi
           git commit -m "chore(release): publish ${{ steps.pkg.outputs.name }} ${{ steps.pkg.outputs.version }} artifacts" \
             || echo "Nothing to commit — artifacts already up to date"
           git push origin main
