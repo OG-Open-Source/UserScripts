@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Hanime1 Download Manager
 // @namespace    Violentmonkey Scripts
-// @version      1.0.0
-// @author       https://github.com/OG-Open-Source/UserScripts
-// @description  Replace download links with a native-style quality menu, batch download mode, and in-page downloads without leaving the page. Languages: 繁體中文 / 简体中文 / English.
+// @version      1.0.1
+// @author       OG-Open-Source
+// @description  Replace download links with a native-style quality menu, batch download mode, and in-page downloads without leaving the page.
 // @icon         https://vdownload.hembed.com/image/icon/nav_logo.png?secure=HxkFdqiVxMMXXjau9riwGg==,4855471889
 // @downloadURL  https://raw.githubusercontent.com/OG-Open-Source/UserScripts/main/packages/hanime1-download-manager/dist/hanime1-download-manager.user.js
 // @updateURL    https://raw.githubusercontent.com/OG-Open-Source/UserScripts/main/packages/hanime1-download-manager/dist/hanime1-download-manager.meta.js
@@ -11,11 +11,15 @@
 // @match        *://hanime1.me/*
 // @match        *://hanimeone.com/*
 // @match        *://hanimeone.me/*
+// @match        https://og-open-source.github.io/UserScripts/
+// @match        https://og-open-source.github.io/UserScripts/*
 // @connect      hanime1.com
 // @connect      hanime1.me
 // @connect      hanimeone.com
 // @connect      hanimeone.me
 // @connect      vdownload.hembed.com
+// @connect      raw.githubusercontent.com
+// @connect      localhost
 // @grant        GM_download
 // @grant        GM_getValue
 // @grant        GM_registerMenuCommand
@@ -32,6 +36,28 @@
   var _GM_registerMenuCommand = /* @__PURE__ */ (() => typeof GM_registerMenuCommand != "undefined" ? GM_registerMenuCommand : void 0)();
   var _GM_setValue = /* @__PURE__ */ (() => typeof GM_setValue != "undefined" ? GM_setValue : void 0)();
   var _GM_xmlhttpRequest = /* @__PURE__ */ (() => typeof GM_xmlhttpRequest != "undefined" ? GM_xmlhttpRequest : void 0)();
+  const CLAIM_GLOBAL = "__userscriptClaims";
+  function registry() {
+    const root = globalThis;
+    let value = root[CLAIM_GLOBAL];
+    if (!value) {
+      value = { claims: [] };
+      root[CLAIM_GLOBAL] = value;
+    }
+    return value;
+  }
+  function claimCapabilities(claim) {
+    const existing = registry().claims;
+    const conflict = existing.find((other) => overlaps(claim, other));
+    if (conflict) return { ok: false, conflict };
+    existing.push(claim);
+    return { ok: true };
+  }
+  function overlaps(a, b) {
+    const shared = a.capabilities.some((item) => b.capabilities.includes(item));
+    if (!shared) return false;
+    return a.kind === "aio" || b.kind === "aio";
+  }
   let api = null;
   function configureGmApi(gm) {
     api = gm;
@@ -69,36 +95,83 @@
   function gmMenuCommand(caption, onClick) {
     getApi().GM_registerMenuCommand(caption, onClick);
   }
-  function detectLang(langs, defaultLang, storageKey = "lang") {
-    const saved = gmGet(storageKey, null);
-    if (saved && langs.includes(saved)) return saved;
-    const nav = (navigator.language || defaultLang).toLowerCase();
-    if (nav.startsWith("zh")) {
-      return nav.includes("tw") || nav.includes("hk") || nav.includes("hant") ? "zh-TW" : "zh-CN";
-    }
-    if (langs.includes("en")) return "en";
-    return defaultLang;
+  const MANAGER_URL = "https://og-open-source.github.io/UserScripts";
+  function openSettings(id) {
+    window.open(`${MANAGER_URL}/#${id}`, "_blank");
   }
-  function createI18n(options) {
-    const {
-      langs,
-      defaultLang,
-      langNames,
-      messages,
-      storageKey = "lang"
-    } = options;
-    const lang = detectLang(langs, defaultLang, storageKey);
-    const t2 = (key) => {
-      return messages[lang]?.[key] ?? messages[defaultLang]?.[key] ?? key;
+  const CACHE_KEY = (scriptId) => `i18n:${scriptId}`;
+  async function loadLocales(source, onChange) {
+    const key = CACHE_KEY(source.scriptId);
+    const cached = gmGet(key, null);
+    const fresh = gmFetch(source.url).then((body) => JSON.parse(body));
+    if (cached) {
+      void fresh.then((next2) => {
+        if (JSON.stringify(cached) !== JSON.stringify(next2)) {
+          gmSet(key, next2);
+          onChange?.();
+        }
+      });
+      return cached;
+    }
+    const next = await fresh;
+    gmSet(key, next);
+    return next;
+  }
+  async function createI18n(options) {
+    const { source, fallback, storageKey = "lang" } = options;
+    const preferred = gmGet(storageKey, null) ?? detectLang();
+    let file = {
+      id: source.scriptId,
+      default: "en",
+      languages: [{ code: "en", name: "English" }]
     };
-    for (const code of langs) {
-      gmMenuCommand(langNames[code] + (code === lang ? " ✓" : ""), () => {
-        if (code === lang) return;
-        gmSet(storageKey, code);
+    try {
+      file = await loadLocales(source, () => location.reload());
+    } catch {
+    }
+    const known = file.languages.map((item) => item.code);
+    const lang = known.includes(preferred) ? preferred : file.default;
+    const entry = file.languages.find((item) => item.code === lang);
+    const t = (key) => {
+      if (lang === file.default) return fallback[key] ?? key;
+      return entry?.messages?.[key] ?? fallback[key] ?? key;
+    };
+    for (const item of file.languages) {
+      gmMenuCommand(item.name + (item.code === lang ? " ✓" : ""), () => {
+        if (item.code === lang) return;
+        gmSet(storageKey, item.code);
         location.reload();
       });
     }
-    return { lang, t: t2 };
+    return { lang, languages: file.languages, t };
+  }
+  function detectLang() {
+    const nav = (navigator.language || "en").toLowerCase();
+    if (nav.startsWith("zh")) {
+      return nav.includes("tw") || nav.includes("hk") || nav.includes("hant") ? "zh-TW" : "zh-CN";
+    }
+    return nav.split("-")[0] || "en";
+  }
+  const REGISTRY_ELEMENT_ID = "userscript-registry";
+  const PRESENCE_EVENT = "userscript:presence";
+  const PRESENCE_GLOBAL = "__userscriptPresence";
+  function all() {
+    const root = globalThis;
+    if (!root[PRESENCE_GLOBAL]) root[PRESENCE_GLOBAL] = [];
+    return root[PRESENCE_GLOBAL];
+  }
+  function publishPresence(presence) {
+    const list = all();
+    if (!list.some((item) => item.id === presence.id)) list.push(presence);
+    let el = document.getElementById(REGISTRY_ELEMENT_ID);
+    if (!el) {
+      el = document.createElement("script");
+      el.type = "application/json";
+      el.id = REGISTRY_ELEMENT_ID;
+      document.head.append(el);
+    }
+    el.textContent = JSON.stringify(list);
+    window.dispatchEvent(new CustomEvent(PRESENCE_EVENT));
   }
   function probeTheme(options) {
     const { panelClass, actionClass, itemHover = "hsla(0,0%,100%,.2)" } = options;
@@ -167,6 +240,41 @@
     }
     return null;
   }
+  const MEDIA_EXTENSIONS = /* @__PURE__ */ new Set([
+    "mp4",
+    "webm",
+    "mkv",
+    "m4v",
+    "mov",
+    "m3u8",
+    "mp3",
+    "jpg",
+    "jpeg",
+    "png",
+    "webp",
+    "gif"
+  ]);
+  function downloadName(filename, url) {
+    const fromUrl = extensionOf(url);
+    const trimmed = filename?.trim() ?? "";
+    if (!trimmed) return fromUrl ? `video.${fromUrl}` : "video.mp4";
+    if (hasExtension(trimmed)) return trimmed;
+    return `${trimmed}.${fromUrl ?? "mp4"}`;
+  }
+  function extensionOf(url) {
+    const path = url.split(/[?#]/, 1)[0] ?? "";
+    const base = path.slice(path.lastIndexOf("/") + 1);
+    const dot = base.lastIndexOf(".");
+    if (dot <= 0 || dot === base.length - 1) return null;
+    const ext = base.slice(dot + 1).toLowerCase();
+    return MEDIA_EXTENSIONS.has(ext) ? ext : null;
+  }
+  function hasExtension(name) {
+    const base = name.slice(name.lastIndexOf("/") + 1);
+    const dot = base.lastIndexOf(".");
+    if (dot <= 0 || dot === base.length - 1) return false;
+    return MEDIA_EXTENSIONS.has(base.slice(dot + 1).toLowerCase());
+  }
   async function resolveWithFallback(videoId, quality, qualities) {
     const list = await queryQualities(videoId);
     const idx = qualities.indexOf(quality);
@@ -177,7 +285,7 @@
     return null;
   }
   const QUALITIES = ["1080p", "720p", "480p"];
-  function createBatch(t2, menuAskQuality, onActiveChange) {
+  function createBatch(t, menuAskQuality, onActiveChange) {
     const batchState = /* @__PURE__ */ new Set();
     let batchBar = null;
     let batchOn = false;
@@ -269,22 +377,21 @@
         }
         return true;
       };
-      const selectAll = mkBtn(t2("selectAll"), "select_all", () => {
+      const selectAll = mkBtn(t("selectAll"), "select_all", () => {
         batchState.forEach((entry) => {
           if (!isCardVisible(entry.card)) return;
-          if (entry.state !== "downloading" && entry.state !== "done")
-            setChecked(entry, true);
+          if (entry.state !== "downloading" && entry.state !== "done") setChecked(entry, true);
         });
       });
       bar.appendChild(selectAll);
-      const selectNone = mkBtn(t2("selectNone"), "deselect", () => {
+      const selectNone = mkBtn(t("selectNone"), "deselect", () => {
         batchState.forEach((entry) => {
           if (entry.state !== "downloading") setChecked(entry, false);
         });
       });
       bar.appendChild(selectNone);
       const dlBtn = mkBtn(
-        t2("downloadSelected"),
+        t("downloadSelected"),
         "download",
         () => void startBatchDownload(),
         "h1dl-bb-dl"
@@ -338,9 +445,7 @@
     }
     function updateBatchBar() {
       if (!batchBar) return;
-      const pending = Array.from(batchState).filter(
-        (e) => e.checked && e.state !== "done"
-      );
+      const pending = Array.from(batchState).filter((e) => e.checked && e.state !== "done");
       batchBar.querySelector(".h1dl-bb-count").textContent = String(pending.length);
       const dlBtn = batchBar.querySelector(".h1dl-bb-dl");
       dlBtn.disabled = pending.length === 0 || pending.some((e) => e.state === "downloading");
@@ -366,9 +471,7 @@
       }
     }
     async function startBatchDownload() {
-      const selected = Array.from(batchState).filter(
-        (e) => e.checked && e.state !== "done"
-      );
+      const selected = Array.from(batchState).filter((e) => e.checked && e.state !== "done");
       if (!selected.length) return;
       if (!batchQuality) {
         const q = await menuAskQuality(QUALITIES);
@@ -390,11 +493,7 @@
         onActiveChange(1);
         const videoId = entry.videoId;
         try {
-          const resolved = await resolveWithFallback(
-            videoId,
-            batchQuality,
-            QUALITIES
-          );
+          const resolved = await resolveWithFallback(videoId, batchQuality, QUALITIES);
           if (!resolved) throw new Error("no download link found");
           if (resolved.quality !== batchQuality) {
             downgraded.push({ entry, from: batchQuality, to: resolved.quality });
@@ -402,10 +501,7 @@
           await new Promise((resolve) => {
             _GM_download({
               url: resolved.info.url,
-              // GM_download's name is a required string in the
-              // vite-plugin-monkey types; undefined falls back to the
-              // manager default at runtime.
-              name: resolved.info.filename ?? void 0,
+              name: downloadName(resolved.info.filename, resolved.info.url),
               onload: () => {
                 onActiveChange(-1);
                 entry.state = "done";
@@ -427,11 +523,7 @@
               },
               onprogress: (e) => {
                 if (e?.lengthComputable) {
-                  updateTick(
-                    entry,
-                    "downloading",
-                    Math.round(e.loaded / e.total * 100)
-                  );
+                  updateTick(entry, "downloading", Math.round(e.loaded / e.total * 100));
                 }
               }
             });
@@ -447,7 +539,7 @@
           const titleEl = d.entry.card.querySelector(".title, .video-title");
           return (titleEl ? titleEl.textContent?.trim() : d.entry.videoId) + ` (${d.from}→${d.to})`;
         }).join("\n");
-        console.warn("[h1dl] " + t2("downgradeNotice") + "\n" + names);
+        console.warn("[h1dl] " + t("downgradeNotice") + "\n" + names);
       }
       batchQuality = null;
       updateBatchBar();
@@ -473,17 +565,17 @@
       startDownload: startBatchDownload
     };
   }
-  function buildStates(t2) {
+  function buildStates(t) {
     return {
-      idle: { icon: "download", label: t2("download") },
-      fetching: { icon: "hourglass_empty", label: t2("fetching"), spin: true },
+      idle: { icon: "download", label: t("download") },
+      fetching: { icon: "hourglass_empty", label: t("fetching"), spin: true },
       downloading: { icon: "cloud_download", label: "%" },
-      done: { icon: "check_circle", label: t2("done") },
-      error: { icon: "error_outline", label: t2("error") }
+      done: { icon: "check_circle", label: t("done") },
+      error: { icon: "error_outline", label: t("error") }
     };
   }
-  function createStateMachine(t2) {
-    const STATES = buildStates(t2);
+  function createStateMachine(t) {
+    const STATES = buildStates(t);
     return function setButtonState(btn, state, percent) {
       const s = STATES[state] || STATES.idle;
       const icon = btn.querySelector(".h1dl-icon");
@@ -498,106 +590,68 @@
       btn.dataset.state = state;
     };
   }
-  async function startDownload(btn, videoId, quality, setState2, onActiveChange) {
-    if (btn.dataset.state === "fetching" || btn.dataset.state === "downloading")
-      return;
-    setState2(btn, "fetching");
+  async function startDownload(btn, videoId, quality, setState, onActiveChange) {
+    if (btn.dataset.state === "fetching" || btn.dataset.state === "downloading") return;
+    setState(btn, "fetching");
     onActiveChange(1);
     try {
       const list = await queryQualities(videoId);
       const info = list.find((q) => q.quality === quality);
       if (!info) throw new Error("quality not found: " + quality);
-      setState2(btn, "downloading", 0);
+      setState(btn, "downloading", 0);
       _GM_download({
         url: info.url,
-        // GM_download's name is a required string in the vite-plugin-monkey
-        // types; undefined falls back to the manager default at runtime.
-        name: info.filename ?? void 0,
+        name: downloadName(info.filename, info.url),
         onload: () => {
           onActiveChange(-1);
-          setState2(btn, "done");
+          setState(btn, "done");
         },
         onerror: () => {
           onActiveChange(-1);
-          setState2(btn, "error");
+          setState(btn, "error");
         },
         ontimeout: () => {
           onActiveChange(-1);
-          setState2(btn, "error");
+          setState(btn, "error");
         },
         onprogress: (e) => {
           if (e?.lengthComputable) {
-            setState2(btn, "downloading", Math.round(e.loaded / e.total * 100));
+            setState(btn, "downloading", Math.round(e.loaded / e.total * 100));
           }
         }
       });
     } catch (err) {
       onActiveChange(-1);
       console.warn("[h1dl] download failed:", err?.message);
-      setState2(btn, "error");
+      setState(btn, "error");
     }
   }
-  const LANGS = ["zh-TW", "zh-CN", "en"];
-  const DEFAULT_LANG = "zh-TW";
-  const LANG_NAMES = {
-    "zh-TW": "繁體中文",
-    "zh-CN": "简体中文",
-    en: "English"
-  };
   const MESSAGES = {
-    "zh-TW": {
-      download: "下載",
-      fetching: "解析中",
-      done: "完成",
-      error: "失敗",
-      loadingQualities: "載入畫質…",
-      noQualities: "無可下載畫質",
-      selectAll: "全選",
-      selectNone: "全不選",
-      downloadSelected: "下載已選取項目",
-      chooseBatchQuality: "選擇批量下載畫質（不足時自動降級）",
-      downgradeNotice: "畫質降級："
-    },
-    "zh-CN": {
-      download: "下载",
-      fetching: "解析中",
-      done: "完成",
-      error: "失败",
-      loadingQualities: "加载画质…",
-      noQualities: "无可下载画质",
-      selectAll: "全选",
-      selectNone: "全不选",
-      downloadSelected: "下载已选取项目",
-      chooseBatchQuality: "选择批量下载画质（不足时自动降级）",
-      downgradeNotice: "画质降级："
-    },
-    en: {
-      download: "Download",
-      fetching: "Resolving",
-      done: "Done",
-      error: "Failed",
-      loadingQualities: "Loading qualities…",
-      noQualities: "No downloadable quality",
-      selectAll: "Select all",
-      selectNone: "Select none",
-      downloadSelected: "Download selected",
-      chooseBatchQuality: "Choose batch quality (auto-downgrade if unavailable)",
-      downgradeNotice: "Quality downgraded:"
-    }
+    download: "Download",
+    fetching: "Resolving",
+    done: "Done",
+    error: "Failed",
+    loadingQualities: "Loading qualities…",
+    noQualities: "No downloadable quality",
+    selectAll: "Select all",
+    selectNone: "Select none",
+    downloadSelected: "Download selected",
+    chooseBatchQuality: "Choose batch quality (auto-downgrade if unavailable)",
+    downgradeNotice: "Quality downgraded:"
   };
-  function createInject(t2, menu2, batch2, setState2) {
+  function createInject(t, menu, batch, setState) {
     function buildListButton(videoId) {
       const btn = document.createElement("div");
       btn.className = "h1dl-list-btn";
-      btn.setAttribute("title", t2("download"));
-      btn.innerHTML = '<i class="material-icons h1dl-icon">download</i><span class="h1dl-label">' + t2("download") + "</span>";
+      btn.setAttribute("title", t("download"));
+      btn.innerHTML = '<i class="material-icons h1dl-icon">download</i><span class="h1dl-label">' + t("download") + "</span>";
       btn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
         if (btn.dataset.state === "error") {
-          setState2(btn, "idle");
+          setState(btn, "idle");
         }
-        menu2.open(btn, videoId);
+        menu.open(btn, videoId);
       });
       return btn;
     }
@@ -611,9 +665,7 @@
           downloadBtn.style.cursor = "pointer";
           const icon = downloadBtn.querySelector("#video-download-btn");
           if (icon) icon.classList.add("h1dl-icon");
-          const labelContainer = icon ? icon.parentElement : downloadBtn.querySelector(
-            ".video-show-action-btn"
-          );
+          const labelContainer = icon ? icon.parentElement : downloadBtn.querySelector(".video-show-action-btn");
           if (labelContainer) {
             Array.from(labelContainer.childNodes).forEach((node) => {
               if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
@@ -627,7 +679,7 @@
           downloadBtn.addEventListener("click", (e) => {
             e.preventDefault();
             e.stopPropagation();
-            menu2.open(downloadBtn, videoId);
+            menu.open(downloadBtn, videoId);
           });
         }
       }
@@ -642,11 +694,9 @@
         anchor.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
-          const openDropdown = document.querySelector(
-            ".more-horiz-wrapper.open"
-          );
+          const openDropdown = document.querySelector(".more-horiz-wrapper.open");
           if (openDropdown) openDropdown.classList.remove("open");
-          menu2.open(anchor, videoId);
+          menu.open(anchor, videoId);
         });
       });
     }
@@ -671,20 +721,20 @@
         const check = document.createElement("div");
         check.className = "h1dl-check";
         check.innerHTML = '<i class="material-icons"></i>';
-        const entry = batch2.addEntry(el, videoId, check);
+        const entry = batch.addEntry(el, videoId, check);
         check.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
           if (entry.state === "done") return;
-          if (!batch2.isOn()) batch2.setMode(true);
-          batch2.setChecked(entry, !entry.checked);
+          if (!batch.isOn()) batch.setMode(true);
+          batch.setChecked(entry, !entry.checked);
         });
         el.appendChild(check);
         el.dataset.h1dlEntry = "";
       });
-      if (batch2.isOn()) batch2.update();
+      if (batch.isOn()) batch.update();
     }
-    function scan2() {
+    function scan() {
       if (location.pathname === "/watch") {
         injectWatchPage();
         injectListings();
@@ -692,7 +742,7 @@
         injectListings();
       }
     }
-    return { scan: scan2 };
+    return { scan };
   }
   const NATIVE_MENU_CLASS = "more-horiz-panel dropdown-menu";
   const NATIVE_ITEM_CLASS = "more-horiz-item";
@@ -748,7 +798,7 @@
     document.head.appendChild(style);
     return style;
   }
-  function createMenu(t2, startDownload2) {
+  function createMenu(t, startDownload2) {
     let openMenu = null;
     function closeMenu() {
       if (openMenu) {
@@ -765,21 +815,21 @@
         el.setAttribute("aria-expanded", "false");
       });
     }
-    function placeMenu(menu2, btn) {
+    function placeMenu(menu, btn) {
       const visual = btn.querySelector(".video-show-action-btn") || btn;
       const vRect = visual.getBoundingClientRect();
       const cs = getComputedStyle(visual);
       const mt = Number.parseFloat(cs.marginTop) || 0;
       const sx = window.scrollX || window.pageXOffset;
       const sy = window.scrollY || window.pageYOffset;
-      const menuW = menu2.offsetWidth;
+      const menuW = menu.offsetWidth;
       let left = vRect.left + sx;
       const top = vRect.bottom - mt + sy + 4;
       if (vRect.left + menuW > window.innerWidth - 8) {
         left = window.innerWidth + sx - menuW - 8;
       }
-      menu2.style.left = Math.max(8, left) + "px";
-      menu2.style.top = top + "px";
+      menu.style.left = Math.max(8, left) + "px";
+      menu.style.top = top + "px";
     }
     function openQualityMenu(btn, videoId) {
       if (openMenu && openMenu.dataset.trigger === btn.dataset.h1dlTrigger) {
@@ -788,28 +838,28 @@
       }
       closeMenu();
       closeSiteDropdowns();
-      const menu2 = document.createElement("div");
-      menu2.className = NATIVE_MENU_CLASS;
-      menu2.style.cssText = "display:block!important;z-index:2147483647;top:-9999px;left:-9999px";
+      const menu = document.createElement("div");
+      menu.className = NATIVE_MENU_CLASS;
+      menu.style.cssText = "display:block!important;z-index:2147483647;top:-9999px;left:-9999px";
       const triggerId = "t" + Math.random().toString(36).slice(2, 9);
       btn.dataset.h1dlTrigger = triggerId;
-      menu2.dataset.trigger = triggerId;
+      menu.dataset.trigger = triggerId;
       const header = document.createElement("div");
       header.className = NATIVE_ITEM_CLASS;
       header.style.cssText = "cursor:default;color:#aaa;font-size:12px";
-      header.textContent = t2("loadingQualities");
-      menu2.appendChild(header);
+      header.textContent = t("loadingQualities");
+      menu.appendChild(header);
       btn.classList.add("h1dl-pinned");
-      document.body.appendChild(menu2);
-      openMenu = menu2;
-      placeMenu(menu2, btn);
+      document.body.appendChild(menu);
+      openMenu = menu;
+      placeMenu(menu, btn);
       queryQualities(videoId).then((list) => {
-        if (openMenu !== menu2) return;
+        if (openMenu !== menu) return;
         header.remove();
         if (!list.length) {
-          header.textContent = t2("noQualities");
+          header.textContent = t("noQualities");
           header.style.cursor = "default";
-          menu2.appendChild(header);
+          menu.appendChild(header);
           return;
         }
         list.forEach((info) => {
@@ -826,9 +876,9 @@
             closeMenu();
             startDownload2(btn, videoId, info.quality);
           });
-          menu2.appendChild(item);
+          menu.appendChild(item);
         });
-        placeMenu(menu2, btn);
+        placeMenu(menu, btn);
       });
       setTimeout(() => {
         document.addEventListener("click", closeMenu, { once: true });
@@ -837,14 +887,14 @@
     function askQuality(qualities) {
       return new Promise((resolve) => {
         closeMenu();
-        const menu2 = document.createElement("div");
-        menu2.className = NATIVE_MENU_CLASS;
-        menu2.style.cssText = "position:fixed;z-index:2147483647;display:block;left:50%;top:30%;transform:translateX(-50%)";
+        const menu = document.createElement("div");
+        menu.className = NATIVE_MENU_CLASS;
+        menu.style.cssText = "position:fixed;z-index:2147483647;display:block;left:50%;top:30%;transform:translateX(-50%)";
         const header = document.createElement("div");
         header.className = NATIVE_ITEM_CLASS;
         header.style.cssText = "cursor:default;color:#aaa;font-size:12px";
-        header.textContent = t2("chooseBatchQuality");
-        menu2.appendChild(header);
+        header.textContent = t("chooseBatchQuality");
+        menu.appendChild(header);
         qualities.forEach((q) => {
           const item = document.createElement("div");
           item.className = NATIVE_ITEM_CLASS;
@@ -859,10 +909,10 @@
             closeMenu();
             resolve(q);
           });
-          menu2.appendChild(item);
+          menu.appendChild(item);
         });
-        document.body.appendChild(menu2);
-        openMenu = menu2;
+        document.body.appendChild(menu);
+        openMenu = menu;
         setTimeout(() => {
           document.addEventListener(
             "click",
@@ -883,10 +933,8 @@
       askQuality
     };
   }
+  var define_SCRIPT_CAPABILITIES_default = ["hanime1:download"];
   const HOSTS = ["hanime1.com", "hanime1.me", "hanimeone.com", "hanimeone.me"];
-  if (!HOSTS.includes(location.hostname)) {
-    throw new Error("[h1dl] not a hanime1 host");
-  }
   configureGmApi({
     GM_xmlhttpRequest: _GM_xmlhttpRequest,
     GM_download: _GM_download,
@@ -894,91 +942,111 @@
     GM_setValue: _GM_setValue,
     GM_registerMenuCommand: _GM_registerMenuCommand
   });
-  const { t } = createI18n({
-    langs: LANGS,
-    defaultLang: DEFAULT_LANG,
-    langNames: LANG_NAMES,
-    messages: MESSAGES,
-    storageKey: "lang"
+  publishPresence({
+    id: "h1dl",
+    name: "Hanime1 Download Manager",
+    description: "Replace download links with a native-style quality menu, batch download mode, and in-page downloads without leaving the page.",
+    kind: "feature",
+    capabilities: [...define_SCRIPT_CAPABILITIES_default],
+    localeUrl: "https://raw.githubusercontent.com/OG-Open-Source/UserScripts/main/packages/hanime1-download-manager/dist/locales.json"
   });
-  const THEME = probeTheme({
-    panelClass: "more-horiz-panel",
-    actionClass: "video-show-action-btn default",
-    itemHover: "hsla(0,0%,100%,.2)"
+  gmMenuCommand("Settings", () => openSettings("h1dl"));
+  window.addEventListener("userscript:settings", (event) => {
+    const lang = event.detail?.lang;
+    if (lang) gmSet("lang", lang);
   });
-  injectStyles(THEME);
-  let activeDownloads = 0;
-  const bumpDownloads = (delta) => {
-    activeDownloads = Math.max(0, activeDownloads + delta);
-    const should = activeDownloads > 0;
-    if (should !== bumpDownloadsFlag) {
-      bumpDownloadsFlag = should;
-      window[should ? "addEventListener" : "removeEventListener"](
-        "beforeunload",
-        onBeforeUnload
-      );
-    }
-  };
-  let bumpDownloadsFlag = false;
-  function onBeforeUnload(e) {
-    e.preventDefault();
-    e.returnValue = "";
+  const ON_MANAGER = location.hostname === "og-open-source.github.io" && location.pathname.startsWith("/UserScripts");
+  if (ON_MANAGER) ;
+  else if (!HOSTS.includes(location.hostname)) {
+    throw new Error("[h1dl] not a hanime1 host");
+  } else {
+    boot();
   }
-  const setState = createStateMachine(t);
-  const singleDownload = (btn, videoId, quality) => {
-    void startDownload(btn, videoId, quality, setState, bumpDownloads);
-  };
-  const menu = createMenu(t, singleDownload);
-  const batch = createBatch(
-    t,
-    menu.askQuality,
-    bumpDownloads
-  );
-  const inject = createInject(
-    t,
-    menu,
-    batch,
-    setState
-  );
-  let injecting = false;
-  let scanTimer = null;
-  function scan() {
-    injecting = true;
-    try {
-      inject.scan();
-    } finally {
-      injecting = false;
+  function boot() {
+    const claim = claimCapabilities({
+      id: "h1dl",
+      kind: "feature",
+      capabilities: [...define_SCRIPT_CAPABILITIES_default]
+    });
+    if (!claim.ok) {
+      console.warn(`[h1dl] not injecting: ${claim.conflict?.id} already provides hanime1:download`);
+      throw new Error("[h1dl] capability already claimed");
     }
+    void start();
   }
-  function scheduleScan() {
-    if (scanTimer) return;
-    scanTimer = window.setTimeout(() => {
-      scanTimer = null;
-      scan();
-    }, 300);
-  }
-  const observer = new MutationObserver((mutations) => {
-    if (injecting) return;
-    if (menu.isOpen()) {
-      const openMenu = menu.element();
-      const ownMutation = mutations.some(
-        (m) => Array.from(m.addedNodes).includes(openMenu) || m.target === openMenu || openMenu?.contains(m.target) || batch.element() === m.target || batch.element()?.contains(m.target)
-      );
-      if (!ownMutation) menu.close();
-    }
-    scheduleScan();
-  });
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key.toLowerCase() === "d" && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+  async function start() {
+    const { t } = await createI18n({
+      source: { scriptId: "h1dl", url: "https://raw.githubusercontent.com/OG-Open-Source/UserScripts/main/packages/hanime1-download-manager/dist/locales.json" },
+      fallback: MESSAGES,
+      storageKey: "lang"
+    });
+    const THEME = probeTheme({
+      panelClass: "more-horiz-panel",
+      actionClass: "video-show-action-btn default",
+      itemHover: "hsla(0,0%,100%,.2)"
+    });
+    injectStyles(THEME);
+    let activeDownloads = 0;
+    const bumpDownloads = (delta) => {
+      activeDownloads = Math.max(0, activeDownloads + delta);
+      const should = activeDownloads > 0;
+      if (should !== bumpDownloadsFlag) {
+        bumpDownloadsFlag = should;
+        window[should ? "addEventListener" : "removeEventListener"]("beforeunload", onBeforeUnload);
+      }
+    };
+    let bumpDownloadsFlag = false;
+    function onBeforeUnload(e) {
       e.preventDefault();
-      e.stopPropagation();
-      batch.setMode(!batch.isOn());
+      e.returnValue = "";
     }
-  });
-  scan();
+    const setState = createStateMachine(t);
+    const singleDownload = (btn, videoId, quality) => {
+      void startDownload(btn, videoId, quality, setState, bumpDownloads);
+    };
+    const menu = createMenu(t, singleDownload);
+    const batch = createBatch(t, menu.askQuality, bumpDownloads);
+    const inject = createInject(t, menu, batch, setState);
+    let injecting = false;
+    let scanTimer = null;
+    function scan() {
+      injecting = true;
+      try {
+        inject.scan();
+      } finally {
+        injecting = false;
+      }
+    }
+    function scheduleScan() {
+      if (scanTimer) return;
+      scanTimer = window.setTimeout(() => {
+        scanTimer = null;
+        scan();
+      }, 300);
+    }
+    const observer = new MutationObserver((mutations) => {
+      if (injecting) return;
+      if (menu.isOpen()) {
+        const openMenu = menu.element();
+        const ownMutation = mutations.some(
+          (m) => Array.from(m.addedNodes).includes(openMenu) || m.target === openMenu || openMenu?.contains(m.target) || batch.element() === m.target || batch.element()?.contains(m.target)
+        );
+        if (!ownMutation) menu.close();
+      }
+      scheduleScan();
+    });
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key.toLowerCase() === "d" && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        batch.setMode(!batch.isOn());
+      }
+    });
+    scan();
+  }
 
 })();
