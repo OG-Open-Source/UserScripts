@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hanime1 Download Manager
 // @namespace    Violentmonkey Scripts
-// @version      1.0.1
+// @version      1.0.2
 // @author       OG-Open-Source
 // @description  Replace download links with a native-style quality menu, batch download mode, and in-page downloads without leaving the page.
 // @icon         https://vdownload.hembed.com/image/icon/nav_logo.png?secure=HxkFdqiVxMMXXjau9riwGg==,4855471889
@@ -12,7 +12,7 @@
 // @match        *://hanimeone.com/*
 // @match        *://hanimeone.me/*
 // @match        https://og-open-source.github.io/UserScripts/
-// @match        https://og-open-source.github.io/UserScripts/*
+// @match        https://og-open-source.github.io/UserScripts/settings/*
 // @connect      hanime1.com
 // @connect      hanime1.me
 // @connect      hanimeone.com
@@ -36,28 +36,6 @@
   var _GM_registerMenuCommand = /* @__PURE__ */ (() => typeof GM_registerMenuCommand != "undefined" ? GM_registerMenuCommand : void 0)();
   var _GM_setValue = /* @__PURE__ */ (() => typeof GM_setValue != "undefined" ? GM_setValue : void 0)();
   var _GM_xmlhttpRequest = /* @__PURE__ */ (() => typeof GM_xmlhttpRequest != "undefined" ? GM_xmlhttpRequest : void 0)();
-  const CLAIM_GLOBAL = "__userscriptClaims";
-  function registry() {
-    const root = globalThis;
-    let value = root[CLAIM_GLOBAL];
-    if (!value) {
-      value = { claims: [] };
-      root[CLAIM_GLOBAL] = value;
-    }
-    return value;
-  }
-  function claimCapabilities(claim) {
-    const existing = registry().claims;
-    const conflict = existing.find((other) => overlaps(claim, other));
-    if (conflict) return { ok: false, conflict };
-    existing.push(claim);
-    return { ok: true };
-  }
-  function overlaps(a, b) {
-    const shared = a.capabilities.some((item) => b.capabilities.includes(item));
-    if (!shared) return false;
-    return a.kind === "aio" || b.kind === "aio";
-  }
   let api = null;
   function configureGmApi(gm) {
     api = gm;
@@ -96,9 +74,6 @@
     getApi().GM_registerMenuCommand(caption, onClick);
   }
   const MANAGER_URL = "https://og-open-source.github.io/UserScripts";
-  function openSettings(id) {
-    window.open(`${MANAGER_URL}/#${id}`, "_blank");
-  }
   const CACHE_KEY = (scriptId) => `i18n:${scriptId}`;
   async function loadLocales(source, onChange) {
     const key = CACHE_KEY(source.scriptId);
@@ -122,8 +97,8 @@
     const preferred = gmGet(storageKey, null) ?? detectLang();
     let file = {
       id: source.scriptId,
-      default: "en",
-      languages: [{ code: "en", name: "English" }]
+      default: "en-US",
+      languages: [{ code: "en-US", name: "English (United States)" }]
     };
     try {
       file = await loadLocales(source, () => location.reload());
@@ -136,21 +111,20 @@
       if (lang === file.default) return fallback[key] ?? key;
       return entry?.messages?.[key] ?? fallback[key] ?? key;
     };
-    for (const item of file.languages) {
-      gmMenuCommand(item.name + (item.code === lang ? " ✓" : ""), () => {
-        if (item.code === lang) return;
-        gmSet(storageKey, item.code);
-        location.reload();
-      });
-    }
+    const current = file.languages.find((item) => item.code === lang);
+    gmMenuCommand(`Language: ${current?.name ?? lang} (${lang})`, () => {
+      window.open(`${MANAGER_URL}/settings/language/`, "_blank");
+    });
     return { lang, languages: file.languages, t };
   }
   function detectLang() {
-    const nav = (navigator.language || "en").toLowerCase();
-    if (nav.startsWith("zh")) {
-      return nav.includes("tw") || nav.includes("hk") || nav.includes("hant") ? "zh-TW" : "zh-CN";
+    const page = (document.documentElement.lang || "en").toLowerCase();
+    if (page.startsWith("zh")) {
+      const traditional = page.includes("hant") || page.includes("tw") || page.includes("hk") || page.includes("mo");
+      return traditional ? "zh-Hant-TW" : "zh-Hans-CN";
     }
-    return nav.split("-")[0] || "en";
+    if (page === "en" || page.startsWith("en-")) return "en-US";
+    return "en-US";
   }
   const REGISTRY_ELEMENT_ID = "userscript-registry";
   const PRESENCE_EVENT = "userscript:presence";
@@ -933,7 +907,6 @@
       askQuality
     };
   }
-  var define_SCRIPT_CAPABILITIES_default = ["hanime1:download"];
   const HOSTS = ["hanime1.com", "hanime1.me", "hanimeone.com", "hanimeone.me"];
   configureGmApi({
     GM_xmlhttpRequest: _GM_xmlhttpRequest,
@@ -946,11 +919,8 @@
     id: "h1dl",
     name: "Hanime1 Download Manager",
     description: "Replace download links with a native-style quality menu, batch download mode, and in-page downloads without leaving the page.",
-    kind: "feature",
-    capabilities: [...define_SCRIPT_CAPABILITIES_default],
     localeUrl: "https://raw.githubusercontent.com/OG-Open-Source/UserScripts/main/packages/hanime1-download-manager/dist/locales.json"
   });
-  gmMenuCommand("Settings", () => openSettings("h1dl"));
   window.addEventListener("userscript:settings", (event) => {
     const lang = event.detail?.lang;
     if (lang) gmSet("lang", lang);
@@ -963,15 +933,6 @@
     boot();
   }
   function boot() {
-    const claim = claimCapabilities({
-      id: "h1dl",
-      kind: "feature",
-      capabilities: [...define_SCRIPT_CAPABILITIES_default]
-    });
-    if (!claim.ok) {
-      console.warn(`[h1dl] not injecting: ${claim.conflict?.id} already provides hanime1:download`);
-      throw new Error("[h1dl] capability already claimed");
-    }
     void start();
   }
   async function start() {
