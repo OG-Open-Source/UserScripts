@@ -149,6 +149,7 @@ dist
 # by the `dist` rule above) — local builds stay out of git. The release
 # workflow force-adds dist/*.user.js, dist/*.meta.js and dist/locales.json to
 # main so @updateURL, @downloadURL and the runtime locale fetch
+packages/*/src/generated/shell.html
 # (raw.githubusercontent.com) resolve. Source translations live in
 # packages/*/locales.json and ARE tracked.
 
