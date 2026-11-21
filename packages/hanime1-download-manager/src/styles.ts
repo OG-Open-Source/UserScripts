@@ -116,11 +116,12 @@ ${inlineVars}
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--us-surface-2);
-  color: var(--us-fg);
+  background: var(--us-overlay-bg);
+  color: var(--us-overlay-fg);
   border: none;
   border-radius: var(--us-radius-sm, 6px);
-  box-shadow: var(--us-shadow-sm);
+  box-shadow: var(--us-overlay-shadow);
+  backdrop-filter: blur(6px);
   cursor: pointer;
   user-select: none;
   font-size: 14px;
@@ -129,9 +130,62 @@ ${inlineVars}
   z-index: 5;
   transition: opacity 180ms var(--us-ease), background-color 180ms var(--us-ease), color 180ms var(--us-ease), box-shadow 200ms var(--us-ease);
 }
+.h1dl-check:hover { background: var(--us-overlay-hover); }
 .h1dl-check .material-icons { font-size: 14px; }
 .h1dl-batch-on .h1dl-check, .h1dl-card:hover .h1dl-check { opacity: 1; }
-.h1dl-check.checked, .h1dl-check.checked .material-icons {
+.h1dl-card-capsule {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--us-radius-sm, 6px);
+  background: var(--us-overlay-bg);
+  color: var(--us-overlay-fg);
+  box-shadow: var(--us-overlay-shadow);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity 180ms var(--us-ease);
+}
+.h1dl-batch-on .h1dl-card-capsule,
+.h1dl-card:hover .h1dl-card-capsule,
+.h1dl-card-capsule:has(.h1dl-pinned),
+.h1dl-card-capsule:has(.checked) {
+  opacity: 1;
+}
+.h1dl-card-capsule .h1dl-check {
+  position: static;
+  opacity: 1;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  width: 22px;
+  height: 22px;
+  color: inherit;
+}
+.h1dl-card-capsule .h1dl-check:hover { background: var(--us-overlay-hover); }
+.h1dl-card-capsule .h1dl-list-btn.h1dl-icon-only {
+  margin-top: 0;
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  justify-content: center;
+  opacity: 1;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+}
+.h1dl-card-capsule .h1dl-list-btn.h1dl-icon-only:hover {
+  background: var(--us-overlay-hover);
+  color: inherit;
+}
+.h1dl-check.checked,
+.h1dl-check.checked .material-icons,
+.h1dl-card-capsule .h1dl-check.checked,
+.h1dl-card-capsule .h1dl-check.checked .material-icons {
   background: var(--us-accent-bg);
   color: var(--us-accent-fg);
 }
@@ -208,15 +262,18 @@ export function getBatchDockCss(hostTokens?: ThemeTokens | null): string {
   height: 28px;
   border: none;
   border-radius: var(--us-radius-sm);
-  background: transparent;
-  color: var(--us-fg);
+  background: var(--_btn-bg, transparent);
+  color: var(--_btn-fg, var(--us-fg));
   cursor: pointer;
   display: grid;
   place-items: center;
   padding: 0;
   transition: background-color 180ms var(--us-ease), color 180ms var(--us-ease), box-shadow 200ms var(--us-ease);
 }
-.co-group-btn:hover:not(:disabled) { background: var(--us-surface-2); }
+.co-group-btn:hover:not(:disabled) {
+  background: var(--_btn-hover-bg, var(--us-surface-2));
+  color: var(--_btn-hover-fg, var(--_btn-fg, var(--us-fg)));
+}
 .co-group-btn:active:not(:disabled) {
   box-shadow: inset 0 0 0 2px oklch(from var(--us-accent-bg) l c h / 0.45);
 }
@@ -224,10 +281,11 @@ export function getBatchDockCss(hostTokens?: ThemeTokens | null): string {
 .co-group-btn[aria-expanded="true"],
 .co-group-btn.active,
 .co-group-btn.primary {
-  background: var(--us-accent-bg);
-  color: var(--us-accent-fg);
+  --_btn-bg: var(--us-accent-bg);
+  --_btn-fg: var(--us-accent-fg);
+  --_btn-hover-bg: var(--us-accent-hover);
+  --_btn-hover-fg: var(--us-accent-fg);
 }
-.co-group-btn.primary:hover:not(:disabled) { background: var(--us-accent-hover); }
 
 .co-mini-ticks {
   display: flex;
@@ -305,6 +363,8 @@ export function getBatchDockCss(hostTokens?: ThemeTokens | null): string {
 .co-body-list {
   padding: 8px;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 6px;
   max-height: 240px;
   overflow-y: auto;
@@ -314,6 +374,8 @@ export function getBatchDockCss(hostTokens?: ThemeTokens | null): string {
   background: var(--us-surface);
   border-radius: var(--us-radius-md);
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 5px;
 }
 .dl-item-row {
@@ -321,12 +383,18 @@ export function getBatchDockCss(hostTokens?: ThemeTokens | null): string {
   justify-content: space-between;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   font-size: 11.5px;
 }
 .dl-item-name {
+  min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.h1dl-pct {
+  flex: none;
 }
 .prefs-pills {
   display: flex;

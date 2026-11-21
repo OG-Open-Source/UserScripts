@@ -123,6 +123,7 @@ export default defineConfig(({ command }) => ({
           "GM_registerMenuCommand",
         ],
         "run-at": "document-idle",
+        noframes: true,
         // meta.js is a small comment-only file; @updateURL points at it so
         // update checks only download that instead of the whole script.
         updateURL: `${RAW_BASE}/hanime1-download-manager.meta.js`,

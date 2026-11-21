@@ -13,6 +13,7 @@ import {
   gmGet,
   gmSet,
   isManagerPage,
+  isTopFrame,
   parseThemeMode,
   probeTheme,
   publishPresence,
@@ -24,6 +25,7 @@ import {
   GM_registerMenuCommand,
   GM_setValue,
   GM_xmlhttpRequest,
+  // biome-ignore lint/correctness/noUnresolvedImports: vite-plugin-monkey virtual module
 } from "$";
 import { createBatch } from "./batch";
 import { createStateMachine, startDownload } from "./download";
@@ -52,43 +54,48 @@ configureGmApi({
   GM_registerMenuCommand,
 });
 
-publishPresence({
-  id: __SCRIPT_ID__,
-  name: __SCRIPT_NAME__,
-  description: __SCRIPT_DESCRIPTION__,
-  localeUrl: __LOCALE_URL__,
-});
-
-let currentThemeMode: ThemeMode = parseThemeMode(
-  gmGet<unknown>(THEME_MODE_KEY, "host") === "system" &&
-    gmGet<unknown>(THEME_MODE_KEY, null) === null
-    ? "host"
-    : gmGet<unknown>(THEME_MODE_KEY, "host")
-);
+let currentThemeMode: ThemeMode = "host";
 let onLiveThemeChange: ((mode: ThemeMode) => void) | null = null;
 
-window.addEventListener("userscript:settings", (event: Event) => {
-  const detail = (
-    event as CustomEvent<{ lang?: string; themeMode?: ThemeMode }>
-  ).detail;
-  if (detail?.lang) {
-    gmSet("lang", detail.lang);
-  }
-  if (detail?.themeMode) {
-    const next = parseThemeMode(detail.themeMode);
-    currentThemeMode = next;
-    gmSet(THEME_MODE_KEY, next);
-    onLiveThemeChange?.(next);
-  }
-});
+if (isTopFrame()) {
+  publishPresence({
+    id: __SCRIPT_ID__,
+    name: __SCRIPT_NAME__,
+    description: __SCRIPT_DESCRIPTION__,
+    localeUrl: __LOCALE_URL__,
+  });
 
-const ON_MANAGER = isManagerPage();
-if (ON_MANAGER) {
-  // Presence only. The download UI does not belong on the manager page.
-} else if (HOSTS.includes(location.hostname)) {
-  boot();
-} else {
-  throw new Error("[h1dl] not a hanime1 host");
+  currentThemeMode = parseThemeMode(
+    gmGet<unknown>(THEME_MODE_KEY, "host") === "system" &&
+      gmGet<unknown>(THEME_MODE_KEY, null) === null
+      ? "host"
+      : gmGet<unknown>(THEME_MODE_KEY, "host")
+  );
+
+  window.addEventListener("userscript:settings", (event: Event) => {
+    const { detail } = event as CustomEvent<{
+      lang?: string;
+      themeMode?: ThemeMode;
+    }>;
+    if (detail?.lang) {
+      gmSet("lang", detail.lang);
+    }
+    if (detail?.themeMode) {
+      const next = parseThemeMode(detail.themeMode);
+      currentThemeMode = next;
+      gmSet(THEME_MODE_KEY, next);
+      onLiveThemeChange?.(next);
+    }
+  });
+
+  const ON_MANAGER = isManagerPage();
+  if (ON_MANAGER) {
+    // Presence only. The download UI does not belong on the manager page.
+  } else if (HOSTS.includes(location.hostname)) {
+    boot();
+  } else {
+    throw new Error("[h1dl] not a hanime1 host");
+  }
 }
 
 function boot(): void {

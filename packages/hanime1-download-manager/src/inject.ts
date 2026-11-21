@@ -9,7 +9,6 @@
 import { markUiRoot } from "@userscripts/shared";
 import { extractVideoId } from "./api";
 import type { BatchApi } from "./batch";
-import { QUALITIES } from "./batch";
 import type { StateUpdater } from "./download";
 import type { MenuApi } from "./menu";
 
@@ -24,12 +23,14 @@ export function createInject(
   batch: BatchApi,
   setState: StateUpdater
 ): InjectApi {
-  function buildListButton(videoId: string): HTMLElement {
+  function buildListButton(videoId: string, iconOnly = false): HTMLElement {
     const btn = document.createElement("div");
-    btn.className = "h1dl-list-btn";
+    btn.className = iconOnly ? "h1dl-list-btn h1dl-icon-only" : "h1dl-list-btn";
     markUiRoot(btn, "h1dl");
     btn.setAttribute("title", t("download"));
-    btn.innerHTML = `<i class="material-icons h1dl-icon">download</i><span class="h1dl-label">${t("download")}</span>`;
+    btn.innerHTML = iconOnly
+      ? '<i class="material-icons h1dl-icon">download</i>'
+      : `<i class="material-icons h1dl-icon">download</i><span class="h1dl-label">${t("download")}</span>`;
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -42,8 +43,59 @@ export function createInject(
     return btn;
   }
 
+  function wrapWatchLabel(downloadBtn: HTMLElement): void {
+    const icon = downloadBtn.querySelector("#video-download-btn");
+    if (icon) {
+      icon.classList.add("h1dl-icon");
+    }
+    // The native markup is <div class="video-show-action-btn ..."><i>download</i>下載</div>:
+    // wrap the trailing text node so setButtonState can address it by class.
+    const labelContainer = icon
+      ? (icon.parentElement as HTMLElement | null)
+      : (downloadBtn.querySelector(
+          ".video-show-action-btn"
+        ) as HTMLElement | null);
+    if (!labelContainer) {
+      return;
+    }
+    for (const node of Array.from(labelContainer.childNodes)) {
+      if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
+        const span = document.createElement("span");
+        span.className = "h1dl-label";
+        span.textContent = node.textContent.trim();
+        node.replaceWith(span);
+      }
+    }
+  }
+
+  function injectMoreHorizLinks(): void {
+    for (const a of document.querySelectorAll("a.more-horiz-download-late")) {
+      const anchor = a as HTMLAnchorElement;
+      if (anchor.dataset.h1dl) {
+        continue;
+      }
+      const videoId = extractVideoId(anchor) || extractVideoId(location.href);
+      if (!videoId) {
+        continue;
+      }
+      anchor.dataset.h1dl = "1";
+      anchor.removeAttribute("href");
+      anchor.style.cursor = "pointer";
+      anchor.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // close the site's own more-horiz dropdown first
+        const openDropdown = document.querySelector(".more-horiz-wrapper.open");
+        if (openDropdown) {
+          openDropdown.classList.remove("open");
+        }
+        menu.open(anchor, videoId);
+      });
+    }
+  }
+
   function injectWatchPage(): void {
-    const downloadBtn = document.getElementById("downloadBtn");
+    const downloadBtn = document.querySelector<HTMLElement>("#downloadBtn");
     if (downloadBtn && !downloadBtn.dataset.h1dl) {
       const videoId =
         extractVideoId(location.href) || extractVideoId(downloadBtn);
@@ -52,30 +104,7 @@ export function createInject(
         downloadBtn.setAttribute("translate", "no");
         downloadBtn.removeAttribute("href");
         downloadBtn.style.cursor = "pointer";
-
-        // Reuse the existing icon and text node ("下載") as state targets;
-        // setButtonState updates them in place instead of appending a new label.
-        const icon = downloadBtn.querySelector("#video-download-btn");
-        if (icon) {
-          icon.classList.add("h1dl-icon");
-        }
-        // The native markup is <div class="video-show-action-btn ..."><i>download</i>下載</div>:
-        // wrap the trailing text node so setButtonState can address it by class.
-        const labelContainer = icon
-          ? (icon.parentElement as HTMLElement | null)
-          : (downloadBtn.querySelector(
-              ".video-show-action-btn"
-            ) as HTMLElement | null);
-        if (labelContainer) {
-          Array.from(labelContainer.childNodes).forEach((node) => {
-            if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
-              const span = document.createElement("span");
-              span.className = "h1dl-label";
-              span.textContent = node.textContent.trim();
-              node.replaceWith(span);
-            }
-          });
-        }
+        wrapWatchLabel(downloadBtn);
         downloadBtn.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -85,109 +114,89 @@ export function createInject(
     }
 
     // more-horiz dropdown "下載" entry
-    document
-      .querySelectorAll("a.more-horiz-download-late")
-      .forEach((a: Element) => {
-        const anchor = a as HTMLAnchorElement;
-        if (anchor.dataset.h1dl) {
-          return;
-        }
-        const videoId = extractVideoId(anchor) || extractVideoId(location.href);
-        if (!videoId) {
-          return;
-        }
-        anchor.dataset.h1dl = "1";
-        anchor.removeAttribute("href");
-        anchor.style.cursor = "pointer";
-        anchor.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          // close the site's own more-horiz dropdown first
-          const openDropdown = document.querySelector(
-            ".more-horiz-wrapper.open"
-          );
-          if (openDropdown) {
-            openDropdown.classList.remove("open");
-          }
-          menu.open(anchor, videoId);
-        });
-      });
+    injectMoreHorizLinks();
+  }
+
+  function buildCardCheck(el: HTMLElement, videoId: string): HTMLElement {
+    const check = document.createElement("div");
+    check.className = "h1dl-check";
+    markUiRoot(check, "h1dl");
+    check.innerHTML = '<i class="material-icons"></i>';
+    const entry = batch.addEntry(el, videoId, check);
+    check.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Completed items are locked: never re-download them.
+      if (entry.state === "done") {
+        return;
+      }
+      if (!batch.isOn()) {
+        batch.setMode(true);
+      }
+      batch.setChecked(entry, !entry.checked);
+    });
+    return check;
+  }
+
+  function injectCard(el: HTMLElement): void {
+    if (el.dataset.h1dlBtn) {
+      return;
+    }
+    const videoId = extractVideoId(el);
+    if (!videoId) {
+      return;
+    }
+    el.dataset.h1dlBtn = "1";
+    el.classList.add("h1dl-card");
+
+    const metaData = el.querySelector(".video-meta-data");
+    const subtitle = el.querySelector(".subtitle");
+    const btn = buildListButton(videoId, Boolean(metaData));
+    const check = buildCardCheck(el, videoId);
+
+    if (metaData) {
+      // b.1: bottom-right capsule holding checkbox + icon-only download button
+      const capsule = document.createElement("div");
+      capsule.className = "h1dl-card-capsule";
+      markUiRoot(capsule, "h1dl");
+      capsule.append(check, btn);
+      el.appendChild(capsule);
+    } else {
+      if (subtitle) {
+        // b.2: button to the right of title/upload-date
+        subtitle.appendChild(btn);
+      } else {
+        el.appendChild(btn);
+      }
+      const img = el.querySelector("img");
+      const thumbWrap =
+        (el.querySelector(
+          ".playlist-hover-wrap, .video-thumb-wrap"
+        ) as HTMLElement | null) ??
+        (img?.closest("a") as HTMLElement | null) ??
+        img?.parentElement ??
+        null;
+      if (thumbWrap && el.contains(thumbWrap)) {
+        thumbWrap.classList.add("h1dl-thumb-wrap");
+        thumbWrap.appendChild(check);
+      } else {
+        el.appendChild(check);
+      }
+    }
+    // NOTE: the watch page renders the same video in up to three places
+    // (playlist rail has hidden-md + hidden-xs responsive copies, plus a
+    // related-videos copy). One entry per CARD, not per videoId, so every
+    // visible checkbox is independently checkable; downloads de-duplicate
+    // by videoId at start time.
+    el.dataset.h1dlEntry = "";
   }
 
   function injectListings(): void {
     // Covers b.1 (playlist-video-card) and b.2 (search/author cards):
     // both share the .video-item-container class.
-    document
-      .querySelectorAll(".video-item-container")
-      .forEach((card: Element) => {
-        const el = card as HTMLElement;
-        if (el.dataset.h1dlBtn) {
-          return;
-        }
-        const videoId = extractVideoId(el);
-        if (!videoId) {
-          return;
-        }
-        el.dataset.h1dlBtn = "1";
-        el.classList.add("h1dl-card");
-
-        const btn = buildListButton(videoId);
-
-        const metaData = el.querySelector(".video-meta-data");
-        const subtitle = el.querySelector(".subtitle");
-        if (metaData) {
-          // b.1: rectangular button under the tags/upload-date row
-          metaData.after(btn);
-        } else if (subtitle) {
-          // b.2: button to the right of title/upload-date
-          subtitle.appendChild(btn);
-        } else {
-          el.appendChild(btn);
-        }
-
-        // Batch checkbox on the thumbnail's top-right corner.
-        // Checkbox uses the site's thumbnail overlay pattern:
-        // .stats-container > .stat-item (semi-transparent chip, radius 3px).
-        // Geometry/opacity live in the stylesheet so the :hover and
-        // .h1dl-batch-on reveal rules can win (inline styles always win).
-        const check = document.createElement("div");
-        check.className = "h1dl-check";
-        markUiRoot(check, "h1dl");
-        check.innerHTML = '<i class="material-icons"></i>';
-        const entry = batch.addEntry(el, videoId, check);
-        check.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          // Completed items are locked: never re-download them.
-          if (entry.state === "done") {
-            return;
-          }
-          if (!batch.isOn()) {
-            batch.setMode(true);
-          }
-          batch.setChecked(entry, !entry.checked);
-        });
-        const img = el.querySelector("img");
-        const thumbWrap =
-          (el.querySelector(
-            ".playlist-hover-wrap, .video-thumb-wrap"
-          ) as HTMLElement | null) ??
-          (img?.closest("a") as HTMLElement | null) ??
-          img?.parentElement ??
-          null;
-        if (thumbWrap && el.contains(thumbWrap)) {
-          thumbWrap.classList.add("h1dl-thumb-wrap");
-          thumbWrap.appendChild(check);
-        } else {
-          el.appendChild(check);
-        }
-        // NOTE: the watch page renders the same video in up to three places
-        // (playlist rail has hidden-md + hidden-xs responsive copies, plus a
-        // related-videos copy). One entry per CARD, not per videoId, so every
-        // visible checkbox is independently checkable; downloads de-duplicate
-        // by videoId at start time.
-        el.dataset.h1dlEntry = "";
-      });
+    for (const card of document.querySelectorAll(".video-item-container")) {
+      injectCard(card as HTMLElement);
+    }
 
     // Build the progress bar lazily; tick sync happens in updateBatchBar.
     if (batch.isOn()) {
@@ -210,4 +219,4 @@ export function createInject(
 }
 
 // QUALITIES is re-exported for the keyboard shortcut module's menu wiring.
-export { QUALITIES };
+export { QUALITIES } from "./batch";

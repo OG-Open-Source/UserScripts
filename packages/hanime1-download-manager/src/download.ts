@@ -7,7 +7,7 @@
  */
 
 import type { DownloadState } from "@userscripts/shared";
-import { gmDownload } from "@userscripts/shared";
+// biome-ignore lint/correctness/noUnresolvedImports: vite-plugin-monkey virtual module
 import { GM_download } from "$";
 import { downloadName, queryQualities } from "./api";
 
@@ -53,7 +53,14 @@ export function createStateMachine(t: (key: string) => string): StateUpdater {
     }
     if (label) {
       label.textContent =
-        state === "downloading" && percent != null ? percent + "%" : s.label;
+        state === "downloading" && typeof percent === "number"
+          ? `${percent}%`
+          : s.label;
+    } else {
+      btn.title =
+        state === "downloading" && typeof percent === "number"
+          ? `${percent}%`
+          : s.label;
     }
     btn.dataset.state = state;
   };
@@ -81,7 +88,7 @@ export async function startDownload(
     const list = await queryQualities(videoId);
     const info = list.find((q) => q.quality === quality);
     if (!info) {
-      throw new Error("quality not found: " + quality);
+      throw new Error(`quality not found: ${quality}`);
     }
     setState(btn, "downloading", 0);
     GM_download({
@@ -104,17 +111,20 @@ export async function startDownload(
         loaded: number;
         total: number;
       }) => {
-        if (e?.lengthComputable) {
+        if (e.lengthComputable) {
           setState(btn, "downloading", Math.round((e.loaded / e.total) * 100));
         }
       },
     });
   } catch (err) {
     onActiveChange(-1);
-    console.warn("[h1dl] download failed:", (err as Error)?.message);
+    console.warn(
+      "[h1dl] download failed:",
+      err instanceof Error ? err.message : String(err)
+    );
     setState(btn, "error");
   }
 }
 
 // gmDownload is re-exported for callers that prefer the promise form.
-export { gmDownload };
+export { gmDownload } from "@userscripts/shared";
