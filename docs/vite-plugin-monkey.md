@@ -18,79 +18,62 @@ import { defineConfig } from "vite";
 import monkey from "vite-plugin-monkey";
 
 export default defineConfig({
-  plugins: [
-    monkey({
-      // 腳本入口檔案（相對於此 vite.config.ts）
-      entry: "./src/main.ts",
+	plugins: [
+		monkey({
+			// 腳本入口檔案（相對於此 vite.config.ts）
+			entry: "./src/main.ts",
 
-      // 使用者腳本元數據（對應 ==UserScript== 區塊）
-      userscript: {
-        name: "Hanime1 Download Manager",
-        namespace: "Violentmonkey Scripts",
-        version: "1.1",
-        description:
-          "Replace download links with a native-style quality menu, batch download mode, and in-page downloads.",
-        match: [
-          "*://hanime1.com/*",
-          "*://hanime1.me/*",
-          "*://hanimeone.com/*",
-          "*://hanimeone.me/*",
-        ],
-        connect: [
-          "hanime1.com",
-          "hanime1.me",
-          "hanimeone.com",
-          "hanimeone.me",
-          "vdownload.hembed.com",
-        ],
-        grant: [
-          "GM_xmlhttpRequest",
-          "GM_download",
-          "GM_setValue",
-          "GM_getValue",
-          "GM_registerMenuCommand",
-        ],
-        "run-at": "document-idle",
-      },
+			// 使用者腳本元數據（對應 ==UserScript== 區塊）
+			userscript: {
+				name: "Hanime1 Download Manager",
+				namespace: "Violentmonkey Scripts",
+				version: "1.1",
+				description:
+					"Replace download links with a native-style quality menu, batch download mode, and in-page downloads.",
+				match: ["*://hanime1.com/*", "*://hanime1.me/*", "*://hanimeone.com/*", "*://hanimeone.me/*"],
+				connect: ["hanime1.com", "hanime1.me", "hanimeone.com", "hanimeone.me", "vdownload.hembed.com"],
+				grant: ["GM_xmlhttpRequest", "GM_download", "GM_setValue", "GM_getValue", "GM_registerMenuCommand"],
+				"run-at": "document-idle",
+			},
 
-      // 建置輸出檔名（必須以 .user.js 結尾）
-      build: {
-        // 預設為 (package.json.name ?? 'monkey') + '.user.js'
-        fileName: "hanime1-download-manager.user.js",
+			// 建置輸出檔名（必須以 .user.js 結尾）
+			build: {
+				// 預設為 (package.json.name ?? 'monkey') + '.user.js'
+				fileName: "hanime1-download-manager.user.js",
 
-        // 只含元數據註解的小檔案，可供 @updateURL 使用；
-        // 檢查更新時只需下載此檔案而非整個腳本
-        metaFileName: true, // → hanime1-download-manager.meta.js
-      },
+				// 只含元數據註解的小檔案，可供 @updateURL 使用；
+				// 檢查更新時只需下載此檔案而非整個腳本
+				metaFileName: true, // → hanime1-download-manager.meta.js
+			},
 
-      // 開發伺服器設定
-      server: {
-        // 元數據變更時自動在預設瀏覽器開啟安裝 URL
-        // 預設在 Win/Mac 平台為 true
-        open: true,
+			// 開發伺服器設定
+			server: {
+				// 元數據變更時自動在預設瀏覽器開啟安裝 URL
+				// 預設在 Win/Mac 平台為 true
+				open: true,
 
-        // 安裝列表中的名稱前綴，用於區分 server.user.js 與 build.user.js
-        // 設為 false 則不加前綴
-        prefix: "server:",
+				// 安裝列表中的名稱前綴，用於區分 server.user.js 與 build.user.js
+				// 設為 false 則不加前綴
+				prefix: "server:",
 
-        // 將 GM_api 掛載到 unsafeWindow（不推薦）
-        // 應透過 ESM import 使用，或使用 unplugin-auto-import
-        mountGmApi: false,
-      },
+				// 將 GM_api 掛載到 unsafeWindow（不推薦）
+				// 應透過 ESM import 使用，或使用 unplugin-auto-import
+				mountGmApi: false,
+			},
 
-      // 客戶端 alias：vite-plugin-monkey/dist/client 的導入別名
-      // 預設為 '$'
-      clientAlias: "$",
+			// 客戶端 alias：vite-plugin-monkey/dist/client 的導入別名
+			// 預設為 '$'
+			clientAlias: "$",
 
-      // 將 CSS import 處理為 HTMLStyleElement 節點
-      // 使用 Shadow DOM 做樣式隔離時非常有用
-      // 支援 .css?style、.less?style、.scss?style 等
-      styleImport: true,
+			// 將 CSS import 處理為 HTMLStyleElement 節點
+			// 使用 Shadow DOM 做樣式隔離時非常有用
+			// 支援 .css?style、.less?style、.scss?style 等
+			styleImport: true,
 
-      // 對齊元數據註解的空格數
-      align: 2,
-    }),
-  ],
+			// 對齊元數據註解的空格數
+			align: 2,
+		}),
+	],
 });
 ```
 
@@ -117,21 +100,21 @@ export default defineConfig({
 ```typescript
 // src/main.ts
 import {
-  GM_xmlhttpRequest,
-  GM_download,
-  GM_setValue,
-  GM_getValue,
-  GM_registerMenuCommand,
-  unsafeWindow,
-  monkeyWindow,
+	GM_xmlhttpRequest,
+	GM_download,
+	GM_setValue,
+	GM_getValue,
+	GM_registerMenuCommand,
+	unsafeWindow,
+	monkeyWindow,
 } from "$";
 
 // monkeyWindow 永遠是「使用者腳本作用域」的 window
 // unsafeWindow 永遠是宿主頁面的 window
 if (unsafeWindow === window) {
-  console.log("scope->host, host esm scope");
+	console.log("scope->host, host esm scope");
 } else {
-  console.log("scope->monkey, userscript scope");
+	console.log("scope->monkey, userscript scope");
 }
 ```
 
@@ -146,12 +129,12 @@ import monkey, { util } from "vite-plugin-monkey";
 import AutoImport from "unplugin-auto-import/vite";
 
 export default defineConfig({
-  plugins: [
-    AutoImport({
-      imports: [util.unimportPreset],
-    }),
-    monkey({/* ... */}),
-  ],
+	plugins: [
+		AutoImport({ imports: [util.unimportPreset] }),
+		monkey({
+			/* ... */
+		}),
+	],
 });
 ```
 
@@ -171,7 +154,7 @@ console.log({ GM_getValue, GM_setValue, unsafeWindow });
 
 ```typescript
 declare module "monkeyApi" {
-  export * from "vite-plugin-monkey/dist/client";
+	export * from "vite-plugin-monkey/dist/client";
 }
 ```
 
@@ -187,13 +170,7 @@ import { defineConfig } from "vite";
 import monkey from "vite-plugin-monkey";
 
 export default defineConfig({
-  plugins: [
-    legacy({
-      renderLegacyChunks: false,
-      modernPolyfills: true,
-    }),
-    monkey({ entry: "./src/main.ts" }),
-  ],
+	plugins: [legacy({ renderLegacyChunks: false, modernPolyfills: true }), monkey({ entry: "./src/main.ts" })],
 });
 ```
 
@@ -201,12 +178,12 @@ export default defineConfig({
 
 ```typescript
 monkey({
-  entry: "./src/main.ts",
-  // 完全自訂註解區塊的產生邏輯
-  generate: ({ userscript, mode }) => {
-    // mode: 'serve' | 'build' | 'meta'
-    return Promise.resolve(`// ==UserScript==\n${userscript}\n// ==/UserScript==`);
-  },
+	entry: "./src/main.ts",
+	// 完全自訂註解區塊的產生邏輯
+	generate: ({ userscript, mode }) => {
+		// mode: 'serve' | 'build' | 'meta'
+		return Promise.resolve(`// ==UserScript==\n${userscript}\n// ==/UserScript==`);
+	},
 });
 ```
 
@@ -225,11 +202,11 @@ const style3 = style1.cloneNode(true); // 複製品仍保留 HMR
 ```jsonc
 // package.json
 {
-  "scripts": {
-    "dev": "vite", // 啟動開發伺服器，HMR + 自動安裝
-    "build": "vite build", // 產出 .user.js 與 .meta.js
-    "preview": "vite preview",
-  },
+	"scripts": {
+		"dev": "vite", // 啟動開發伺服器，HMR + 自動安裝
+		"build": "vite build", // 產出 .user.js 與 .meta.js
+		"preview": "vite preview"
+	}
 }
 ```
 

@@ -59,7 +59,7 @@ UserScripts/
 ├── packages/
 │   ├── shared/                    # @userscripts/shared：共用工具與型別
 │   └── hanime1-download-manager/  # hanime1 下載管理器（userscript.id: h1dl）
-├── scripts/new-script.mjs         # 腳手架
+├── tools/new-script.mjs           # 腳手架
 └── package.json                   # workspaces 設定
 ```
 

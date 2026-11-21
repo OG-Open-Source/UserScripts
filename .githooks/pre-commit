@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+set -eu
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+if [ -z "$STAGED" ]; then
+	exit 0
+fi
+
+for file in $STAGED; do
+	case "$file" in
+		*.dist-dev/*|.dist-dev/*|*.dev.user.js|*.dev.meta.js|*.local.user.js)
+			echo "pre-commit: refusing to commit dev userscript artifact: $file" >&2
+			exit 1
+			;;
+		*.user.js|*.meta.js)
+			if git show ":$file" | grep -Eq '@version[[:space:]]+0\.0\.0-dev'; then
+				echo "pre-commit: refusing to commit 0.0.0-dev artifact: $file" >&2
+				exit 1
+			fi
+			;;
+	esac
+done

@@ -1,157 +1,114 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <!--
-==UserScript==
-@name         UserScripts Language
-@namespace    Violentmonkey Scripts
-@version      1.0.0
-@description  Sets the language used by every installed OG-Open-Source/UserScripts script.
-@match        https://og-open-source.github.io/UserScripts/settings/language/
-@match        https://og-open-source.github.io/UserScripts/settings/language/index.html
-@noframes
-==/UserScript==
-		-->
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Language — UserScripts</title>
-    <style>
-      :root {
-        color-scheme: light dark;
-        --bg: #fff;
-        --fg: #1a1a1a;
-        --muted: #666;
-        --line: #e4e4e4;
-      }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg: #161616;
-          --fg: #ededed;
-          --muted: #9a9a9a;
-          --line: #2c2c2c;
-        }
-      }
-      body {
-        margin: 0 auto;
-        max-width: 640px;
-        padding: 2.5rem 1.25rem 4rem;
-        background: var(--bg);
-        color: var(--fg);
-        font:
-          15px/1.55 system-ui,
-          sans-serif;
-      }
-      a {
-        color: inherit;
-      }
-      .lead,
-      .note {
-        color: var(--muted);
-      }
-      label {
-        display: block;
-        margin-bottom: 0.4rem;
-      }
-      select,
-      button {
-        font: inherit;
-        padding: 0.3rem 0.5rem;
-      }
-    </style>
-  </head>
-  <body>
-    <p><a href="../../">UserScripts</a></p>
-    <h1>Language</h1>
-    <p class="lead">
-      Applies to every installed script. The list is the languages those scripts actually ship.
-    </p>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="userscripts-manager" content="1" />
+		<title>Language — UserScripts</title>
+		<link rel="stylesheet" href="../shared/tokens.css" />
+	</head>
+	<body>
+		<div class="settings-shell">
+			<header class="breadcrumb">
+				<span><a href="../../"><strong>UserScripts</strong></a> / Language</span>
+				<span class="us-chip" id="statusChip"><i class="us-dot"></i>Detecting…</span>
+			</header>
 
-    <label for="lang">Language</label>
-    <select id="lang"></select>
-    <p>
-      <button id="apply" type="button">Apply</button>
-    </p>
-    <p class="note" id="note"></p>
+			<section class="settings-group">
+				<h1>Language</h1>
+				<p class="lead">
+					Applies to every installed script. The list is the languages those scripts actually ship.
+				</p>
 
-    <script type="module">
-      const KEY = "userscripts:lang";
-      const REGISTRY_ID = "userscript-registry";
+				<div class="field">
+					<span class="field-label" id="langLabel">Language</span>
+					<div id="langSelect"></div>
+				</div>
 
-      // Installed scripts write their own annotation into this element.
-      function readScripts() {
-        const el = document.getElementById(REGISTRY_ID);
-        if (!el?.textContent) return [];
-        try {
-          return JSON.parse(el.textContent);
-        } catch {
-          return [];
-        }
-      }
+				<div class="us-row-between" style="margin-top: 14px">
+					<span class="note" id="note" style="margin: 0"></span>
+					<button class="us-btn us-btn-primary" id="apply" type="button">Apply</button>
+				</div>
+			</section>
+		</div>
 
-      function waitForScripts(ms) {
-        return new Promise((resolve) => {
-          if (readScripts().length) {
-            resolve(readScripts());
-            return;
-          }
-          const timer = setTimeout(done, ms);
-          function done() {
-            clearTimeout(timer);
-            window.removeEventListener("userscript:presence", done);
-            resolve(readScripts());
-          }
-          window.addEventListener("userscript:presence", done);
-        });
-      }
+		<script type="module">
+			import { collectScripts, createCustomSelect, dispatchSettings, onPresence, waitForScripts } from "../shared/bridge.js";
 
-      const scripts = await waitForScripts(2000);
+			const KEY = "userscripts:lang";
+			const languages = new Map();
+			const loadedScriptIds = new Set();
+			const chip = document.getElementById("statusChip");
+			const note = document.getElementById("note");
+			const saved = localStorage.getItem(KEY) ?? "";
 
-      const languages = new Map();
-      await Promise.all(
-        scripts.map(async (script) => {
-          if (!script.localeUrl) return;
-          try {
-            const file = await fetch(script.localeUrl).then((res) => res.json());
-            for (const language of file.languages ?? []) {
-              if (!languages.has(language.code)) languages.set(language.code, language.name);
-            }
-          } catch {
-            // A script whose locale file is unreachable simply offers nothing.
-          }
-        }),
-      );
+			const langSelect = createCustomSelect(document.getElementById("langSelect"), {
+				labelledBy: "langLabel",
+				initialValue: saved,
+			});
 
-      const select = document.getElementById("lang");
-      const saved = localStorage.getItem(KEY);
-      if (!languages.size) {
-        const option = document.createElement("option");
-        option.textContent = "No installed script announced a language";
-        select.append(option);
-        select.disabled = true;
-      }
-      for (const [code, name] of languages) {
-        const option = document.createElement("option");
-        option.value = code;
-        option.textContent = `${name} (${code})`;
-        if (code === saved) option.selected = true;
-        select.append(option);
-      }
+			async function ingestScripts(list) {
+				let addedLang = false;
+				await Promise.all(
+					list.map(async (script) => {
+						if (loadedScriptIds.has(script.id)) return;
+						loadedScriptIds.add(script.id);
+						if (!script.localeUrl) return;
+						try {
+							const file = await fetch(script.localeUrl).then((res) => res.json());
+							for (const language of file.languages ?? []) {
+								if (!languages.has(language.code)) {
+									languages.set(language.code, language.name);
+									addedLang = true;
+								}
+							}
+						} catch {
+							// A script whose locale file is unreachable simply offers nothing.
+						}
+					}),
+				);
+				return addedLang;
+			}
 
-      const note = document.getElementById("note");
-      note.textContent = scripts.length
-        ? "Each script stores the choice itself and reads it on its next run."
-        : "Open this page through your userscript manager so installed scripts can be seen.";
+			function renderOptions() {
+				const entries = Array.from(languages, ([code, name]) => ({
+					value: code,
+					label: `${name} (${code})`,
+				}));
+				langSelect.setOptions(entries, "No installed script announced a language");
+				if (saved && languages.has(saved)) langSelect.setValue(saved);
+			}
 
-      document.getElementById("apply").addEventListener("click", () => {
-        localStorage.setItem(KEY, select.value);
-        // Broadcast: GM storage is per script, so each one writes its own copy.
-        window.dispatchEvent(
-          new CustomEvent("userscript:settings", { detail: { lang: select.value } }),
-        );
-        note.textContent = scripts.length
-          ? `Applied "${select.value}" to ${scripts.length} installed script(s). Reload the target pages to see it.`
-          : "No installed script heard this page, so nothing was applied.";
-      });
-    </script>
-  </body>
+			function updateStatus(list) {
+				chip.innerHTML = list.length
+					? `<i class="us-dot ok"></i>${list.length} script(s)`
+					: '<i class="us-dot warn"></i>No script detected';
+				note.textContent = list.length
+					? `Detected ${list.length} installed script(s). Changes apply on each script's next page load.`
+					: "Open this page through your userscript manager so installed scripts can be seen.";
+			}
+
+			const scripts = await waitForScripts(1800);
+			await ingestScripts(scripts);
+			renderOptions();
+			updateStatus(scripts);
+
+			onPresence(async (list) => {
+				const changed = await ingestScripts(list);
+				if (changed) renderOptions();
+				updateStatus(list);
+			});
+
+			document.getElementById("apply").addEventListener("click", () => {
+				const currentScripts = collectScripts();
+				const value = langSelect.getValue();
+				if (!value) return;
+				localStorage.setItem(KEY, value);
+				dispatchSettings({ lang: value });
+				note.textContent = currentScripts.length
+					? `Applied "${value}" to ${currentScripts.length} installed script(s).`
+					: `Saved "${value}" locally (no active script heard this page).`;
+			});
+		</script>
+	</body>
 </html>

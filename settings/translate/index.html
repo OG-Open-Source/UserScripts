@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="userscripts-manager" content="1" />
+		<title>Page Translator — UserScripts</title>
+		<link rel="stylesheet" href="../shared/tokens.css" />
+	</head>
+	<body>
+		<div class="settings-shell">
+			<header class="breadcrumb">
+				<span><a href="../../"><strong>UserScripts</strong></a> / Page Translator</span>
+				<span class="us-chip" id="ptrStatus"><i class="us-dot"></i>Detecting ptr…</span>
+			</header>
+
+			<section class="settings-group">
+				<h1>Page Translator</h1>
+				<p class="lead">
+					Configure routing, CSS presentation, CJK spacing, Traditional/Simplified conversion,
+					inspect/volunteer tools, per-site <code>+</code>/<code>-</code>/<code>*</code> rules, and cached dictionaries.
+				</p>
+
+				<h2>1. Core &amp; Routing</h2>
+				<div class="grid-2">
+					<div class="field">
+						<label for="targetLang">Target Language</label>
+						<input id="targetLang" class="us-input" type="text" placeholder="zh-TW" />
+					</div>
+					<div class="field">
+						<span class="field-label" id="providerLabel">Provider</span>
+						<div id="providerSelect"></div>
+					</div>
+				</div>
+				<div class="field">
+					<label for="apiKey">translate-pa API Key</label>
+					<div class="us-row">
+						<input id="apiKey" class="us-input" style="flex: 1" type="password" autocomplete="off" placeholder="Leave blank to clear saved key" />
+						<button id="clearApiKey" class="us-btn us-btn-sm" type="button">Clear</button>
+					</div>
+				</div>
+			</section>
+
+			<section class="settings-group">
+				<h2>2. Presentation &amp; Typography</h2>
+				<div class="field">
+					<label for="customFont">Custom Font (<code>--ptr-font</code>)</label>
+					<div class="us-row">
+						<input id="customFont" class="us-input" style="flex: 1 1 220px" type="text" list="localFontsList" placeholder='"Noto Sans TC", system-ui, sans-serif' />
+						<button id="loadFonts" class="us-btn us-btn-sm" type="button">Load Local Fonts</button>
+					</div>
+					<div id="localFontSelectWrap" style="margin-top: 6px" hidden></div>
+					<datalist id="localFontsList"></datalist>
+					<p class="note" id="fontNote"></p>
+				</div>
+				<div class="field">
+					<label for="customCss">Presentation CSS</label>
+					<div class="us-row" style="margin-bottom: 6px">
+						<button class="us-btn us-btn-sm" type="button" data-preset="replace">Preset: Replace (default)</button>
+						<button class="us-btn us-btn-sm" type="button" data-preset="bilingual">Preset: Bilingual Stacked</button>
+						<button class="us-btn us-btn-sm" type="button" data-preset="hover">Preset: Hover Original</button>
+					</div>
+					<textarea id="customCss" class="us-textarea" rows="5" placeholder="/* Override [data-tr-orig] / [data-tr-dst] */"></textarea>
+				</div>
+			</section>
+
+			<section class="settings-group">
+				<h2>3. CJK Spacing &amp; Conversion</h2>
+				<div class="field">
+					<span class="field-label" id="spacingLabel">CJK / ASCII Spacing Mode</span>
+					<div id="spacingSelect"></div>
+				</div>
+				<div class="grid-2">
+					<div class="field">
+						<span class="field-label" id="punctLabel">Punctuation Width Normalization</span>
+						<div id="punctSelect"></div>
+					</div>
+					<div class="field">
+						<span class="field-label" id="openccLabel">Traditional / Simplified Conversion</span>
+						<div id="openccSelect"></div>
+					</div>
+				</div>
+			</section>
+
+			<section class="settings-group">
+				<h2>4. Capture Inspector &amp; Volunteer Tools</h2>
+				<label class="check-row"><input id="autoTranslate" class="us-checkbox" type="checkbox" /> Auto-translate on page load</label>
+				<label class="check-row"><input id="debugSpacingMarks" class="us-checkbox" type="checkbox" /> Debug spacing marks (show <code>^</code> and <code>_</code>)</label>
+				<label class="check-row"><input id="debugInspect" class="us-checkbox" type="checkbox" /> Capture Preview Inspector HUD (<code>debugInspect</code>)</label>
+				<label class="check-row"><input id="volunteerMode" class="us-checkbox" type="checkbox" /> Volunteer Dictionary Mode (<code>volunteerMode</code>)</label>
+				<label class="check-row" id="lockRow"><input id="volunteerBlockClicks" class="us-checkbox" type="checkbox" /> Lock page clicks while Volunteer Mode is active (<code>volunteerBlockClicks</code>)</label>
+			</section>
+
+			<section class="settings-group">
+				<h2>5. Per-Site Delta Rules</h2>
+				<div class="field">
+					<label for="siteDeltas">
+						JSON map of host/glob → multiline <code>+</code>, <code>-</code>, <code>*</code> CSS selectors
+					</label>
+					<textarea id="siteDeltas" class="us-textarea" rows="5" placeholder='{&#10;  "github.com": "- [class*=\"languageList__\"]\n* [class*=\"kbd__\"] : inline-atomic, no-opencc"&#10;}'></textarea>
+				</div>
+			</section>
+
+			<section class="settings-group">
+				<h2>6. Cached Site Dictionaries (<code>ptr:site-tr:*</code>)</h2>
+				<table class="us-table">
+					<thead>
+						<tr><th>Host</th><th>Static</th><th>Dynamic</th><th>Scoped</th><th>Actions</th></tr>
+					</thead>
+					<tbody id="dictBody" class="us-mono">
+						<tr><td colspan="5" class="us-muted">No cached host dictionaries loaded yet.</td></tr>
+					</tbody>
+				</table>
+				<input id="importDictFile" type="file" accept="application/json,.json" hidden />
+				<div class="us-row-between" style="margin-top: 12px">
+					<div class="us-row">
+						<button id="importDictBtn" class="us-btn us-btn-sm" type="button">Import JSON…</button>
+						<button id="refreshDictBtn" class="us-btn us-btn-sm" type="button">Refresh</button>
+					</div>
+					<button id="apply" class="us-btn us-btn-primary" type="button">Apply Settings</button>
+				</div>
+				<p class="note" id="note"></p>
+			</section>
+		</div>
+
+		<script type="module">
+			import { createCustomSelect, dispatchSettings, hasScript, onPresence, waitForScripts } from "../shared/bridge.js";
+
+			const STORAGE_KEY = "userscripts:ptr:settings";
+			const PRESETS = {
+				replace: "",
+				bilingual: "[data-tr-orig] { display: block; opacity: 0.65; }\n[data-tr-dst] { display: block; margin-top: 0.2em; }",
+				hover: "[data-tr-block]:hover > [data-tr-orig] { display: block; opacity: 0.7; }",
+			};
+
+			const el = (id) => document.getElementById(id);
+
+			const providerSelect = createCustomSelect(el("providerSelect"), { labelledBy: "providerLabel", initialValue: "translate-pa" });
+			providerSelect.setOptions([
+				{ value: "translate-pa", label: "Google translate-pa (default)" },
+				{ value: "inspect", label: "Capture Inspector only (no API calls)" },
+			]);
+
+			const spacingSelect = createCustomSelect(el("spacingSelect"), { labelledBy: "spacingLabel", initialValue: "both" });
+			spacingSelect.setOptions([
+				{ value: "both", label: "Both (W3C text-autospace + JS spacing)" },
+				{ value: "js", label: "JS only (punctuation-aware text spacing)" },
+				{ value: "w3c", label: "W3C CSS only (text-autospace: normal)" },
+				{ value: "off", label: "Off" },
+			]);
+
+			const punctSelect = createCustomSelect(el("punctSelect"), { labelledBy: "punctLabel", initialValue: "zh-norm" });
+			punctSelect.setOptions([
+				{ value: "zh-norm", label: "Context-aware (zh-norm)" },
+				{ value: "off", label: "Off" },
+			]);
+
+			const openccSelect = createCustomSelect(el("openccSelect"), { labelledBy: "openccLabel", initialValue: "off" });
+			openccSelect.setOptions([
+				{ value: "off", label: "Off" },
+				{ value: "s2twp", label: "Simplified → Traditional (TW)" },
+				{ value: "tw2sp", label: "Traditional (TW) → Simplified" },
+				{ value: "s2t", label: "Simplified → Traditional (Std)" },
+				{ value: "t2s", label: "Traditional → Simplified (Std)" },
+			]);
+
+			const localFontWrap = el("localFontSelectWrap");
+			const localFontSelect = createCustomSelect(localFontWrap, {
+				onChange: (val) => {
+					if (val) el("customFont").value = val;
+				},
+			});
+
+			const volInput = el("volunteerMode");
+			const lockInput = el("volunteerBlockClicks");
+			const lockRow = el("lockRow");
+
+			function syncLockAvailability() {
+				const active = volInput.checked;
+				lockInput.disabled = !active;
+				if (!active) lockInput.checked = false;
+				lockRow.classList.toggle("disabled", !active);
+			}
+			volInput.addEventListener("change", syncLockAvailability);
+
+			function fillForm(cfg) {
+				if (!cfg) return;
+				if (cfg.targetLang !== undefined) el("targetLang").value = cfg.targetLang;
+				if (cfg.provider !== undefined) providerSelect.setValue(cfg.provider);
+				if (cfg.translatePaApiKey !== undefined) el("apiKey").value = cfg.translatePaApiKey;
+				if (cfg.customFont !== undefined) el("customFont").value = cfg.customFont;
+				if (cfg.customCss !== undefined) el("customCss").value = cfg.customCss;
+				if (cfg.spacingMode !== undefined) spacingSelect.setValue(cfg.spacingMode);
+				else if (cfg.autoSpacing !== undefined) spacingSelect.setValue(cfg.autoSpacing ? "both" : "off");
+				if (cfg.punctNorm !== undefined) punctSelect.setValue(cfg.punctNorm);
+				if (cfg.openccMode !== undefined) openccSelect.setValue(cfg.openccMode);
+				if (cfg.debugSpacingMarks !== undefined) el("debugSpacingMarks").checked = Boolean(cfg.debugSpacingMarks);
+				if (cfg.autoTranslate !== undefined) el("autoTranslate").checked = Boolean(cfg.autoTranslate);
+				if (cfg.debugInspect !== undefined) el("debugInspect").checked = Boolean(cfg.debugInspect);
+				if (cfg.volunteerMode !== undefined) volInput.checked = Boolean(cfg.volunteerMode);
+				if (cfg.volunteerBlockClicks !== undefined) lockInput.checked = Boolean(cfg.volunteerBlockClicks);
+				if (cfg.siteDeltas !== undefined) el("siteDeltas").value = JSON.stringify(cfg.siteDeltas, null, 2);
+				syncLockAvailability();
+			}
+
+			try {
+				const cached = localStorage.getItem(STORAGE_KEY);
+				if (cached) fillForm(JSON.parse(cached));
+			} catch {
+				// ignore invalid localStorage
+			}
+			syncLockAvailability();
+
+			const ptrStatus = el("ptrStatus");
+			function updatePtrStatus() {
+				ptrStatus.innerHTML = hasScript("ptr")
+					? '<i class="us-dot ok"></i>ptr connected'
+					: '<i class="us-dot warn"></i>ptr not detected';
+			}
+
+			const requestBridgeState = () => {
+				window.dispatchEvent(new CustomEvent("userscript:ptr-request-config"));
+				window.dispatchEvent(new CustomEvent("userscript:ptr-request-dicts"));
+			};
+
+			window.addEventListener("userscript:ptr-config", (event) => {
+				fillForm(event.detail);
+				updatePtrStatus();
+			});
+
+			function countDictEntries(file) {
+				let s = 0;
+				let d = 0;
+				let sc = 0;
+				for (const table of Object.values(file?.locales ?? {})) {
+					s += Object.keys(table?.static ?? {}).length;
+					d += Object.keys(table?.dynamic ?? {}).length;
+					sc += Object.keys(table?.scoped ?? {}).length;
+				}
+				return { s, d, sc };
+			}
+
+			function renderDicts(list) {
+				const tbody = el("dictBody");
+				tbody.innerHTML = "";
+				if (!Array.isArray(list) || list.length === 0) {
+					const tr = document.createElement("tr");
+					const td = document.createElement("td");
+					td.colSpan = 5;
+					td.className = "us-muted";
+					td.textContent = "No cached host dictionaries in GM storage.";
+					tr.append(td);
+					tbody.append(tr);
+					return;
+				}
+				for (const file of list) {
+					const { s, d, sc } = countDictEntries(file);
+					const tr = document.createElement("tr");
+					const tdHost = document.createElement("td");
+					tdHost.textContent = file.host;
+					const tdS = document.createElement("td");
+					tdS.textContent = String(s);
+					const tdD = document.createElement("td");
+					tdD.textContent = String(d);
+					const tdSc = document.createElement("td");
+					tdSc.textContent = String(sc);
+					const tdAct = document.createElement("td");
+					tdAct.className = "us-row";
+
+					const expBtn = document.createElement("button");
+					expBtn.type = "button";
+					expBtn.className = "us-btn us-btn-sm";
+					expBtn.textContent = "Export";
+					expBtn.addEventListener("click", () => {
+						const blob = new Blob([JSON.stringify(file, null, 2)], { type: "application/json" });
+						const url = URL.createObjectURL(blob);
+						const a = document.createElement("a");
+						a.href = url;
+						a.download = `${file.host}.json`;
+						a.click();
+						URL.revokeObjectURL(url);
+					});
+
+					const delBtn = document.createElement("button");
+					delBtn.type = "button";
+					delBtn.className = "us-btn us-btn-sm";
+					delBtn.textContent = "Clear";
+					delBtn.addEventListener("click", () => {
+						window.dispatchEvent(new CustomEvent("userscript:ptr-delete-dict", { detail: { host: file.host } }));
+					});
+
+					tdAct.append(expBtn, delBtn);
+					tr.append(tdHost, tdS, tdD, tdSc, tdAct);
+					tbody.append(tr);
+				}
+			}
+
+			window.addEventListener("userscript:ptr-dicts", (event) => {
+				renderDicts(event.detail);
+			});
+
+			onPresence(() => {
+				updatePtrStatus();
+				requestBridgeState();
+			});
+			requestBridgeState();
+			waitForScripts(1500).then(() => {
+				updatePtrStatus();
+				requestBridgeState();
+			});
+
+			el("clearApiKey").addEventListener("click", () => {
+				el("apiKey").value = "";
+			});
+
+			el("refreshDictBtn").addEventListener("click", () => {
+				window.dispatchEvent(new CustomEvent("userscript:ptr-request-dicts"));
+			});
+
+			const importFile = el("importDictFile");
+			el("importDictBtn").addEventListener("click", () => importFile.click());
+			importFile.addEventListener("change", async () => {
+				const file = importFile.files?.[0];
+				importFile.value = "";
+				if (!file) return;
+				try {
+					const parsed = JSON.parse(await file.text());
+					if (!parsed?.host || !parsed?.locales) {
+						el("note").textContent = "Invalid dictionary JSON: missing host or locales.";
+						return;
+					}
+					window.dispatchEvent(new CustomEvent("userscript:ptr-save-dict", { detail: parsed }));
+					el("note").textContent = `Imported dictionary for ${parsed.host}.`;
+				} catch {
+					el("note").textContent = "Failed to parse imported JSON file.";
+				}
+			});
+
+			const loadFontsBtn = el("loadFonts");
+			const fontList = el("localFontsList");
+			const fontNote = el("fontNote");
+			if (!("queryLocalFonts" in window)) {
+				loadFontsBtn.disabled = true;
+				fontNote.textContent = "Local Font Access API is not supported in this browser; enter a font name manually.";
+			} else {
+				loadFontsBtn.addEventListener("click", async () => {
+					fontNote.textContent = "Requesting local fonts permission...";
+					try {
+						const fonts = await window.queryLocalFonts();
+						const families = Array.from(new Set(fonts.map((f) => f.family).filter(Boolean))).sort((a, b) =>
+							a.localeCompare(b),
+						);
+						fontList.innerHTML = "";
+						for (const fam of families) {
+							const dlOpt = document.createElement("option");
+							dlOpt.value = `"${fam}", sans-serif`;
+							fontList.append(dlOpt);
+						}
+						localFontSelect.setOptions(
+							families.map((fam) => ({ value: `"${fam}", sans-serif`, label: fam })),
+							"No local fonts found",
+						);
+						localFontWrap.hidden = families.length === 0;
+						fontNote.textContent = `Loaded ${families.length} local font families.`;
+					} catch (err) {
+						fontNote.textContent = `Could not load local fonts: ${err instanceof Error ? err.message : String(err)}`;
+					}
+				});
+			}
+
+			for (const btn of document.querySelectorAll("[data-preset]")) {
+				btn.addEventListener("click", () => {
+					el("customCss").value = PRESETS[btn.dataset.preset] ?? "";
+				});
+			}
+
+			el("apply").addEventListener("click", () => {
+				let siteDeltas = {};
+				const rawDeltas = el("siteDeltas").value.trim();
+				if (rawDeltas) {
+					try {
+						siteDeltas = JSON.parse(rawDeltas);
+					} catch {
+						el("note").textContent = "Invalid JSON in Per-Site Delta Rules.";
+						return;
+					}
+				}
+
+				const spacingMode = spacingSelect.getValue();
+				const ptr = {
+					targetLang: el("targetLang").value.trim() || "zh-TW",
+					provider: providerSelect.getValue(),
+					translatePaApiKey: el("apiKey").value,
+					customFont: el("customFont").value.trim(),
+					customCss: el("customCss").value,
+					spacingMode,
+					autoSpacing: spacingMode !== "off",
+					punctNorm: punctSelect.getValue(),
+					openccMode: openccSelect.getValue(),
+					debugSpacingMarks: el("debugSpacingMarks").checked,
+					autoTranslate: el("autoTranslate").checked,
+					debugInspect: el("debugInspect").checked,
+					volunteerMode: volInput.checked,
+					volunteerBlockClicks: volInput.checked ? lockInput.checked : false,
+					siteDeltas,
+				};
+
+				localStorage.setItem(STORAGE_KEY, JSON.stringify(ptr));
+				dispatchSettings({ ptr });
+				el("note").textContent = hasScript("ptr")
+					? "Applied settings to Page Translator."
+					: "Saved locally (Page Translator not detected on this page).";
+			});
+		</script>
+	</body>
+</html>

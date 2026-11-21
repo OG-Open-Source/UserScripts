@@ -26,16 +26,16 @@ const REPO = "OG-Open-Source/UserScripts";
 
 const args = process.argv.slice(2);
 if (args.length === 0) {
-  console.error("Usage: bun run new-script <name> [--framework vanilla|solid|svelte]");
-  exit(1);
+	console.error("Usage: bun run new-script <name> [--framework vanilla|solid|svelte]");
+	exit(1);
 }
 
 const name = args[0];
 const frameworkIdx = args.indexOf("--framework");
 const framework = frameworkIdx !== -1 ? args[frameworkIdx + 1] : "vanilla";
 if (!["vanilla", "solid", "svelte"].includes(framework)) {
-  console.error(`Unknown framework: ${framework}. Use vanilla | solid | svelte.`);
-  exit(1);
+	console.error(`Unknown framework: ${framework}. Use vanilla | solid | svelte.`);
+	exit(1);
 }
 
 // Unique userscript id: lowercase, digits and hyphens only. Used in release
@@ -44,73 +44,64 @@ const id = name.toLowerCase().replace(/[^a-z0-9-]/g, "");
 
 const pkgDir = resolve(root, "packages", name);
 if (existsSync(pkgDir)) {
-  console.error(`packages/${name} already exists.`);
-  exit(1);
+	console.error(`packages/${name} already exists.`);
+	exit(1);
 }
 mkdirSync(resolve(pkgDir, "src"), { recursive: true });
 
 const packageName = `@userscripts/${name}`;
 const titleName = name
-  .split("-")
-  .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-  .join(" ");
+	.split("-")
+	.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+	.join(" ");
 
 // No version field: the tag is the source of truth. No userscript.id field:
 // vite.config.ts's USERSCRIPT_ID export is the single source the release
 // workflow reads.
 writeFileSync(
-  resolve(pkgDir, "package.json"),
-  JSON.stringify(
-    {
-      name: packageName,
-      private: true,
-      description: `${titleName} userscript.`,
-      type: "module",
-      scripts: {
-        dev: "vite",
-        build: "vite build",
-        typecheck: "tsc --noEmit",
-      },
-      dependencies: {
-        "@userscripts/shared": "*",
-        ...(framework === "solid"
-          ? { "solid-js": "^1.9.0" }
-          : framework === "svelte"
-            ? { svelte: "^5.0.0" }
-            : {}),
-      },
-      devDependencies: {
-        typescript: "^5.9.0",
-        vite: "^7.1.0",
-        "vite-plugin-monkey": "^5.0.0",
-        "@types/node": "^22.0.0",
-        ...(framework === "solid"
-          ? { "vite-plugin-solid": "^2.11.0" }
-          : framework === "svelte"
-            ? { "@sveltejs/vite-plugin-svelte": "^5.0.0" }
-            : {}),
-      },
-    },
-    null,
-    2,
-  ) + "\n",
+	resolve(pkgDir, "package.json"),
+	JSON.stringify(
+		{
+			name: packageName,
+			private: true,
+			description: `${titleName} userscript.`,
+			type: "module",
+			scripts: { dev: "vite", build: "vite build", typecheck: "tsc --noEmit" },
+			dependencies: {
+				"@userscripts/shared": "*",
+				...(framework === "solid" ? { "solid-js": "^1.9.0" } : framework === "svelte" ? { svelte: "^5.0.0" } : {}),
+			},
+			devDependencies: {
+				typescript: "^5.9.0",
+				vite: "^7.1.0",
+				"vite-plugin-monkey": "^5.0.0",
+				"@types/node": "^22.0.0",
+				...(framework === "solid"
+					? { "vite-plugin-solid": "^2.11.0" }
+					: framework === "svelte"
+						? { "@sveltejs/vite-plugin-svelte": "^5.0.0" }
+						: {}),
+			},
+		},
+		null,
+		2,
+	) + "\n",
 );
 
-const entry =
-  framework === "svelte" ? "src/main.ts" : framework === "solid" ? "src/main.tsx" : "src/main.ts";
+const entry = framework === "svelte" ? "src/main.ts" : framework === "solid" ? "src/main.tsx" : "src/main.ts";
 
 writeFileSync(
-  resolve(pkgDir, "vite.config.ts"),
-  `import { readFileSync } from 'node:fs';
+	resolve(pkgDir, "vite.config.ts"),
+	`import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';${
-    framework === "solid"
-      ? "\nimport solid from 'vite-plugin-solid';"
-      : framework === "svelte"
-        ? "\nimport { svelte } from '@sveltejs/vite-plugin-svelte';"
-        : ""
-  }
+		framework === "solid"
+			? "\nimport solid from 'vite-plugin-solid';"
+			: framework === "svelte"
+				? "\nimport { svelte } from '@sveltejs/vite-plugin-svelte';"
+				: ""
+	}
 import monkey from 'vite-plugin-monkey';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -142,17 +133,21 @@ export const USERSCRIPT_FILE = '${name}.user.js';
  * \`0.0.0-dev\` placeholder so \`bun run dev\` still emits a valid @version.
  */
 const VERSION =
-  process.env.USERSCRIPT_VERSION ?? pkg.version ?? "0.0.0-dev";
+	process.env.USERSCRIPT_VERSION ?? pkg.version ?? "0.0.0-dev";
+const IS_RELEASE = VERSION !== "0.0.0-dev";
+const OUT_DIR = IS_RELEASE ? "dist" : ".dist-dev";
 
 // Released assets are published by the release workflow; the update URLs
 // point here so installed scripts self-update via @updateURL.
 const RAW_BASE = \`https://raw.githubusercontent.com/${REPO}/main/packages/${name}/dist\`;
 
 export default defineConfig({
-  plugins: [
-    ${framework === "solid" ? "solid(),\n    " : ""}${
-      framework === "svelte" ? "svelte(),\n    " : ""
-    }monkey({
+	build: {
+		outDir: OUT_DIR,
+		emptyOutDir: true,
+	},
+	plugins: [
+    ${framework === "solid" ? "solid(),\n    " : ""}${framework === "svelte" ? "svelte(),\n    " : ""}monkey({
       entry: './${entry}',
       userscript: {
         name: USERSCRIPT_NAME,
@@ -180,30 +175,24 @@ export default defineConfig({
 );
 
 writeFileSync(
-  resolve(pkgDir, "tsconfig.json"),
-  JSON.stringify(
-    {
-      extends: "../../tsconfig.base.json",
-      compilerOptions: {
-        noEmit: true,
-        types: ["node", "vite-plugin-monkey/client"],
-      },
-      include: ["src/**/*.ts", "vite.config.ts", "vite-env.d.ts"],
-    },
-    null,
-    2,
-  ) + "\n",
+	resolve(pkgDir, "tsconfig.json"),
+	JSON.stringify(
+		{
+			extends: "../../tsconfig.base.json",
+			compilerOptions: { noEmit: true, types: ["node", "vite-plugin-monkey/client"] },
+			include: ["src/**/*.ts", "vite.config.ts", "vite-env.d.ts"],
+		},
+		null,
+		2,
+	) + "\n",
 );
 
-writeFileSync(
-  resolve(pkgDir, "vite-env.d.ts"),
-  '/// <reference types="vite-plugin-monkey/client" />\n',
-);
+writeFileSync(resolve(pkgDir, "vite-env.d.ts"), '/// <reference types="vite-plugin-monkey/client" />\n');
 
 if (framework === "vanilla") {
-  writeFileSync(
-    resolve(pkgDir, "src/main.ts"),
-    `/**
+	writeFileSync(
+		resolve(pkgDir, "src/main.ts"),
+		`/**
  * ${titleName} — userscript entry.
  *
  * Scaffolded with the Vanilla TS template. Import shared utilities from
@@ -215,11 +204,11 @@ configureGmApi({});
 
 console.log('[${id}] loaded');
 `,
-  );
+	);
 } else if (framework === "solid") {
-  writeFileSync(
-    resolve(pkgDir, "src/main.tsx"),
-    `/**
+	writeFileSync(
+		resolve(pkgDir, "src/main.tsx"),
+		`/**
  * ${titleName} — userscript entry (SolidJS).
  *
  * Mount a reactive UI into the page; keep DOM-surgery concerns in plain
@@ -236,11 +225,11 @@ document.documentElement.appendChild(host);
 
 render(() => <div>${titleName}</div>, host);
 `,
-  );
+	);
 } else {
-  writeFileSync(
-    resolve(pkgDir, "src/main.ts"),
-    `/**
+	writeFileSync(
+		resolve(pkgDir, "src/main.ts"),
+		`/**
  * ${titleName} — userscript entry (Svelte).
  */
 import { mount } from 'svelte';
@@ -255,16 +244,16 @@ document.documentElement.appendChild(host);
 
 mount(App, { target: host });
 `,
-  );
-  writeFileSync(
-    resolve(pkgDir, "src/App.svelte"),
-    `<script lang="ts">
+	);
+	writeFileSync(
+		resolve(pkgDir, "src/App.svelte"),
+		`<script lang="ts">
   // ${titleName} root component.
 </script>
 
 <div>${titleName}</div>
 `,
-  );
+	);
 }
 
 console.log(`Created packages/${name} (${framework}), USERSCRIPT_ID='${id}'.`);

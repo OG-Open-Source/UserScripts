@@ -1,0 +1,50 @@
+name: Bug Report
+description: Report a problem with a userscript in this repository
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in all four
+        sections below so the issue can be reproduced and diagnosed quickly.
+
+        Security vulnerabilities **must not** be reported here — see
+        [SECURITY.md](../../SECURITY.md) for private reporting instructions.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system and architecture, browser, and userscript manager with versions.
+      placeholder: |
+        e.g.
+        - OS: Windows 11 (x86_64)
+        - Browser: Firefox 134.0
+        - Userscript manager: Violentmonkey 2.20.0
+        - Script: hanime1-download-manager (installed from h1dl-v1.1.0)
+    validations:
+      required: true
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Minimal steps or a reproducible example that triggers the issue.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See the error
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happened instead (include console errors or screenshots if available).
+    validations:
+      required: true

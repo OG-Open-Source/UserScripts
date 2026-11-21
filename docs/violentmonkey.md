@@ -57,10 +57,10 @@
 ```javascript
 // 相容多種腳本管理器
 GM.xmlHttpRequest({
-  url,
-  onload: (res) => {
-    /* ... */
-  },
+	url,
+	onload: (res) => {
+		/* ... */
+	},
 });
 ```
 
@@ -111,16 +111,16 @@ const id = "status";
 const inplace = id === GM_registerMenuCommand("Enabled", onClick, { id });
 
 if (inplace) {
-  // 同一 id 會原地取代原指令
-  GM_registerMenuCommand("Disabled", onClick, { id, title: "Status" });
+	// 同一 id 會原地取代原指令
+	GM_registerMenuCommand("Disabled", onClick, { id, title: "Status" });
 } else {
-  // 不支援原地更新時的 fallback
-  GM_unregisterMenuCommand("Enabled");
-  GM_unregisterMenuCommand("Foo");
-  GM_unregisterMenuCommand("Bar");
-  GM_registerMenuCommand("Disabled", onClick);
-  GM_registerMenuCommand("Foo", onClick2);
-  GM_registerMenuCommand("Bar", onClick3);
+	// 不支援原地更新時的 fallback
+	GM_unregisterMenuCommand("Enabled");
+	GM_unregisterMenuCommand("Foo");
+	GM_unregisterMenuCommand("Bar");
+	GM_registerMenuCommand("Disabled", onClick);
+	GM_registerMenuCommand("Foo", onClick2);
+	GM_registerMenuCommand("Bar", onClick3);
 }
 ```
 
@@ -141,10 +141,10 @@ const lang = GM_getValue("lang", null); // 第二參數為預設值
 
 ```javascript
 GM_download({
-  url: "https://example.com/video.mp4",
-  name: "video.mp4",
-  onload: () => console.log("done"),
-  onerror: (err) => console.error(err),
+	url: "https://example.com/video.mp4",
+	name: "video.mp4",
+	onload: () => console.log("done"),
+	onerror: (err) => console.error(err),
 });
 ```
 

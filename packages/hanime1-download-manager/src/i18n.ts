@@ -7,28 +7,28 @@
  */
 
 export type Hanime1MessageKey =
-  | "download"
-  | "fetching"
-  | "done"
-  | "error"
-  | "loadingQualities"
-  | "noQualities"
-  | "selectAll"
-  | "selectNone"
-  | "downloadSelected"
-  | "chooseBatchQuality"
-  | "downgradeNotice";
+	| "download"
+	| "fetching"
+	| "done"
+	| "error"
+	| "loadingQualities"
+	| "noQualities"
+	| "selectAll"
+	| "selectNone"
+	| "downloadSelected"
+	| "chooseBatchQuality"
+	| "downgradeNotice";
 
 export const MESSAGES: Record<Hanime1MessageKey, string> = {
-  download: "Download",
-  fetching: "Resolving",
-  done: "Done",
-  error: "Failed",
-  loadingQualities: "Loading qualities…",
-  noQualities: "No downloadable quality",
-  selectAll: "Select all",
-  selectNone: "Select none",
-  downloadSelected: "Download selected",
-  chooseBatchQuality: "Choose batch quality (auto-downgrade if unavailable)",
-  downgradeNotice: "Quality downgraded:",
+	download: "Download",
+	fetching: "Resolving",
+	done: "Done",
+	error: "Failed",
+	loadingQualities: "Loading qualities…",
+	noQualities: "No downloadable quality",
+	selectAll: "Select all",
+	selectNone: "Select none",
+	downloadSelected: "Download selected",
+	chooseBatchQuality: "Choose batch quality (auto-downgrade if unavailable)",
+	downgradeNotice: "Quality downgraded:",
 };

@@ -21,8 +21,8 @@ export const NATIVE_ITEM_CLASS = "more-horiz-item";
 
 /** Build the <style> element and append it to <head>. */
 export function injectStyles(theme: NativeTheme): HTMLStyleElement {
-  const style = document.createElement("style");
-  style.textContent = `
+	const style = document.createElement("style");
+	style.textContent = `
 :root {
   --h1dl-panel-bg: ${theme.panelBg};
   --h1dl-panel-color: ${theme.panelColor};
@@ -44,8 +44,8 @@ export function injectStyles(theme: NativeTheme): HTMLStyleElement {
 .h1dl-check.checked,.h1dl-check.checked .material-icons{background:#2196f3;border-color:#2196f3;color:#fff}
 .h1dl-check.completed{opacity:.35!important;cursor:default;pointer-events:none}
 .h1dl-batch-tick{position:relative;height:6px;width:20px;border-radius:2px;background:var(--h1dl-action-bg);overflow:visible;flex:none}
-.h1dl-batch-tick .h1dl-batch-fill{position:absolute;left:0;top:0;bottom:0;background:#2196f3;width:0%;transition:width .2s linear;border-radius:inherit}
-.h1dl-batch-tick.done .h1dl-batch-fill,.h1dl-batch-tick.error .h1dl-batch-fill{width:100%}
+.h1dl-batch-tick .h1dl-batch-fill{position:absolute;inset:0;width:100%;background:#2196f3;transform-origin:left center;transform:scaleX(0);will-change:transform;transition:transform .2s linear;border-radius:inherit}
+.h1dl-batch-tick.done .h1dl-batch-fill,.h1dl-batch-tick.error .h1dl-batch-fill{transform:scaleX(1)} 
 .h1dl-batch-tick.done .h1dl-batch-fill{background:#33CC55}
 .h1dl-batch-tick.error .h1dl-batch-fill{background:#CC3333}
 .h1dl-batch-name{display:none;position:absolute;right:calc(100% + 6px);top:50%;transform:translateY(-50%);height:24px;line-height:24px;padding:0 8px;background:var(--h1dl-panel-bg);color:var(--h1dl-panel-color);border-radius:4px;white-space:nowrap;font-size:12px;pointer-events:none;box-shadow:0 2px 10px rgba(0,0,0,.6)}
@@ -69,6 +69,6 @@ export function injectStyles(theme: NativeTheme): HTMLStyleElement {
   }
 }
 `;
-  document.head.appendChild(style);
-  return style;
+	document.head.appendChild(style);
+	return style;
 }

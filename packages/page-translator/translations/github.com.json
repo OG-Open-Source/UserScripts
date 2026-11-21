@@ -1,0 +1,49 @@
+{
+	"version": 1,
+	"host": "github.com",
+	"locales": {
+		"zh-Hant-TW": {
+			"static": {
+				"Code": "程式碼",
+				"Issues": "議題",
+				"Pull requests": "拉取請求",
+				"Actions": "自動化動作",
+				"Projects": "專案",
+				"Wiki": "維基",
+				"Security": "安全性",
+				"Insights": "洞察分析",
+				"Settings": "設定",
+				"Star": "加星標",
+				"Starred": "已加星標",
+				"Fork": "復刻",
+				"Watch": "關注",
+				"Releases": "發布版本",
+				"Packages": "套件"
+			},
+			"dynamic": {
+				"Type {v0} to search": "按 {v0} 搜尋",
+				"{v0} hours ago": "{v0} 小時前",
+				"{v0} minutes ago": "{v0} 分鐘前",
+				"{v0} days ago": "{v0} 天前",
+				"{v0} stars": "{v0} 顆星",
+				"{v0} forks": "{v0} 次復刻"
+			},
+			"scoped": {
+				"nav[aria-label='Insights'], .Subhead": {
+					"static": {
+						"Pulse": "脈動",
+						"Contributors": "貢獻者",
+						"Community": "社群",
+						"Community Standards": "社群規範",
+						"Traffic": "流量",
+						"Commits": "提交紀錄",
+						"Code frequency": "程式碼頻率",
+						"Dependency graph": "相依性圖表",
+						"Network": "分支網絡",
+						"Forks": "復刻列表"
+					}
+				}
+			}
+		}
+	}
+}

@@ -60,7 +60,7 @@ UserScripts/
 │       ├── package.json
 │       ├── tsconfig.json
 │       └── vite-env.d.ts
-├── scripts/                       # 倉庫腳本
+├── tools/                         # 開發工具與腳手架
 │   └── new-script.mjs             # 腳手架：建立新腳本套件
 ├── package.json                   # 根套件：workspaces + 指令
 ├── bun.lock                       # bun 鎖檔
@@ -73,25 +73,21 @@ UserScripts/
 ```jsonc
 // 根 package.json
 {
-  "name": "userscripts",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "bun run --filter '*' dev",
-    "dev:hanime1": "bun run --filter '@userscripts/hanime1-download-manager' dev",
-    "build": "bun run --filter '*' build",
-    "build:hanime1": "bun run --filter '@userscripts/hanime1-download-manager' build",
-    "typecheck": "bun run --filter '*' typecheck",
-    "new-script": "bun run scripts/new-script.mjs",
-  },
-  "workspaces": ["packages/*"],
-  "devDependencies": {
-    "typescript": "^5.9.0",
-    "vite": "^7.1.0",
-    "vite-plugin-monkey": "^5.0.0",
-  },
-  "engines": { "bun": ">=1.2.0" },
+	"name": "userscripts",
+	"private": true,
+	"version": "1.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "bun run --filter '*' dev",
+		"dev:hanime1": "bun run --filter '@userscripts/hanime1-download-manager' dev",
+		"build": "bun run --filter '*' build",
+		"build:hanime1": "bun run --filter '@userscripts/hanime1-download-manager' build",
+		"typecheck": "bun run --filter '*' typecheck",
+		"new-script": "bun run tools/new-script.mjs"
+	},
+	"workspaces": ["packages/*"],
+	"devDependencies": { "typescript": "^5.9.0", "vite": "^7.1.0", "vite-plugin-monkey": "^5.0.0" },
+	"engines": { "bun": ">=1.2.0" }
 }
 ```
 
@@ -102,41 +98,26 @@ UserScripts/
 ```jsonc
 // packages/hanime1-download-manager/package.json
 {
-  "name": "@userscripts/hanime1-download-manager",
-  "version": "1.1.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "typecheck": "tsc --noEmit",
-  },
-  "dependencies": {
-    "@userscripts/shared": "*",
-  },
-  "devDependencies": {
-    "typescript": "^5.9.0",
-    "vite": "^7.1.0",
-    "vite-plugin-monkey": "^5.0.0",
-  },
+	"name": "@userscripts/hanime1-download-manager",
+	"version": "1.1.0",
+	"private": true,
+	"type": "module",
+	"scripts": { "dev": "vite", "build": "vite build", "typecheck": "tsc --noEmit" },
+	"dependencies": { "@userscripts/shared": "*" },
+	"devDependencies": { "typescript": "^5.9.0", "vite": "^7.1.0", "vite-plugin-monkey": "^5.0.0" }
 }
 ```
 
 ```jsonc
 // packages/shared/package.json
 {
-  "name": "@userscripts/shared",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "exports": {
-    ".": "./src/index.ts",
-    "./i18n": "./src/i18n.ts",
-    "./theme": "./src/theme.ts",
-    "./gm": "./src/gm.ts",
-  },
+	"name": "@userscripts/shared",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"main": "./src/index.ts",
+	"types": "./src/index.ts",
+	"exports": { ".": "./src/index.ts", "./i18n": "./src/i18n.ts", "./theme": "./src/theme.ts", "./gm": "./src/gm.ts" }
 }
 ```
 
@@ -153,6 +134,7 @@ UserScripts/
 | 套件                                    | USERSCRIPT_ID | 發布 tag 範例 |
 | --------------------------------------- | ------------- | ------------- |
 | `@userscripts/hanime1-download-manager` | `h1dl`        | `h1dl-v1.1.0` |
+| `@userscripts/page-translator`          | `ptr`         | `ptr-v1.0.0`  |
 
 推送 tag 後 `.github/workflows/release.yml` 會：
 
@@ -212,26 +194,26 @@ export type LangCode = "zh-Hant-TW" | "zh-Hans-CN" | "en";
  * 當前語言標記 ✓，切換後儲存並重載頁面。
  */
 export function createI18nMenu<TLang extends string>(options: {
-  langs: TLang[];
-  defaultLang: TLang;
-  langNames: Record<TLang, string>;
-  storageKey: string;
+	langs: TLang[];
+	defaultLang: TLang;
+	langNames: Record<TLang, string>;
+	storageKey: string;
 }): { lang: TLang; t: (key: string) => string } {
-  const { langs, defaultLang, langNames, storageKey } = options;
-  const saved = GM_getValue(storageKey, null) as TLang | null;
-  const lang = langs.includes(saved) ? (saved as TLang) : defaultLang;
+	const { langs, defaultLang, langNames, storageKey } = options;
+	const saved = GM_getValue(storageKey, null) as TLang | null;
+	const lang = langs.includes(saved) ? (saved as TLang) : defaultLang;
 
-  if (typeof GM_registerMenuCommand === "function") {
-    for (const code of langs) {
-      GM_registerMenuCommand(langNames[code] + (code === lang ? " ✓" : ""), () => {
-        if (code === lang) return;
-        GM_setValue(storageKey, code);
-        location.reload();
-      });
-    }
-  }
+	if (typeof GM_registerMenuCommand === "function") {
+		for (const code of langs) {
+			GM_registerMenuCommand(langNames[code] + (code === lang ? " ✓" : ""), () => {
+				if (code === lang) return;
+				GM_setValue(storageKey, code);
+				location.reload();
+			});
+		}
+	}
 
-  return { lang, t: (key) => key };
+	return { lang, t: (key) => key };
 }
 ```
 
@@ -241,14 +223,14 @@ import { GM_xmlhttpRequest } from "$";
 
 /** Promise 化的 GM_xmlhttpRequest */
 export function gmFetch(url: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    GM_xmlhttpRequest({
-      method: "GET",
-      url,
-      onload: (res) => resolve(res.responseText),
-      onerror: (err) => reject(err),
-    });
-  });
+	return new Promise((resolve, reject) => {
+		GM_xmlhttpRequest({
+			method: "GET",
+			url,
+			onload: (res) => resolve(res.responseText),
+			onerror: (err) => reject(err),
+		});
+	});
 }
 ```
 
@@ -259,15 +241,15 @@ export function gmFetch(url: string): Promise<string> {
  * 讀取 .offsetLeft 強制同步 reflow，取得真實 computed style。
  */
 export function probeTheme(probeClass: string): CSSStyleDeclaration {
-  const probe = document.createElement("div");
-  probe.className = probeClass;
-  probe.style.cssText =
-    "position:fixed;left:-9999px;top:-9999px;visibility:hidden;z-index:-1;display:block!important;opacity:1";
-  document.body.appendChild(probe);
-  probe.offsetLeft; // 強制 reflow
-  const style = getComputedStyle(probe);
-  probe.remove();
-  return style;
+	const probe = document.createElement("div");
+	probe.className = probeClass;
+	probe.style.cssText =
+		"position:fixed;left:-9999px;top:-9999px;visibility:hidden;z-index:-1;display:block!important;opacity:1";
+	document.body.appendChild(probe);
+	probe.offsetLeft; // 強制 reflow
+	const style = getComputedStyle(probe);
+	probe.remove();
+	return style;
 }
 ```
 
