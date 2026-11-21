@@ -26,11 +26,16 @@ const PRESENCE_EVENT = "userscript:presence";
 const PRESENCE_GLOBAL = "__userscriptPresence";
 
 function all(): ScriptPresence[] {
-  const root = globalThis as unknown as Record<string, ScriptPresence[]>;
-  if (!root[PRESENCE_GLOBAL]) {
-    root[PRESENCE_GLOBAL] = [];
+  const root = globalThis as unknown as Record<
+    string,
+    ScriptPresence[] | undefined
+  >;
+  let list = root[PRESENCE_GLOBAL];
+  if (!list) {
+    list = [];
+    root[PRESENCE_GLOBAL] = list;
   }
-  return root[PRESENCE_GLOBAL];
+  return list;
 }
 
 /**
@@ -56,8 +61,8 @@ export function publishPresence(presence: ScriptPresence): void {
   const root = globalThis as unknown as Record<string, ScriptPresence[]>;
   root[PRESENCE_GLOBAL] = merged;
 
-  let el = document.getElementById(
-    REGISTRY_ELEMENT_ID
+  let el = document.querySelector(
+    `#${REGISTRY_ELEMENT_ID}`
   ) as HTMLScriptElement | null;
   if (!el) {
     el = document.createElement("script");
@@ -72,7 +77,7 @@ export function publishPresence(presence: ScriptPresence): void {
 
 /** Read the annotations currently in the page. */
 export function readPresence(): ScriptPresence[] {
-  const el = document.getElementById(REGISTRY_ELEMENT_ID);
+  const el = document.querySelector(`#${REGISTRY_ELEMENT_ID}`);
   if (!el?.textContent) {
     return all();
   }
@@ -102,15 +107,32 @@ export function isManagerPage(
   );
 }
 
+/**
+ * Returns true when running in the top-level browsing context (`self === top`),
+ * and false inside iframes or when cross-origin frame access throws.
+ */
+export function isTopFrame(
+  win: Pick<Window, "self" | "top"> | null = typeof window === "undefined"
+    ? null
+    : window
+): boolean {
+  try {
+    return win ? win.self === win.top : true;
+  } catch {
+    return false;
+  }
+}
+
 /** Await annotations for a moment — scripts run at document-idle, not before. */
-export async function waitForPresence(ms = 2000): Promise<ScriptPresence[]> {
+export function waitForPresence(ms = 2000): Promise<ScriptPresence[]> {
   const deadline = Date.now() + ms;
-  while (Date.now() < deadline) {
+  const poll = async (): Promise<ScriptPresence[]> => {
     const seen = readPresence();
-    if (seen.length) {
+    if (seen.length > 0 || Date.now() >= deadline) {
       return seen;
     }
     await new Promise((resolve) => window.setTimeout(resolve, 100));
-  }
-  return readPresence();
+    return poll();
+  };
+  return poll();
 }

@@ -48,6 +48,7 @@ export { createI18n, detectLang, loadLocales } from "./i18n";
 export type { ScriptPresence } from "./presence";
 export {
   isManagerPage,
+  isTopFrame,
   publishPresence,
   readPresence,
   waitForPresence,

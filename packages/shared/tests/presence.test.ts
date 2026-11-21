@@ -1,12 +1,17 @@
 import { expect, test } from "bun:test";
-import { isManagerPage, publishPresence, readPresence } from "../src/presence";
+import {
+  isManagerPage,
+  isTopFrame,
+  publishPresence,
+  readPresence,
+} from "../src/presence";
 
 test("publishPresence merges across isolated userscript sandboxes via DOM registry", () => {
   let registryEl: { type: string; id: string; textContent: string } | null =
     null;
   const mockDoc = {
-    getElementById: (id: string) =>
-      id === "userscript-registry" ? registryEl : null,
+    querySelector: (selector: string) =>
+      selector === "#userscript-registry" ? registryEl : null,
     createElement: () => ({ type: "", id: "", textContent: "" }),
     head: {
       append: (el: { type: string; id: string; textContent: string }) => {
@@ -22,12 +27,15 @@ test("publishPresence merges across isolated userscript sandboxes via DOM regist
   (globalThis as Record<string, unknown>).document = mockDoc;
   (globalThis as Record<string, unknown>).window = mockWin;
   (globalThis as Record<string, unknown>).CustomEvent = class {
-    constructor(public type: string) {}
+    type: string;
+    constructor(type: string) {
+      this.type = type;
+    }
   };
 
   try {
     // Sandbox 1 publishes h1dl
-    delete (globalThis as Record<string, unknown>).__userscriptPresence;
+    (globalThis as Record<string, unknown>).__userscriptPresence = undefined;
     publishPresence({
       id: "h1dl",
       name: "Hanime1 Download Manager",
@@ -36,7 +44,7 @@ test("publishPresence merges across isolated userscript sandboxes via DOM regist
     });
 
     // Sandbox 2 has its own empty globalThis.__userscriptPresence and publishes ptr
-    delete (globalThis as Record<string, unknown>).__userscriptPresence;
+    (globalThis as Record<string, unknown>).__userscriptPresence = undefined;
     publishPresence({
       id: "ptr",
       name: "Page Translator",
@@ -50,7 +58,7 @@ test("publishPresence merges across isolated userscript sandboxes via DOM regist
     (globalThis as Record<string, unknown>).document = prevDoc;
     (globalThis as Record<string, unknown>).window = prevWin;
     (globalThis as Record<string, unknown>).CustomEvent = prevEvent;
-    delete (globalThis as Record<string, unknown>).__userscriptPresence;
+    (globalThis as Record<string, unknown>).__userscriptPresence = undefined;
   }
 });
 
@@ -78,4 +86,23 @@ test("isManagerPage matches hosted settings path or manager meta tag on localhos
       pathname: "/settings/translate/",
     })
   ).toBe(true);
+});
+
+test("isTopFrame returns true only when self === top and false on cross-origin error", () => {
+  const topWin = {} as Window;
+  (topWin as { self: unknown; top: unknown }).self = topWin;
+  (topWin as { self: unknown; top: unknown }).top = topWin;
+  expect(isTopFrame(topWin)).toBe(true);
+  expect(isTopFrame(null)).toBe(true);
+
+  const childWin = { self: {}, top: topWin } as unknown as Window;
+  expect(isTopFrame(childWin)).toBe(false);
+
+  const throwingWin = {
+    get self() {
+      throw new Error("SecurityError");
+    },
+    top: topWin,
+  } as unknown as Window;
+  expect(isTopFrame(throwingWin)).toBe(false);
 });

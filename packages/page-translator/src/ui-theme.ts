@@ -42,8 +42,8 @@ button.ptr-btn {
   font-size: 12px;
   line-height: 1.25;
   padding: 6px 11px;
-  background: var(--us-surface-2);
-  color: var(--us-fg);
+  background: var(--_btn-bg, var(--us-surface-2));
+  color: var(--_btn-fg, var(--us-fg));
   border: none;
   border-radius: var(--us-radius-md);
   cursor: pointer;
@@ -59,7 +59,8 @@ button.ptr-btn {
 
 .ptr-btn:hover:not(:disabled),
 button.ptr-btn:hover:not(:disabled) {
-  background: var(--us-surface-3);
+  background: var(--_btn-hover-bg, var(--us-surface-3));
+  color: var(--_btn-hover-fg, var(--_btn-fg, var(--us-fg)));
   box-shadow: var(--us-shadow-sm);
 }
 
@@ -85,16 +86,11 @@ button.ptr-btn.flash-done {
 button.ptr-btn-primary,
 .ptr-btn[aria-pressed="true"],
 button.ptr-btn[aria-pressed="true"] {
-  background: var(--us-accent-bg);
-  color: var(--us-accent-fg);
+  --_btn-bg: var(--us-accent-bg);
+  --_btn-fg: var(--us-accent-fg);
+  --_btn-hover-bg: var(--us-accent-hover);
+  --_btn-hover-fg: var(--us-accent-fg);
   font-weight: 600;
-}
-
-.ptr-btn-primary:hover:not(:disabled),
-button.ptr-btn-primary:hover:not(:disabled),
-.ptr-btn[aria-pressed="true"]:hover:not(:disabled),
-button.ptr-btn[aria-pressed="true"]:hover:not(:disabled) {
-  background: var(--us-accent-hover);
 }
 
 .ptr-input,

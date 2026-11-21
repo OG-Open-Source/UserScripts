@@ -42,8 +42,11 @@ export function getUiTokensCss(
   scopeSelector = ":host",
   hostTokens?: ThemeTokens
 ): string {
-  const lightTokens = resolveThemeTokens("light")!;
-  const darkTokens = resolveThemeTokens("dark")!;
+  const lightTokens = resolveThemeTokens("light");
+  const darkTokens = resolveThemeTokens("dark");
+  if (!(lightTokens && darkTokens)) {
+    throw new Error("Failed to resolve default light/dark theme tokens");
+  }
   const hostOverride = hostTokens
     ? `
 ${scopeAttr(scopeSelector, '[data-theme-mode="host"]')} {
@@ -66,6 +69,12 @@ ${scopeSelector} {
 ${tokenVarsBlock(lightTokens)}
   --us-accent-hover: oklch(47.00% 0.1771 255.83);
   --us-focus: var(--nk-blue);
+
+  /* Media overlay contrast tokens (over bright/dark video or images) */
+  --us-overlay-bg: oklch(16.00% 0.0140 264.00 / 0.78);
+  --us-overlay-hover: oklch(22.00% 0.0180 264.00 / 0.90);
+  --us-overlay-fg: oklch(97.00% 0.0050 264.00);
+  --us-overlay-shadow: 0 2px 10px oklch(4% 0.01 264 / 0.50);
 
   /* NovaKit radius scale */
   --us-radius-lg: 12px;
@@ -176,8 +185,8 @@ button.us-btn {
   font-size: 12px;
   line-height: 1.25;
   padding: 6px 11px;
-  background: var(--us-surface-2);
-  color: var(--us-fg);
+  background: var(--_btn-bg, var(--us-surface-2));
+  color: var(--_btn-fg, var(--us-fg));
   border: none;
   border-radius: var(--us-radius-md);
   cursor: pointer;
@@ -193,7 +202,8 @@ button.us-btn {
 
 .us-btn:hover:not(:disabled),
 button.us-btn:hover:not(:disabled) {
-  background: var(--us-surface-3);
+  background: var(--_btn-hover-bg, var(--us-surface-3));
+  color: var(--_btn-hover-fg, var(--_btn-fg, var(--us-fg)));
   box-shadow: var(--us-shadow-sm);
 }
 
@@ -239,15 +249,11 @@ button.us-btn-sm {
 button.us-btn-primary,
 .us-btn[aria-pressed="true"],
 button.us-btn[aria-pressed="true"] {
-  background: var(--us-accent-bg);
-  color: var(--us-accent-fg);
+  --_btn-bg: var(--us-accent-bg);
+  --_btn-fg: var(--us-accent-fg);
+  --_btn-hover-bg: var(--us-accent-hover);
+  --_btn-hover-fg: var(--us-accent-fg);
   font-weight: 600;
-}
-
-.us-btn-primary:hover:not(:disabled),
-button.us-btn-primary:hover:not(:disabled),
-.us-btn[aria-pressed="true"]:hover:not(:disabled) {
-  background: var(--us-accent-hover);
 }
 
 .us-btn-group {
