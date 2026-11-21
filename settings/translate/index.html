@@ -4,34 +4,37 @@
     <meta charset="utf-8">
     <meta content="width=device-width, initial-scale=1" name="viewport">
     <meta content="1" name="userscripts-manager">
-    <title>Page Translator — UserScripts</title>
+    <title data-i18n="pageTitle">Page Translator — UserScripts</title>
     <link href="../shared/tokens.css" rel="stylesheet">
   </head>
   <body>
     <div class="settings-shell">
       <header class="breadcrumb">
-        <span
+        <span data-i18n-html="breadcrumb"
           ><a href="../../"><strong>UserScripts</strong></a> / Page
           Translator</span
         >
         <span class="us-chip" id="ptrStatus"
-          ><i class="us-dot"></i>Detecting ptr…</span
+          ><i class="us-dot"></i
+          ><span data-i18n="ptrDetecting">Detecting ptr…</span></span
         >
       </header>
 
       <section class="settings-group">
-        <h1>Page Translator</h1>
-        <p class="lead">
+        <h1 data-i18n="heading">Page Translator</h1>
+        <p class="lead" data-i18n-html="leadHtml">
           Configure routing, CSS presentation, CJK spacing,
           Traditional/Simplified conversion, inspect/volunteer tools, per-site
           <code>+</code>/<code>-</code>/<code>*</code> rules, and cached
           dictionaries.
         </p>
 
-        <h2>1. Core &amp; Routing</h2>
+        <h2 data-i18n="sec1">1. Core &amp; Routing</h2>
         <div class="grid-2">
           <div class="field">
-            <label for="targetLang">Target Language</label>
+            <label data-i18n="targetLangLabel" for="targetLang"
+              >Target Language</label
+            >
             <input
               class="us-input"
               id="targetLang"
@@ -40,27 +43,42 @@
             >
           </div>
           <div class="field">
-            <span class="field-label" id="providerLabel">Provider</span>
+            <span
+              class="field-label"
+              data-i18n="providerLabel"
+              id="providerLabel"
+              >Provider</span
+            >
             <div id="providerSelect"></div>
           </div>
         </div>
         <div class="grid-2">
           <div class="field">
-            <span class="field-label" id="themeLabel">UI Theme Rule</span>
+            <span class="field-label" data-i18n="themeLabel" id="themeLabel"
+              >UI Theme Rule</span
+            >
             <div id="themeSelect"></div>
           </div>
           <div class="field">
-            <label for="apiKey">translate-pa API Key</label>
+            <label data-i18n="apiKeyLabel" for="apiKey"
+              >translate-pa API Key</label
+            >
             <div class="us-row">
               <input
                 autocomplete="off"
                 class="us-input"
+                data-i18n-placeholder="apiKeyPlaceholder"
                 id="apiKey"
                 placeholder="Leave blank to clear saved key"
                 style="flex: 1"
                 type="password"
               >
-              <button class="us-btn us-btn-sm" id="clearApiKey" type="button">
+              <button
+                class="us-btn us-btn-sm"
+                data-i18n="clear"
+                id="clearApiKey"
+                type="button"
+              >
                 Clear
               </button>
             </div>
@@ -69,9 +87,11 @@
       </section>
 
       <section class="settings-group">
-        <h2>2. Presentation &amp; Typography</h2>
+        <h2 data-i18n="sec2">2. Presentation &amp; Typography</h2>
         <div class="field">
-          <label for="customFont">Custom Font (<code>--ptr-font</code>)</label>
+          <label data-i18n-html="customFontHtml" for="customFont"
+            >Custom Font (<code>--ptr-font</code>)</label
+          >
           <div class="us-row">
             <input
               class="us-input"
@@ -81,7 +101,12 @@
               style="flex: 1 1 220px"
               type="text"
             >
-            <button class="us-btn us-btn-sm" id="loadFonts" type="button">
+            <button
+              class="us-btn us-btn-sm"
+              data-i18n="loadFonts"
+              id="loadFonts"
+              type="button"
+            >
               Load Local Fonts
             </button>
           </div>
@@ -90,10 +115,13 @@
           <p class="note" id="fontNote"></p>
         </div>
         <div class="field">
-          <label for="customCss">Presentation CSS</label>
+          <label data-i18n="customCssLabel" for="customCss"
+            >Presentation CSS</label
+          >
           <div class="us-row" style="margin-bottom: 6px">
             <button
               class="us-btn us-btn-sm"
+              data-i18n="presetReplace"
               data-preset="replace"
               type="button"
             >
@@ -101,17 +129,24 @@
             </button>
             <button
               class="us-btn us-btn-sm"
+              data-i18n="presetBilingual"
               data-preset="bilingual"
               type="button"
             >
               Preset: Bilingual Stacked
             </button>
-            <button class="us-btn us-btn-sm" data-preset="hover" type="button">
+            <button
+              class="us-btn us-btn-sm"
+              data-i18n="presetHover"
+              data-preset="hover"
+              type="button"
+            >
               Preset: Hover Original
             </button>
           </div>
           <textarea
             class="us-textarea"
+            data-i18n-placeholder="customCssPlaceholder"
             id="customCss"
             placeholder="/* Override [data-tr-orig] / [data-tr-dst] */"
             rows="5"
@@ -120,22 +155,22 @@
       </section>
 
       <section class="settings-group">
-        <h2>3. CJK Spacing &amp; Conversion</h2>
+        <h2 data-i18n="sec3">3. CJK Spacing &amp; Conversion</h2>
         <div class="field">
-          <span class="field-label" id="spacingLabel"
+          <span class="field-label" data-i18n="spacingLabel" id="spacingLabel"
             >CJK / ASCII Spacing Mode</span
           >
           <div id="spacingSelect"></div>
         </div>
         <div class="grid-2">
           <div class="field">
-            <span class="field-label" id="punctLabel"
+            <span class="field-label" data-i18n="punctLabel" id="punctLabel"
               >Punctuation Width Normalization</span
             >
             <div id="punctSelect"></div>
           </div>
           <div class="field">
-            <span class="field-label" id="openccLabel"
+            <span class="field-label" data-i18n="openccLabel" id="openccLabel"
               >Traditional / Simplified Conversion</span
             >
             <div id="openccSelect"></div>
@@ -143,10 +178,12 @@
         </div>
         <label class="check-row"
           ><input class="us-checkbox" id="spaceSkippedCjk" type="checkbox">
-          Also apply CJK spacing &amp; normalization to same-language skipped
-          segments</label
+          <span data-i18n="spaceSkippedCjk"
+            >Also apply CJK spacing &amp; normalization to same-language skipped
+            segments</span
+          ></label
         >
-        <p class="note">
+        <p class="note" data-i18n-html="spacingNoteHtml">
           <code>js</code> inserts ASCII spaces between CJK and Latin/numbers;
           <code>w3c</code> applies CSS <code>text-autospace: normal</code>
           without inserting characters. CJK parentheses normalize to fullwidth
@@ -155,36 +192,45 @@
       </section>
 
       <section class="settings-group">
-        <h2>4. Capture Inspector &amp; Volunteer Tools</h2>
+        <h2 data-i18n="sec4">4. Capture Inspector &amp; Volunteer Tools</h2>
         <label class="check-row"
           ><input class="us-checkbox" id="autoTranslate" type="checkbox">
-          Auto-translate on page load</label
+          <span data-i18n="autoTranslate"
+            >Auto-translate on page load</span
+          ></label
         >
         <label class="check-row"
           ><input class="us-checkbox" id="debugSpacingMarks" type="checkbox">
-          Debug spacing marks (show
-          <code>^</code> and <code>_</code>)</label
+          <span data-i18n-html="debugSpacingMarksHtml"
+            >Debug spacing marks (show <code>^</code> and <code>_</code>)</span
+          ></label
         >
         <label class="check-row"
-          ><input class="us-checkbox" id="debugInspect" type="checkbox"> Capture
-          Preview Inspector HUD (<code>debugInspect</code>)</label
+          ><input class="us-checkbox" id="debugInspect" type="checkbox">
+          <span data-i18n-html="debugInspectHtml"
+            >Capture Preview Inspector HUD (<code>debugInspect</code>)</span
+          ></label
         >
         <label class="check-row"
           ><input class="us-checkbox" id="volunteerMode" type="checkbox">
-          Volunteer Dictionary Mode (<code>volunteerMode</code>)</label
+          <span data-i18n-html="volunteerModeHtml"
+            >Volunteer Dictionary Mode (<code>volunteerMode</code>)</span
+          ></label
         >
         <label class="check-row" id="lockRow"
           ><input class="us-checkbox" id="volunteerBlockClicks" type="checkbox">
-          Lock page clicks while Volunteer Mode is active (<code
-            >volunteerBlockClicks</code
-          >)</label
+          <span data-i18n-html="volunteerBlockClicksHtml"
+            >Lock page clicks while Volunteer Mode is active (<code
+              >volunteerBlockClicks</code
+            >)</span
+          ></label
         >
       </section>
 
       <section class="settings-group">
-        <h2>5. Per-Site Delta Rules</h2>
+        <h2 data-i18n="sec5">5. Per-Site Delta Rules</h2>
         <div class="field">
-          <label for="siteDeltas">
+          <label data-i18n-html="siteDeltasHtml" for="siteDeltas">
             JSON map of host/glob → multiline <code>+</code>, <code>-</code>,
             <code>*</code> CSS selectors
           </label>
@@ -198,20 +244,22 @@
       </section>
 
       <section class="settings-group">
-        <h2>6. Cached Site Dictionaries (<code>ptr:site-tr:*</code>)</h2>
+        <h2 data-i18n-html="sec6Html">
+          6. Cached Site Dictionaries (<code>ptr:site-tr:*</code>)
+        </h2>
         <table class="us-table">
           <thead>
             <tr>
-              <th>Host</th>
-              <th>Static</th>
-              <th>Dynamic</th>
-              <th>Scoped</th>
-              <th>Actions</th>
+              <th data-i18n="colHost">Host</th>
+              <th data-i18n="colStatic">Static</th>
+              <th data-i18n="colDynamic">Dynamic</th>
+              <th data-i18n="colScoped">Scoped</th>
+              <th data-i18n="colActions">Actions</th>
             </tr>
           </thead>
           <tbody class="us-mono" id="dictBody">
             <tr>
-              <td class="us-muted" colspan="5">
+              <td class="us-muted" colspan="5" data-i18n="dictInitial">
                 No cached host dictionaries loaded yet.
               </td>
             </tr>
@@ -225,14 +273,29 @@
         >
         <div class="us-row-between" style="margin-top: 12px">
           <div class="us-row">
-            <button class="us-btn us-btn-sm" id="importDictBtn" type="button">
+            <button
+              class="us-btn us-btn-sm"
+              data-i18n="importDict"
+              id="importDictBtn"
+              type="button"
+            >
               Import JSON…
             </button>
-            <button class="us-btn us-btn-sm" id="refreshDictBtn" type="button">
+            <button
+              class="us-btn us-btn-sm"
+              data-i18n="refresh"
+              id="refreshDictBtn"
+              type="button"
+            >
               Refresh
             </button>
           </div>
-          <button class="us-btn us-btn-primary" id="apply" type="button">
+          <button
+            class="us-btn us-btn-primary"
+            data-i18n="applySettings"
+            id="apply"
+            type="button"
+          >
             Apply Settings
           </button>
         </div>
@@ -248,6 +311,275 @@
         onPresence,
         waitForScripts,
       } from "../shared/bridge.js";
+      import { createSettingsTranslator } from "../shared/i18n.js";
+
+      const DICT = {
+        "en-US": {
+          pageTitle: "Page Translator — UserScripts",
+          breadcrumb:
+            '<a href="../../"><strong>UserScripts</strong></a> / Page Translator',
+          ptrDetecting: "Detecting ptr…",
+          ptrConnected: "ptr connected",
+          ptrNotDetected: "ptr not detected",
+          heading: "Page Translator",
+          leadHtml:
+            "Configure routing, CSS presentation, CJK spacing, Traditional/Simplified conversion, inspect/volunteer tools, per-site <code>+</code>/<code>-</code>/<code>*</code> rules, and cached dictionaries.",
+          sec1: "1. Core & Routing",
+          targetLangLabel: "Target Language",
+          providerLabel: "Provider",
+          providerTranslatePa: "Google translate-pa (default)",
+          providerInspect: "Capture Inspector only (no API calls)",
+          themeLabel: "UI Theme Rule",
+          themeSystem: "System (prefers-color-scheme)",
+          themeLight: "Light",
+          themeDark: "Dark",
+          themeHost: "Host Page (Oklab derived)",
+          apiKeyLabel: "translate-pa API Key",
+          apiKeyPlaceholder: "Leave blank to clear saved key",
+          clear: "Clear",
+          clearLocal: "Clear Local",
+          sec2: "2. Presentation & Typography",
+          customFontHtml: "Custom Font (<code>--ptr-font</code>)",
+          loadFonts: "Load Local Fonts",
+          customCssLabel: "Presentation CSS",
+          presetReplace: "Preset: Replace (default)",
+          presetBilingual: "Preset: Bilingual Stacked",
+          presetHover: "Preset: Hover Original",
+          customCssPlaceholder: "/* Override [data-tr-orig] / [data-tr-dst] */",
+          fontRequesting: "Requesting local fonts permission...",
+          fontEmpty: "No local fonts found",
+          fontLoaded: "Loaded {count} local font families.",
+          fontError: "Could not load local fonts: {error}",
+          fontUnsupported:
+            "Local Font Access API is not supported in this browser; enter a font name manually.",
+          sec3: "3. CJK Spacing & Conversion",
+          spacingLabel: "CJK / ASCII Spacing Mode",
+          spacingBoth: "Both (W3C text-autospace + JS spacing)",
+          spacingJs: "JS only (punctuation-aware text spacing)",
+          spacingW3c: "W3C CSS only (text-autospace: normal)",
+          spacingOff: "Off",
+          punctLabel: "Punctuation Width Normalization",
+          punctZhNorm: "Context-aware (zh-norm)",
+          openccLabel: "Traditional / Simplified Conversion",
+          openccS2twp: "Simplified → Traditional (TW)",
+          openccTw2sp: "Traditional (TW) → Simplified",
+          openccS2t: "Simplified → Traditional (Std)",
+          openccT2s: "Traditional → Simplified (Std)",
+          spaceSkippedCjk:
+            "Also apply CJK spacing & normalization to same-language skipped segments",
+          spacingNoteHtml:
+            "<code>js</code> inserts ASCII spaces between CJK and Latin/numbers; <code>w3c</code> applies CSS <code>text-autospace: normal</code> without inserting characters. CJK parentheses normalize to fullwidth <code>（）</code> with no extra gap after fullwidth punctuation.",
+          sec4: "4. Capture Inspector & Volunteer Tools",
+          autoTranslate: "Auto-translate on page load",
+          debugSpacingMarksHtml:
+            "Debug spacing marks (show <code>^</code> and <code>_</code>)",
+          debugInspectHtml:
+            "Capture Preview Inspector HUD (<code>debugInspect</code>)",
+          volunteerModeHtml:
+            "Volunteer Dictionary Mode (<code>volunteerMode</code>)",
+          volunteerBlockClicksHtml:
+            "Lock page clicks while Volunteer Mode is active (<code>volunteerBlockClicks</code>)",
+          sec5: "5. Per-Site Delta Rules",
+          siteDeltasHtml:
+            "JSON map of host/glob → multiline <code>+</code>, <code>-</code>, <code>*</code> CSS selectors",
+          sec6Html: "6. Cached Site Dictionaries (<code>ptr:site-tr:*</code>)",
+          colHost: "Host",
+          colStatic: "Static",
+          colDynamic: "Dynamic",
+          colScoped: "Scoped",
+          colActions: "Actions",
+          dictInitial: "No cached host dictionaries loaded yet.",
+          dictEmpty: "No cached host dictionaries in GM storage.",
+          layerRemote: "remote",
+          layerLocal: "local",
+          exportDict: "Export",
+          importDict: "Import JSON…",
+          refresh: "Refresh",
+          applySettings: "Apply Settings",
+          importInvalid: "Invalid dictionary JSON: missing host or locales.",
+          importSuccess: "Imported dictionary for {host}.",
+          importParseError: "Failed to parse imported JSON file.",
+          invalidDeltas: "Invalid JSON in Per-Site Delta Rules.",
+          appliedPtr: "Applied settings to Page Translator.",
+          savedLocalPtr:
+            "Saved locally (Page Translator not detected on this page).",
+        },
+        "zh-Hant-TW": {
+          pageTitle: "Page Translator — UserScripts",
+          breadcrumb:
+            '<a href="../../"><strong>UserScripts</strong></a> / Page Translator',
+          ptrDetecting: "正在偵測 ptr…",
+          ptrConnected: "ptr 已連線",
+          ptrNotDetected: "未偵測到 ptr",
+          heading: "Page Translator",
+          leadHtml:
+            "設定翻譯路由、CSS 呈現、CJK 間距、繁簡轉換、擷取與志工工具、各站點 <code>+</code>/<code>-</code>/<code>*</code> 規則與快取詞典。",
+          sec1: "1. 核心與路由",
+          targetLangLabel: "目標語言",
+          providerLabel: "翻譯服務",
+          providerTranslatePa: "Google translate-pa（預設）",
+          providerInspect: "僅捕捉預覽模式（不呼叫 API）",
+          themeLabel: "介面主題規則",
+          themeSystem: "跟隨系統 (prefers-color-scheme)",
+          themeLight: "淺色",
+          themeDark: "深色",
+          themeHost: "依宿主網頁（Oklab 推導）",
+          apiKeyLabel: "translate-pa API 金鑰",
+          apiKeyPlaceholder: "留空即可清除已儲存的金鑰",
+          clear: "清除",
+          clearLocal: "清除本機",
+          sec2: "2. 呈現與字體排版",
+          customFontHtml: "自訂字型（<code>--ptr-font</code>）",
+          loadFonts: "載入本機字型",
+          customCssLabel: "呈現 CSS",
+          presetReplace: "預設：取代原文",
+          presetBilingual: "預設：雙語上下並列",
+          presetHover: "預設：懸停顯示原文",
+          customCssPlaceholder: "/* 覆寫 [data-tr-orig] / [data-tr-dst] */",
+          fontRequesting: "正在請求本機字型權限…",
+          fontEmpty: "找不到本機字型",
+          fontLoaded: "已載入 {count} 個本機字型家族。",
+          fontError: "無法載入本機字型：{error}",
+          fontUnsupported:
+            "此瀏覽器不支援 Local Font Access API，請手動輸入字型名稱。",
+          sec3: "3. CJK 間距與繁簡轉換",
+          spacingLabel: "CJK / ASCII 間距模式",
+          spacingBoth: "兩者併用（W3C text-autospace + JS 間距）",
+          spacingJs: "僅 JS（依標點調整文字間距）",
+          spacingW3c: "僅 W3C CSS（text-autospace: normal）",
+          spacingOff: "關閉",
+          punctLabel: "標點全半形正規化",
+          punctZhNorm: "依語境正規化 (zh-norm)",
+          openccLabel: "繁體 / 簡體轉換",
+          openccS2twp: "簡體 → 臺灣繁體",
+          openccTw2sp: "臺灣繁體 → 簡體",
+          openccS2t: "簡體 → 標準繁體",
+          openccT2s: "繁體 → 標準簡體",
+          spaceSkippedCjk: "同語系跳過片段也套用 CJK 間距與標點正規化",
+          spacingNoteHtml:
+            "<code>js</code> 會在 CJK 與拉丁字母／數字之間插入半形空白；<code>w3c</code> 則套用 CSS <code>text-autospace: normal</code> 而不插入字元。CJK 括號會正規化為全形 <code>（）</code>，全形標點後不再額外加空隙。",
+          sec4: "4. 捕捉預覽與志工工具",
+          autoTranslate: "頁面載入時自動翻譯",
+          debugSpacingMarksHtml:
+            "除錯間距標記（顯示 <code>^</code> 與 <code>_</code>）",
+          debugInspectHtml: "捕捉預覽檢視器 HUD（<code>debugInspect</code>）",
+          volunteerModeHtml: "志工詞典協作模式（<code>volunteerMode</code>）",
+          volunteerBlockClicksHtml:
+            "志工模式啟用時鎖定頁面點擊（<code>volunteerBlockClicks</code>）",
+          sec5: "5. 站點增量規則",
+          siteDeltasHtml:
+            "host/glob 對應多行 <code>+</code>、<code>-</code>、<code>*</code> CSS 選擇器的 JSON 映射表",
+          sec6Html: "6. 已快取站點詞典（<code>ptr:site-tr:*</code>）",
+          colHost: "網域",
+          colStatic: "靜態",
+          colDynamic: "動態",
+          colScoped: "Scoped",
+          colActions: "操作",
+          dictInitial: "尚未載入已快取的站點詞典。",
+          dictEmpty: "GM 儲存區中尚無快取的站點詞典。",
+          layerRemote: "遠端",
+          layerLocal: "本機",
+          exportDict: "匯出",
+          importDict: "匯入 JSON…",
+          refresh: "重新整理",
+          applySettings: "套用設定",
+          importInvalid: "無效的詞典 JSON：缺少 host 或 locales。",
+          importSuccess: "已匯入 {host} 的詞典。",
+          importParseError: "解析匯入的 JSON 檔案失敗。",
+          invalidDeltas: "站點增量規則的 JSON 格式無效。",
+          appliedPtr: "已將設定套用至 Page Translator。",
+          savedLocalPtr: "已在本機儲存（此頁面未偵測到 Page Translator）。",
+        },
+        "zh-Hans-CN": {
+          pageTitle: "Page Translator — UserScripts",
+          breadcrumb:
+            '<a href="../../"><strong>UserScripts</strong></a> / Page Translator',
+          ptrDetecting: "正在检测 ptr…",
+          ptrConnected: "ptr 已连接",
+          ptrNotDetected: "未检测到 ptr",
+          heading: "Page Translator",
+          leadHtml:
+            "配置翻译路由、CSS 呈现、CJK 间距、繁简转换、采集与志愿工具、各站点 <code>+</code>/<code>-</code>/<code>*</code> 规则与缓存词典。",
+          sec1: "1. 核心与路由",
+          targetLangLabel: "目标语言",
+          providerLabel: "翻译服务",
+          providerTranslatePa: "Google translate-pa（默认）",
+          providerInspect: "仅采集预览模式（不调用 API）",
+          themeLabel: "界面主题规则",
+          themeSystem: "跟随系统 (prefers-color-scheme)",
+          themeLight: "浅色",
+          themeDark: "深色",
+          themeHost: "依宿主网页（Oklab 推导）",
+          apiKeyLabel: "translate-pa API 密钥",
+          apiKeyPlaceholder: "留空即可清除已保存的密钥",
+          clear: "清除",
+          clearLocal: "清除本地",
+          sec2: "2. 呈现与字体排版",
+          customFontHtml: "自定义字体（<code>--ptr-font</code>）",
+          loadFonts: "加载本地字体",
+          customCssLabel: "呈现 CSS",
+          presetReplace: "预设：替换原文",
+          presetBilingual: "预设：双语上下堆叠",
+          presetHover: "预设：悬停显示原文",
+          customCssPlaceholder: "/* 覆盖 [data-tr-orig] / [data-tr-dst] */",
+          fontRequesting: "正在请求本地字体权限…",
+          fontEmpty: "未找到本地字体",
+          fontLoaded: "已加载 {count} 个本地字体家族。",
+          fontError: "无法加载本地字体：{error}",
+          fontUnsupported:
+            "此浏览器不支持 Local Font Access API，请手动输入字体名称。",
+          sec3: "3. CJK 间距与繁简转换",
+          spacingLabel: "CJK / ASCII 间距模式",
+          spacingBoth: "两者并用（W3C text-autospace + JS 间距）",
+          spacingJs: "仅 JS（按标点调整文本间距）",
+          spacingW3c: "仅 W3C CSS（text-autospace: normal）",
+          spacingOff: "关闭",
+          punctLabel: "标点全半角规范化",
+          punctZhNorm: "按语境规范化 (zh-norm)",
+          openccLabel: "繁体 / 简体转换",
+          openccS2twp: "简体 → 台湾繁体",
+          openccTw2sp: "台湾繁体 → 简体",
+          openccS2t: "简体 → 标准繁体",
+          openccT2s: "繁体 → 标准简体",
+          spaceSkippedCjk: "同语系跳过片段也应用 CJK 间距与标点规范化",
+          spacingNoteHtml:
+            "<code>js</code> 会在 CJK 与拉丁字母／数字之间插入半角空格；<code>w3c</code> 则应用 CSS <code>text-autospace: normal</code> 而不插入字符。CJK 括号会规范化为全角 <code>（）</code>，全角标点后不再额外添加空隙。",
+          sec4: "4. 采集预览与志愿工具",
+          autoTranslate: "页面加载时自动翻译",
+          debugSpacingMarksHtml:
+            "调试间距标记（显示 <code>^</code> 与 <code>_</code>）",
+          debugInspectHtml: "采集预览检查器 HUD（<code>debugInspect</code>）",
+          volunteerModeHtml: "志愿词典协作模式（<code>volunteerMode</code>）",
+          volunteerBlockClicksHtml:
+            "志愿模式启用时锁定页面点击（<code>volunteerBlockClicks</code>）",
+          sec5: "5. 站点增量规则",
+          siteDeltasHtml:
+            "host/glob 对应多行 <code>+</code>、<code>-</code>、<code>*</code> CSS 选择器的 JSON 映射表",
+          sec6Html: "6. 已缓存站点词典（<code>ptr:site-tr:*</code>）",
+          colHost: "域名",
+          colStatic: "静态",
+          colDynamic: "动态",
+          colScoped: "Scoped",
+          colActions: "操作",
+          dictInitial: "尚未加载已缓存的站点词典。",
+          dictEmpty: "GM 存储区中尚无缓存的站点词典。",
+          layerRemote: "远程",
+          layerLocal: "本地",
+          exportDict: "导出",
+          importDict: "导入 JSON…",
+          refresh: "刷新",
+          applySettings: "应用设置",
+          importInvalid: "无效的词典 JSON：缺少 host 或 locales。",
+          importSuccess: "已导入 {host} 的词典。",
+          importParseError: "解析导入的 JSON 文件失败。",
+          invalidDeltas: "站点增量规则的 JSON 格式无效。",
+          appliedPtr: "已将设置应用至 Page Translator。",
+          savedLocalPtr: "已在本地保存（此页面未检测到 Page Translator）。",
+        },
+      };
+
+      const i18n = createSettingsTranslator(DICT);
+      i18n.applyDom();
 
       const STORAGE_KEY = "userscripts:ptr:settings";
       const PRESETS = {
@@ -258,15 +590,15 @@
           "[data-tr-block]:hover > [data-tr-orig] { display: block; opacity: 0.7; }",
       };
 
-      const el = (id) => document.getElementById(id);
+      const el = (id) => document.querySelector(`#${id}`);
 
       const providerSelect = createCustomSelect(el("providerSelect"), {
         labelledBy: "providerLabel",
         initialValue: "translate-pa",
       });
       providerSelect.setOptions([
-        { value: "translate-pa", label: "Google translate-pa (default)" },
-        { value: "inspect", label: "Capture Inspector only (no API calls)" },
+        { value: "translate-pa", label: i18n.t("providerTranslatePa") },
+        { value: "inspect", label: i18n.t("providerInspect") },
       ]);
 
       const themeSelect = createCustomSelect(el("themeSelect"), {
@@ -281,10 +613,10 @@
         },
       });
       themeSelect.setOptions([
-        { value: "system", label: "System (prefers-color-scheme)" },
-        { value: "light", label: "Light" },
-        { value: "dark", label: "Dark" },
-        { value: "host", label: "Host Page (Oklab derived)" },
+        { value: "system", label: i18n.t("themeSystem") },
+        { value: "light", label: i18n.t("themeLight") },
+        { value: "dark", label: i18n.t("themeDark") },
+        { value: "host", label: i18n.t("themeHost") },
       ]);
 
       const spacingSelect = createCustomSelect(el("spacingSelect"), {
@@ -292,10 +624,10 @@
         initialValue: "both",
       });
       spacingSelect.setOptions([
-        { value: "both", label: "Both (W3C text-autospace + JS spacing)" },
-        { value: "js", label: "JS only (punctuation-aware text spacing)" },
-        { value: "w3c", label: "W3C CSS only (text-autospace: normal)" },
-        { value: "off", label: "Off" },
+        { value: "both", label: i18n.t("spacingBoth") },
+        { value: "js", label: i18n.t("spacingJs") },
+        { value: "w3c", label: i18n.t("spacingW3c") },
+        { value: "off", label: i18n.t("spacingOff") },
       ]);
 
       const punctSelect = createCustomSelect(el("punctSelect"), {
@@ -303,8 +635,8 @@
         initialValue: "zh-norm",
       });
       punctSelect.setOptions([
-        { value: "zh-norm", label: "Context-aware (zh-norm)" },
-        { value: "off", label: "Off" },
+        { value: "zh-norm", label: i18n.t("punctZhNorm") },
+        { value: "off", label: i18n.t("spacingOff") },
       ]);
 
       const openccSelect = createCustomSelect(el("openccSelect"), {
@@ -312,11 +644,11 @@
         initialValue: "off",
       });
       openccSelect.setOptions([
-        { value: "off", label: "Off" },
-        { value: "s2twp", label: "Simplified → Traditional (TW)" },
-        { value: "tw2sp", label: "Traditional (TW) → Simplified" },
-        { value: "s2t", label: "Simplified → Traditional (Std)" },
-        { value: "t2s", label: "Traditional → Simplified (Std)" },
+        { value: "off", label: i18n.t("spacingOff") },
+        { value: "s2twp", label: i18n.t("openccS2twp") },
+        { value: "tw2sp", label: i18n.t("openccTw2sp") },
+        { value: "s2t", label: i18n.t("openccS2t") },
+        { value: "t2s", label: i18n.t("openccT2s") },
       ]);
 
       const localFontWrap = el("localFontSelectWrap");
@@ -342,35 +674,21 @@
       }
       volInput.addEventListener("change", syncLockAvailability);
 
-      function fillForm(cfg) {
-        if (!cfg) {
-          return;
+      function applyThemeAttr(mode) {
+        if (mode === "light" || mode === "dark") {
+          document.documentElement.setAttribute("data-theme-mode", mode);
+        } else {
+          document.documentElement.removeAttribute("data-theme-mode");
         }
-        if (cfg.targetLang !== undefined) {
-          el("targetLang").value = cfg.targetLang;
-        }
+      }
+
+      function fillSelectFields(cfg) {
         if (cfg.provider !== undefined) {
           providerSelect.setValue(cfg.provider);
         }
         if (cfg.themeMode !== undefined) {
           themeSelect.setValue(cfg.themeMode);
-          if (cfg.themeMode === "light" || cfg.themeMode === "dark") {
-            document.documentElement.setAttribute(
-              "data-theme-mode",
-              cfg.themeMode
-            );
-          } else {
-            document.documentElement.removeAttribute("data-theme-mode");
-          }
-        }
-        if (cfg.translatePaApiKey !== undefined) {
-          el("apiKey").value = cfg.translatePaApiKey;
-        }
-        if (cfg.customFont !== undefined) {
-          el("customFont").value = cfg.customFont;
-        }
-        if (cfg.customCss !== undefined) {
-          el("customCss").value = cfg.customCss;
+          applyThemeAttr(cfg.themeMode);
         }
         if (cfg.spacingMode !== undefined) {
           spacingSelect.setValue(cfg.spacingMode);
@@ -383,27 +701,44 @@
         if (cfg.openccMode !== undefined) {
           openccSelect.setValue(cfg.openccMode);
         }
-        if (cfg.spaceSkippedCjk !== undefined) {
-          el("spaceSkippedCjk").checked = Boolean(cfg.spaceSkippedCjk);
-        }
-        if (cfg.debugSpacingMarks !== undefined) {
-          el("debugSpacingMarks").checked = Boolean(cfg.debugSpacingMarks);
-        }
-        if (cfg.autoTranslate !== undefined) {
-          el("autoTranslate").checked = Boolean(cfg.autoTranslate);
-        }
-        if (cfg.debugInspect !== undefined) {
-          el("debugInspect").checked = Boolean(cfg.debugInspect);
-        }
-        if (cfg.volunteerMode !== undefined) {
-          volInput.checked = Boolean(cfg.volunteerMode);
-        }
-        if (cfg.volunteerBlockClicks !== undefined) {
-          lockInput.checked = Boolean(cfg.volunteerBlockClicks);
+      }
+
+      function fillInputFields(cfg) {
+        const textMap = [
+          ["targetLang", cfg.targetLang],
+          ["apiKey", cfg.translatePaApiKey],
+          ["customFont", cfg.customFont],
+          ["customCss", cfg.customCss],
+        ];
+        for (const [id, val] of textMap) {
+          if (val !== undefined) {
+            el(id).value = val;
+          }
         }
         if (cfg.siteDeltas !== undefined) {
           el("siteDeltas").value = JSON.stringify(cfg.siteDeltas, null, 2);
         }
+        const checkMap = [
+          ["spaceSkippedCjk", cfg.spaceSkippedCjk],
+          ["debugSpacingMarks", cfg.debugSpacingMarks],
+          ["autoTranslate", cfg.autoTranslate],
+          ["debugInspect", cfg.debugInspect],
+          ["volunteerMode", cfg.volunteerMode],
+          ["volunteerBlockClicks", cfg.volunteerBlockClicks],
+        ];
+        for (const [id, val] of checkMap) {
+          if (val !== undefined) {
+            el(id).checked = Boolean(val);
+          }
+        }
+      }
+
+      function fillForm(cfg) {
+        if (!cfg) {
+          return;
+        }
+        fillInputFields(cfg);
+        fillSelectFields(cfg);
         syncLockAvailability();
       }
 
@@ -419,9 +754,13 @@
 
       const ptrStatus = el("ptrStatus");
       function updatePtrStatus() {
-        ptrStatus.innerHTML = hasScript("ptr")
-          ? '<i class="us-dot ok"></i>ptr connected'
-          : '<i class="us-dot warn"></i>ptr not detected';
+        const connected = hasScript("ptr");
+        const dot = document.createElement("i");
+        dot.className = connected ? "us-dot ok" : "us-dot warn";
+        const label = connected
+          ? i18n.t("ptrConnected")
+          : i18n.t("ptrNotDetected");
+        ptrStatus.replaceChildren(dot, document.createTextNode(label));
       }
 
       const requestBridgeState = () => {
@@ -446,24 +785,55 @@
         return { s, d, sc };
       }
 
+      function makeLayerBadge(kind, label) {
+        const badge = document.createElement("span");
+        badge.className = `us-badge us-badge-${kind}`;
+        badge.textContent = label;
+        return badge;
+      }
+
       function renderDicts(list) {
         const tbody = el("dictBody");
-        tbody.innerHTML = "";
+        tbody.replaceChildren();
         if (!Array.isArray(list) || list.length === 0) {
           const tr = document.createElement("tr");
           const td = document.createElement("td");
           td.colSpan = 5;
           td.className = "us-muted";
-          td.textContent = "No cached host dictionaries in GM storage.";
+          td.textContent = i18n.t("dictEmpty");
           tr.append(td);
           tbody.append(tr);
           return;
         }
-        for (const file of list) {
+        for (const entry of list) {
+          const isLayered =
+            Boolean(entry) &&
+            typeof entry === "object" &&
+            "file" in entry &&
+            Boolean(entry.file);
+          const file = isLayered ? entry.file : entry;
+          if (!file?.host) {
+            continue;
+          }
+          const hasLocal = isLayered ? Boolean(entry.hasLocal) : false;
+          const hasRemote = isLayered ? Boolean(entry.hasRemote) : false;
           const { s, d, sc } = countDictEntries(file);
           const tr = document.createElement("tr");
+
           const tdHost = document.createElement("td");
-          tdHost.textContent = file.host;
+          const hostWrap = document.createElement("div");
+          hostWrap.className = "us-host-cell";
+          const hostName = document.createElement("span");
+          hostName.textContent = file.host;
+          hostWrap.append(hostName);
+          if (hasRemote) {
+            hostWrap.append(makeLayerBadge("remote", i18n.t("layerRemote")));
+          }
+          if (hasLocal) {
+            hostWrap.append(makeLayerBadge("local", i18n.t("layerLocal")));
+          }
+          tdHost.append(hostWrap);
+
           const tdS = document.createElement("td");
           tdS.textContent = String(s);
           const tdD = document.createElement("td");
@@ -476,7 +846,7 @@
           const expBtn = document.createElement("button");
           expBtn.type = "button";
           expBtn.className = "us-btn us-btn-sm";
-          expBtn.textContent = "Export";
+          expBtn.textContent = i18n.t("exportDict");
           expBtn.addEventListener("click", () => {
             const blob = new Blob([JSON.stringify(file, null, 2)], {
               type: "application/json",
@@ -492,7 +862,8 @@
           const delBtn = document.createElement("button");
           delBtn.type = "button";
           delBtn.className = "us-btn us-btn-sm";
-          delBtn.textContent = "Clear";
+          delBtn.textContent =
+            hasLocal && hasRemote ? i18n.t("clearLocal") : i18n.t("clear");
           delBtn.addEventListener("click", () => {
             window.dispatchEvent(
               new CustomEvent("userscript:ptr-delete-dict", {
@@ -540,16 +911,17 @@
         try {
           const parsed = JSON.parse(await file.text());
           if (!(parsed?.host && parsed?.locales)) {
-            el("note").textContent =
-              "Invalid dictionary JSON: missing host or locales.";
+            el("note").textContent = i18n.t("importInvalid");
             return;
           }
           window.dispatchEvent(
             new CustomEvent("userscript:ptr-save-dict", { detail: parsed })
           );
-          el("note").textContent = `Imported dictionary for ${parsed.host}.`;
+          el("note").textContent = i18n.t("importSuccess", {
+            host: parsed.host,
+          });
         } catch {
-          el("note").textContent = "Failed to parse imported JSON file.";
+          el("note").textContent = i18n.t("importParseError");
         }
       });
 
@@ -558,13 +930,13 @@
       const fontNote = el("fontNote");
       if ("queryLocalFonts" in window) {
         loadFontsBtn.addEventListener("click", async () => {
-          fontNote.textContent = "Requesting local fonts permission...";
+          fontNote.textContent = i18n.t("fontRequesting");
           try {
             const fonts = await window.queryLocalFonts();
             const families = Array.from(
               new Set(fonts.map((f) => f.family).filter(Boolean))
             ).sort((a, b) => a.localeCompare(b));
-            fontList.innerHTML = "";
+            fontList.replaceChildren();
             for (const fam of families) {
               const dlOpt = document.createElement("option");
               dlOpt.value = `"${fam}", sans-serif`;
@@ -575,18 +947,21 @@
                 value: `"${fam}", sans-serif`,
                 label: fam,
               })),
-              "No local fonts found"
+              i18n.t("fontEmpty")
             );
             localFontWrap.hidden = families.length === 0;
-            fontNote.textContent = `Loaded ${families.length} local font families.`;
+            fontNote.textContent = i18n.t("fontLoaded", {
+              count: families.length,
+            });
           } catch (err) {
-            fontNote.textContent = `Could not load local fonts: ${err instanceof Error ? err.message : String(err)}`;
+            fontNote.textContent = i18n.t("fontError", {
+              error: err instanceof Error ? err.message : String(err),
+            });
           }
         });
       } else {
         loadFontsBtn.disabled = true;
-        fontNote.textContent =
-          "Local Font Access API is not supported in this browser; enter a font name manually.";
+        fontNote.textContent = i18n.t("fontUnsupported");
       }
 
       for (const btn of document.querySelectorAll("[data-preset]")) {
@@ -602,7 +977,7 @@
           try {
             siteDeltas = JSON.parse(rawDeltas);
           } catch {
-            el("note").textContent = "Invalid JSON in Per-Site Delta Rules.";
+            el("note").textContent = i18n.t("invalidDeltas");
             return;
           }
         }
@@ -631,8 +1006,8 @@
         localStorage.setItem(STORAGE_KEY, JSON.stringify(ptr));
         dispatchSettings({ ptr });
         el("note").textContent = hasScript("ptr")
-          ? "Applied settings to Page Translator."
-          : "Saved locally (Page Translator not detected on this page).";
+          ? i18n.t("appliedPtr")
+          : i18n.t("savedLocalPtr");
       });
     </script>
   </body>

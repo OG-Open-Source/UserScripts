@@ -4,35 +4,43 @@
     <meta charset="utf-8">
     <meta content="width=device-width, initial-scale=1" name="viewport">
     <meta content="1" name="userscripts-manager">
-    <title>Language — UserScripts</title>
+    <title data-i18n="pageTitle">Language — UserScripts</title>
     <link href="../shared/tokens.css" rel="stylesheet">
   </head>
   <body>
     <div class="settings-shell">
       <header class="breadcrumb">
-        <span
+        <span data-i18n-html="breadcrumb"
           ><a href="../../"><strong>UserScripts</strong></a> / Language</span
         >
         <span class="us-chip" id="statusChip"
-          ><i class="us-dot"></i>Detecting…</span
+          ><i class="us-dot"></i
+          ><span data-i18n="detecting">Detecting…</span></span
         >
       </header>
 
       <section class="settings-group">
-        <h1>Language</h1>
-        <p class="lead">
+        <h1 data-i18n="heading">Language</h1>
+        <p class="lead" data-i18n="lead">
           Applies to every installed script. The list is the languages those
           scripts actually ship.
         </p>
 
         <div class="field">
-          <span class="field-label" id="langLabel">Language</span>
+          <span class="field-label" data-i18n="langLabel" id="langLabel"
+            >Language</span
+          >
           <div id="langSelect"></div>
         </div>
 
         <div class="us-row-between" style="margin-top: 14px">
           <span class="note" id="note" style="margin: 0"></span>
-          <button class="us-btn us-btn-primary" id="apply" type="button">
+          <button
+            class="us-btn us-btn-primary"
+            data-i18n="apply"
+            id="apply"
+            type="button"
+          >
             Apply
           </button>
         </div>
@@ -47,16 +55,81 @@
         onPresence,
         waitForScripts,
       } from "../shared/bridge.js";
+      import { createSettingsTranslator } from "../shared/i18n.js";
+
+      const DICT = {
+        "en-US": {
+          pageTitle: "Language — UserScripts",
+          breadcrumb:
+            '<a href="../../"><strong>UserScripts</strong></a> / Language',
+          detecting: "Detecting…",
+          heading: "Language",
+          lead: "Applies to every installed script. The list is the languages those scripts actually ship.",
+          langLabel: "Language",
+          apply: "Apply",
+          emptyOptions: "No installed script announced a language",
+          statusCount: "{count} script(s)",
+          noScript: "No script detected",
+          noteDetected:
+            "Detected {count} installed script(s). Changes apply on each script's next page load.",
+          noteNone:
+            "Open this page through your userscript manager so installed scripts can be seen.",
+          appliedCount: 'Applied "{lang}" to {count} installed script(s).',
+          savedLocal:
+            'Saved "{lang}" locally (no active script heard this page).',
+        },
+        "zh-Hant-TW": {
+          pageTitle: "語言 — UserScripts",
+          breadcrumb:
+            '<a href="../../"><strong>UserScripts</strong></a> / 語言',
+          detecting: "偵測中…",
+          heading: "語言",
+          lead: "套用至所有已安裝腳本。清單內容為這些腳本實際提供的語言。",
+          langLabel: "語言",
+          apply: "套用",
+          emptyOptions: "尚未有已安裝腳本宣告語言",
+          statusCount: "{count} 個腳本",
+          noScript: "未偵測到腳本",
+          noteDetected:
+            "已偵測到 {count} 個已安裝腳本。變更將於各腳本下次載入頁面時生效。",
+          noteNone:
+            "請透過已啟用使用者腳本管理器的瀏覽器開啟此頁，以便檢視已安裝腳本。",
+          appliedCount: "已將「{lang}」套用至 {count} 個已安裝腳本。",
+          savedLocal: "已在本機儲存「{lang}」（此頁面尚無作用中的腳本回應）。",
+        },
+        "zh-Hans-CN": {
+          pageTitle: "语言 — UserScripts",
+          breadcrumb:
+            '<a href="../../"><strong>UserScripts</strong></a> / 语言',
+          detecting: "检测中…",
+          heading: "语言",
+          lead: "应用至所有已安装脚本。列表内容为这些脚本实际提供的语言。",
+          langLabel: "语言",
+          apply: "应用",
+          emptyOptions: "尚无已安装脚本声明语言",
+          statusCount: "{count} 个脚本",
+          noScript: "未检测到脚本",
+          noteDetected:
+            "已检测到 {count} 个已安装脚本。更改将在各脚本下次加载页面时生效。",
+          noteNone:
+            "请通过已启用用户脚本管理器的浏览器打开此页，以便查看已安装脚本。",
+          appliedCount: "已将“{lang}”应用至 {count} 个已安装脚本。",
+          savedLocal: "已在本地保存“{lang}”（此页面尚无活动脚本响应）。",
+        },
+      };
+
+      let i18n = createSettingsTranslator(DICT);
+      i18n.applyDom();
 
       const KEY = "userscripts:lang";
       const languages = new Map();
       const loadedScriptIds = new Set();
-      const chip = document.getElementById("statusChip");
-      const note = document.getElementById("note");
+      const chip = document.querySelector("#statusChip");
+      const note = document.querySelector("#note");
       const saved = localStorage.getItem(KEY) ?? "";
 
       const langSelect = createCustomSelect(
-        document.getElementById("langSelect"),
+        document.querySelector("#langSelect"),
         {
           labelledBy: "langLabel",
           initialValue: saved,
@@ -97,22 +170,26 @@
           value: code,
           label: `${name} (${code})`,
         }));
-        langSelect.setOptions(
-          entries,
-          "No installed script announced a language"
-        );
+        langSelect.setOptions(entries, i18n.t("emptyOptions"));
         if (saved && languages.has(saved)) {
           langSelect.setValue(saved);
         }
       }
 
+      function updateChip(list) {
+        const dot = document.createElement("i");
+        dot.className = list.length ? "us-dot ok" : "us-dot warn";
+        const label = list.length
+          ? i18n.t("statusCount", { count: list.length })
+          : i18n.t("noScript");
+        chip.replaceChildren(dot, document.createTextNode(label));
+      }
+
       function updateStatus(list) {
-        chip.innerHTML = list.length
-          ? `<i class="us-dot ok"></i>${list.length} script(s)`
-          : '<i class="us-dot warn"></i>No script detected';
+        updateChip(list);
         note.textContent = list.length
-          ? `Detected ${list.length} installed script(s). Changes apply on each script's next page load.`
-          : "Open this page through your userscript manager so installed scripts can be seen.";
+          ? i18n.t("noteDetected", { count: list.length })
+          : i18n.t("noteNone");
       }
 
       const scripts = await waitForScripts(1800);
@@ -128,7 +205,7 @@
         updateStatus(list);
       });
 
-      document.getElementById("apply").addEventListener("click", () => {
+      document.querySelector("#apply").addEventListener("click", () => {
         const currentScripts = collectScripts();
         const value = langSelect.getValue();
         if (!value) {
@@ -136,9 +213,18 @@
         }
         localStorage.setItem(KEY, value);
         dispatchSettings({ lang: value });
+        i18n = createSettingsTranslator(DICT);
+        i18n.applyDom();
+        updateChip(currentScripts);
+        if (languages.size === 0) {
+          renderOptions();
+        }
         note.textContent = currentScripts.length
-          ? `Applied "${value}" to ${currentScripts.length} installed script(s).`
-          : `Saved "${value}" locally (no active script heard this page).`;
+          ? i18n.t("appliedCount", {
+              lang: value,
+              count: currentScripts.length,
+            })
+          : i18n.t("savedLocal", { lang: value });
       });
     </script>
   </body>

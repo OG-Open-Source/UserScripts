@@ -226,7 +226,12 @@ h1 {
 .us-textarea {
   font-family: var(--us-mono);
   font-size: 12px;
-  resize: vertical;
+}
+
+@supports (resize: vertical) {
+  .us-textarea {
+    resize: vertical;
+  }
 }
 
 .us-btn {
@@ -461,7 +466,12 @@ h1 {
   padding: 5px 0;
   font-size: 13px;
   cursor: pointer;
-  user-select: none;
+}
+
+@supports (user-select: none) {
+  .check-row {
+    user-select: none;
+  }
 }
 
 .check-row.disabled {
@@ -542,6 +552,36 @@ h1 {
 
 .us-table tbody tr:nth-child(even) {
   background: var(--us-surface);
+}
+
+.us-host-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.us-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  font-family: var(--us-sans);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--us-muted);
+  background: var(--us-surface-2);
+  border-radius: var(--us-radius-sm);
+}
+
+.us-badge-local {
+  color: var(--us-focus);
+  background: oklch(from var(--us-accent-bg) l c h / 0.16);
+}
+
+.us-badge-remote {
+  color: var(--us-muted);
+  background: var(--us-surface-2);
 }
 
 .us-nav-list {

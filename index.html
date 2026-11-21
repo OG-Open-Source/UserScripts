@@ -4,29 +4,30 @@
     <meta charset="utf-8">
     <meta content="width=device-width, initial-scale=1" name="viewport">
     <meta content="1" name="userscripts-manager">
-    <title>UserScripts</title>
+    <title data-i18n="pageTitle">UserScripts</title>
     <link href="./settings/shared/tokens.css" rel="stylesheet">
   </head>
   <body>
     <div class="settings-shell">
       <header class="breadcrumb">
-        <span><strong>UserScripts</strong></span>
+        <span><strong data-i18n="brand">UserScripts</strong></span>
         <span class="us-chip" id="statusChip"
-          ><i class="us-dot"></i>Detecting scripts…</span
+          ><i class="us-dot"></i
+          ><span data-i18n="detecting">Detecting scripts…</span></span
         >
       </header>
 
       <section class="settings-group">
-        <h1>UserScripts</h1>
-        <p class="lead">
+        <h1 data-i18n="brand">UserScripts</h1>
+        <p class="lead" data-i18n="lead">
           Settings for the scripts distributed by OG-Open-Source/UserScripts.
         </p>
         <ul class="us-nav-list">
           <li>
             <a href="./settings/language/">
               <span
-                ><strong>Language</strong><br>
-                <span class="us-muted"
+                ><strong data-i18n="navLanguageTitle">Language</strong><br>
+                <span class="us-muted" data-i18n="navLanguageDesc"
                   >Shared UI language across all installed scripts</span
                 ></span
               >
@@ -36,8 +37,8 @@
           <li>
             <a href="./settings/translate/">
               <span
-                ><strong>Page Translator</strong><br>
-                <span class="us-muted"
+                ><strong data-i18n="navPtrTitle">Page Translator</strong><br>
+                <span class="us-muted" data-i18n="navPtrDesc"
                   >Translation routing, CSS presentation, CJK spacing, inspect
                   HUD &amp; site dictionaries</span
                 ></span
@@ -49,8 +50,8 @@
       </section>
 
       <section class="settings-group">
-        <h2>Installed Scripts</h2>
-        <div class="note" id="scriptsList">
+        <h2 data-i18n="installedScripts">Installed Scripts</h2>
+        <div class="note" data-i18n="waitingPresence" id="scriptsList">
           Waiting for userscript manager presence…
         </div>
       </section>
@@ -58,22 +59,99 @@
 
     <script type="module">
       import { onPresence, waitForScripts } from "./settings/shared/bridge.js";
+      import { createSettingsTranslator } from "./settings/shared/i18n.js";
 
-      const chip = document.getElementById("statusChip");
-      const listEl = document.getElementById("scriptsList");
+      const DICT = {
+        "en-US": {
+          pageTitle: "UserScripts",
+          brand: "UserScripts",
+          detecting: "Detecting scripts…",
+          noScript: "No script detected",
+          connectedCount: "{count} connected",
+          lead: "Settings for the scripts distributed by OG-Open-Source/UserScripts.",
+          navLanguageTitle: "Language",
+          navLanguageDesc: "Shared UI language across all installed scripts",
+          navPtrTitle: "Page Translator",
+          navPtrDesc:
+            "Translation routing, CSS presentation, CJK spacing, inspect HUD & site dictionaries",
+          installedScripts: "Installed Scripts",
+          waitingPresence: "Waiting for userscript manager presence…",
+          emptyHint:
+            "Open this page through your userscript manager so installed scripts can be detected.",
+          colId: "ID",
+          colName: "Name",
+          colDescription: "Description",
+        },
+        "zh-Hant-TW": {
+          pageTitle: "UserScripts",
+          brand: "UserScripts",
+          detecting: "正在偵測腳本…",
+          noScript: "未偵測到腳本",
+          connectedCount: "已連線 {count} 個",
+          lead: "OG-Open-Source/UserScripts 所發布腳本的統一設定頁面。",
+          navLanguageTitle: "語言",
+          navLanguageDesc: "所有已安裝腳本共用的介面語言",
+          navPtrTitle: "Page Translator",
+          navPtrDesc: "翻譯路由、CSS 呈現、CJK 間距、擷取 HUD 與站點詞典",
+          installedScripts: "已安裝腳本",
+          waitingPresence: "正在等待使用者腳本管理器回應…",
+          emptyHint:
+            "請透過已啟用使用者腳本管理器的瀏覽器開啟此頁，以便偵測已安裝腳本。",
+          colId: "ID",
+          colName: "名稱",
+          colDescription: "說明",
+        },
+        "zh-Hans-CN": {
+          pageTitle: "UserScripts",
+          brand: "UserScripts",
+          detecting: "正在检测脚本…",
+          noScript: "未检测到脚本",
+          connectedCount: "已连接 {count} 个",
+          lead: "OG-Open-Source/UserScripts 所发布脚本的统一设置页面。",
+          navLanguageTitle: "语言",
+          navLanguageDesc: "所有已安装脚本共用的界面语言",
+          navPtrTitle: "Page Translator",
+          navPtrDesc: "翻译路由、CSS 呈现、CJK 间距、采集 HUD 与站点词典",
+          installedScripts: "已安装脚本",
+          waitingPresence: "正在等待用户脚本管理器响应…",
+          emptyHint:
+            "请通过已启用用户脚本管理器的浏览器打开此页，以便检测已安装脚本。",
+          colId: "ID",
+          colName: "名称",
+          colDescription: "说明",
+        },
+      };
+
+      const i18n = createSettingsTranslator(DICT);
+      i18n.applyDom();
+
+      const chip = document.querySelector("#statusChip");
+      const listEl = document.querySelector("#scriptsList");
+
+      function setChip(dotClass, text) {
+        const dot = document.createElement("i");
+        dot.className = dotClass ? `us-dot ${dotClass}` : "us-dot";
+        chip.replaceChildren(dot, document.createTextNode(text));
+      }
 
       function renderScripts(scripts) {
         if (!scripts.length) {
-          chip.innerHTML = '<i class="us-dot warn"></i>No script detected';
-          listEl.textContent =
-            "Open this page through your userscript manager so installed scripts can be detected.";
+          setChip("warn", i18n.t("noScript"));
+          listEl.textContent = i18n.t("emptyHint");
           return;
         }
-        chip.innerHTML = `<i class="us-dot ok"></i>${scripts.length} connected`;
+        setChip("ok", i18n.t("connectedCount", { count: scripts.length }));
         const table = document.createElement("table");
         table.className = "us-table";
-        table.innerHTML =
-          "<thead><tr><th>ID</th><th>Name</th><th>Description</th></tr></thead>";
+        const thead = document.createElement("thead");
+        const headRow = document.createElement("tr");
+        for (const key of ["colId", "colName", "colDescription"]) {
+          const th = document.createElement("th");
+          th.textContent = i18n.t(key);
+          headRow.append(th);
+        }
+        thead.append(headRow);
+        table.append(thead);
         const tbody = document.createElement("tbody");
         for (const s of scripts) {
           const tr = document.createElement("tr");
@@ -89,8 +167,7 @@
           tbody.append(tr);
         }
         table.append(tbody);
-        listEl.innerHTML = "";
-        listEl.append(table);
+        listEl.replaceChildren(table);
       }
 
       const initial = await waitForScripts(1500);

@@ -7,7 +7,7 @@ const CHECK_SVG =
 const knownScripts = new Map();
 
 export function readScripts() {
-  const el = document.getElementById(REGISTRY_ID);
+  const el = document.querySelector(`#${REGISTRY_ID}`);
   if (!el?.textContent) {
     return [];
   }
@@ -40,10 +40,10 @@ export function waitForScripts(ms = 1800) {
       if (settleTimer) {
         clearTimeout(settleTimer);
       }
-      window.removeEventListener("userscript:presence", onPresence);
+      window.removeEventListener("userscript:presence", handlePresence);
       resolve(collectScripts());
     };
-    const onPresence = () => {
+    const handlePresence = () => {
       collectScripts();
       if (settleTimer) {
         clearTimeout(settleTimer);
@@ -51,9 +51,9 @@ export function waitForScripts(ms = 1800) {
       settleTimer = setTimeout(finish, 250);
     };
     const maxTimer = setTimeout(finish, ms);
-    window.addEventListener("userscript:presence", onPresence);
+    window.addEventListener("userscript:presence", handlePresence);
     if (collectScripts().length > 0) {
-      onPresence();
+      handlePresence();
     }
   });
 }
@@ -154,6 +154,17 @@ export function createCustomSelect(
     }
   }
 
+  function selectOptionValue(nextValue) {
+    const prev = currentValue;
+    currentValue = nextValue;
+    syncSelected();
+    close();
+    trigger.focus();
+    if (prev !== currentValue) {
+      onChange?.(currentValue);
+    }
+  }
+
   function setOptions(nextOptions, emptyText = "No options") {
     options = nextOptions;
     menu.innerHTML = "";
@@ -174,16 +185,8 @@ export function createCustomSelect(
       label.textContent = opt.label;
       btn.append(label);
       btn.insertAdjacentHTML("beforeend", CHECK_SVG);
-      btn.addEventListener("click", () => {
-        const prev = currentValue;
-        currentValue = opt.value;
-        syncSelected();
-        close();
-        trigger.focus();
-        if (prev !== currentValue) {
-          onChange?.(currentValue);
-        }
-      });
+      const optValue = opt.value;
+      btn.addEventListener("click", () => selectOptionValue(optValue));
       menu.append(btn);
     }
     syncSelected();
