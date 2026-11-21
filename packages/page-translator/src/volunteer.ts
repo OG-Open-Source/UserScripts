@@ -27,11 +27,13 @@ import {
   matchSiteTranslation,
   suggestScopeSelector,
 } from "./transform/template";
+import { mergeLocaleTables } from "./translations-remote";
 import { getSharedPanelCss } from "./ui-theme";
 
 const VOLUNTEER_MENU_ID = "ptr-volunteer";
 const VOLUNTEER_CLICK_MENU_ID = "ptr-volunteer-block-clicks";
 const VOLUNTEER_STYLE_ID = "ptr-vol-style";
+const INLINE_PLACEHOLDER_RE = /<x\s+id="\d+"/u;
 
 function triggerPulse(btn: HTMLElement): void {
   btn.classList.remove("flash-done");
@@ -39,11 +41,21 @@ function triggerPulse(btn: HTMLElement): void {
   btn.classList.add("flash-done");
 }
 
+export interface VolunteerConflict {
+  existing: string;
+  id: string;
+  imported: string;
+  key: string;
+  kind: "static" | "dynamic";
+  scope?: string;
+}
+
 export interface VolunteerControllerOptions {
   doc: Document;
   formatClickBlockLabel?: (blocked: boolean) => string;
   formatLabel?: (enabled: boolean) => string;
   getDelta: () => CompiledSiteDelta;
+  getLocalLocaleTable?: () => SiteLocaleTable | null;
   getSiteLocaleTable: () => SiteLocaleTable | null;
   getStyle?: StyleReader;
   getTargetLang: () => string;
@@ -51,6 +63,8 @@ export interface VolunteerControllerOptions {
   hostname: string;
   isClickBlocked?: () => boolean;
   isEnabled: () => boolean;
+  onSiteDictUpdated?: () => void;
+  onSyncLocalTable?: (patch: SiteLocaleTable) => void;
   /** Ignored legacy field: volunteer exports never include a pathname. */
   pathname?: string;
   setClickBlocked?: (next: boolean) => void;
@@ -72,6 +86,11 @@ interface VolunteerRefs {
   badgeDotEl: HTMLElement;
   badgeTextEl: HTMLElement;
   blockClicksBtn: HTMLButtonElement;
+  conflictHeaderEl: HTMLElement;
+  conflictKeepAllBtn: HTMLButtonElement;
+  conflictListEl: HTMLElement;
+  conflictOverwriteAllBtn: HTMLButtonElement;
+  conflictsEl: HTMLElement;
   copyBtn: HTMLButtonElement;
   dlBtn: HTMLButtonElement;
   editorEl: HTMLElement;
@@ -122,8 +141,8 @@ function applyVolCss(sr: ShadowRoot, doc: Document, css: string): void {
       // Fall back to <style> node
     }
   }
-  let styleEl = sr.getElementById(
-    VOLUNTEER_STYLE_ID
+  let styleEl = sr.querySelector(
+    `#${VOLUNTEER_STYLE_ID}`
   ) as HTMLStyleElement | null;
   if (!styleEl) {
     styleEl = doc.createElement("style");
@@ -137,6 +156,132 @@ function isNonEmptyScopedValue(value: string): boolean {
   return value.trim() !== "";
 }
 
+function filterNonEmptyDict(
+  dict?: Record<string, string>
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!dict) {
+    return out;
+  }
+  for (const [k, v] of Object.entries(dict)) {
+    if (isNonEmptyScopedValue(v)) {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+function buildCleanScoped(
+  scoped?: Record<string, SiteLocaleScope>
+): Record<string, SiteLocaleScope> {
+  const out: Record<string, SiteLocaleScope> = {};
+  if (!scoped) {
+    return out;
+  }
+  for (const [selector, scope] of Object.entries(scoped)) {
+    const clean: SiteLocaleScope = {};
+    const scopedStatic = filterNonEmptyDict(scope.static);
+    const scopedDynamic = filterNonEmptyDict(scope.dynamic);
+    if (Object.keys(scopedStatic).length > 0) {
+      clean.static = scopedStatic;
+    }
+    if (Object.keys(scopedDynamic).length > 0) {
+      clean.dynamic = scopedDynamic;
+    }
+    if (clean.static || clean.dynamic) {
+      out[selector] = clean;
+    }
+  }
+  return out;
+}
+
+function addPatchEntry(
+  patch: SiteLocaleTable,
+  kind: "static" | "dynamic",
+  key: string,
+  value: string,
+  scope?: string
+): void {
+  if (scope) {
+    patch.scoped ??= {};
+    const curScope = patch.scoped[scope] ?? {};
+    if (kind === "static") {
+      curScope.static = { ...(curScope.static ?? {}), [key]: value };
+    } else {
+      curScope.dynamic = { ...(curScope.dynamic ?? {}), [key]: value };
+    }
+    patch.scoped[scope] = curScope;
+    return;
+  }
+  if (kind === "static") {
+    patch.static = { ...(patch.static ?? {}), [key]: value };
+  } else {
+    patch.dynamic = { ...(patch.dynamic ?? {}), [key]: value };
+  }
+}
+
+function buildConflictId(
+  kind: "static" | "dynamic",
+  key: string,
+  scope?: string
+): string {
+  return `${kind}::${scope ?? ""}::${key}`;
+}
+
+function resolveSavedTranslation(
+  cur: CapturedEntry,
+  activeScope: string,
+  localTable: SiteLocaleTable,
+  table: SiteLocaleTable | null
+): string | undefined {
+  if (activeScope) {
+    const scopedSaved =
+      cur.kind === "static"
+        ? (localTable.scoped?.[activeScope]?.static?.[cur.key] ??
+          table?.scoped?.[activeScope]?.static?.[cur.key])
+        : (localTable.scoped?.[activeScope]?.dynamic?.[cur.key] ??
+          table?.scoped?.[activeScope]?.dynamic?.[cur.key]);
+    if (scopedSaved !== undefined) {
+      return scopedSaved;
+    }
+  }
+  return cur.kind === "static"
+    ? (localTable.static?.[cur.key] ?? table?.static?.[cur.key])
+    : (localTable.dynamic?.[cur.key] ?? table?.dynamic?.[cur.key]);
+}
+
+interface ImportCandidate {
+  imported: string;
+  key: string;
+  kind: "static" | "dynamic";
+  scope?: string;
+}
+
+function collectImportCandidates(
+  parsed: ReturnType<typeof parseAiTranslationImport>,
+  entryByKey: Map<string, CapturedEntry>
+): ImportCandidate[] {
+  const out: ImportCandidate[] = [];
+  for (const [k, v] of Object.entries(parsed.static)) {
+    const matched = entryByKey.get(k);
+    const kind: "static" | "dynamic" =
+      matched && matched.kind === "dynamic" ? "dynamic" : "static";
+    out.push({ kind, key: k, imported: v });
+  }
+  for (const [k, v] of Object.entries(parsed.dynamic)) {
+    out.push({ kind: "dynamic", key: k, imported: v });
+  }
+  for (const [selector, sc] of Object.entries(parsed.scoped)) {
+    for (const [k, v] of Object.entries(sc.static ?? {})) {
+      out.push({ kind: "static", key: k, imported: v, scope: selector });
+    }
+    for (const [k, v] of Object.entries(sc.dynamic ?? {})) {
+      out.push({ kind: "dynamic", key: k, imported: v, scope: selector });
+    }
+  }
+  return out;
+}
+
 export function createVolunteerController(options: VolunteerControllerOptions) {
   let hostEl: HTMLElement | null = null;
   let refs: VolunteerRefs | null = null;
@@ -145,9 +290,9 @@ export function createVolunteerController(options: VolunteerControllerOptions) {
   let registeredClickHandle: GMMenuHandle | undefined;
   let menuRegistered = false;
   let internalClickBlocked = false;
-  const draftStatic: Record<string, string> = {};
-  const draftDynamic: Record<string, string> = {};
-  const draftScoped: Record<string, SiteLocaleScope> = {};
+  let localOverrides: SiteLocaleTable =
+    mergeLocaleTables(null, options.getLocalLocaleTable?.()) ?? {};
+  let pendingConflicts: VolunteerConflict[] = [];
   let capturedEntries: CapturedEntry[] = [];
   let containerToIndex = new WeakMap<Element, number>();
   let staticCount = 0;
@@ -196,13 +341,43 @@ export function createVolunteerController(options: VolunteerControllerOptions) {
     return options.doc.defaultView ?? options.doc;
   }
 
+  function getEffectiveLocalTable(): SiteLocaleTable {
+    const external = options.getLocalLocaleTable?.() ?? null;
+    if (options.onSyncLocalTable && options.getLocalLocaleTable) {
+      return external ?? {};
+    }
+    return mergeLocaleTables(external, localOverrides) ?? {};
+  }
+
+  function syncLocalPatch(patch: SiteLocaleTable): void {
+    if (!(patch.static || patch.dynamic || patch.scoped)) {
+      return;
+    }
+    localOverrides = mergeLocaleTables(localOverrides, patch) ?? {};
+    options.onSyncLocalTable?.(patch);
+  }
+
+  function upsertConflict(conflict: VolunteerConflict): void {
+    const existingIdx = pendingConflicts.findIndex(
+      (item) => item.id === conflict.id
+    );
+    if (existingIdx >= 0) {
+      pendingConflicts[existingIdx] = conflict;
+    } else {
+      pendingConflicts.push(conflict);
+    }
+  }
+
   function scanPage(): void {
     const root = options.doc.body ?? options.doc.documentElement;
     if (!root) {
       return;
     }
     const delta = options.getDelta();
-    const table = options.getSiteLocaleTable();
+    const table = mergeLocaleTables(
+      options.getSiteLocaleTable(),
+      getEffectiveLocalTable()
+    );
     const segs = collectSegments(
       root,
       delta,
@@ -252,41 +427,10 @@ export function createVolunteerController(options: VolunteerControllerOptions) {
   }
 
   function getExportJson(): string {
-    const staticOut: Record<string, string> = {};
-    for (const [k, v] of Object.entries(draftStatic)) {
-      if (isNonEmptyScopedValue(v)) {
-        staticOut[k] = v;
-      }
-    }
-    const dynamicOut: Record<string, string> = {};
-    for (const [k, v] of Object.entries(draftDynamic)) {
-      if (isNonEmptyScopedValue(v)) {
-        dynamicOut[k] = v;
-      }
-    }
-    const scopedOut: Record<string, SiteLocaleScope> = {};
-    for (const [selector, scope] of Object.entries(draftScoped)) {
-      const clean: SiteLocaleScope = {};
-      const scopedStatic = Object.fromEntries(
-        Object.entries(scope.static ?? {}).filter(([, v]) =>
-          isNonEmptyScopedValue(v)
-        )
-      );
-      const scopedDynamic = Object.fromEntries(
-        Object.entries(scope.dynamic ?? {}).filter(([, v]) =>
-          isNonEmptyScopedValue(v)
-        )
-      );
-      if (Object.keys(scopedStatic).length > 0) {
-        clean.static = scopedStatic;
-      }
-      if (Object.keys(scopedDynamic).length > 0) {
-        clean.dynamic = scopedDynamic;
-      }
-      if (clean.static || clean.dynamic) {
-        scopedOut[selector] = clean;
-      }
-    }
+    const localTable = getEffectiveLocalTable();
+    const staticOut = filterNonEmptyDict(localTable.static);
+    const dynamicOut = filterNonEmptyDict(localTable.dynamic);
+    const scopedOut = buildCleanScoped(localTable.scoped);
     return JSON.stringify(
       {
         version: 1,
@@ -309,13 +453,56 @@ export function createVolunteerController(options: VolunteerControllerOptions) {
       hostname: options.hostname,
       targetLang: options.getTargetLang(),
       getStyle: options.getStyle,
-      siteTable: options.getSiteLocaleTable(),
+      siteTable: mergeLocaleTables(
+        options.getSiteLocaleTable(),
+        getEffectiveLocalTable()
+      ),
     });
   }
 
-  function importAiJson(raw: string): { applied: number } {
+  function processImportCandidate(
+    candidate: ImportCandidate,
+    existingTable: SiteLocaleTable | null,
+    localPatch: SiteLocaleTable
+  ): boolean {
+    const { kind, key, imported, scope } = candidate;
+    if (typeof imported !== "string" || imported.trim() === "") {
+      return false;
+    }
+    const existing = scope
+      ? existingTable?.scoped?.[scope]?.[kind]?.[key]
+      : existingTable?.[kind]?.[key];
+    const existingTrimmed = typeof existing === "string" ? existing.trim() : "";
+    if (existingTrimmed === "") {
+      addPatchEntry(localPatch, kind, key, imported, scope);
+      return true;
+    }
+    if (existing === imported) {
+      return false;
+    }
+    upsertConflict({
+      id: buildConflictId(kind, key, scope),
+      kind,
+      key,
+      ...(scope ? { scope } : {}),
+      existing: existing as string,
+      imported,
+    });
+    return false;
+  }
+
+  function importAiJson(raw: string): {
+    applied: number;
+    conflicts: number;
+    synced: number;
+  } {
     const parsed = parseAiTranslationImport(raw, options.getTargetLang());
-    let applied = 0;
+    const existingTable = mergeLocaleTables(
+      options.getSiteLocaleTable(),
+      getEffectiveLocalTable()
+    );
+    const localPatch: SiteLocaleTable = {};
+    let synced = 0;
 
     const entryByKey = new Map<string, CapturedEntry>();
     for (const entry of capturedEntries) {
@@ -324,47 +511,78 @@ export function createVolunteerController(options: VolunteerControllerOptions) {
       }
     }
 
-    for (const [k, v] of Object.entries(parsed.static)) {
-      const matched = entryByKey.get(k);
-      if (matched && matched.kind === "dynamic") {
-        draftDynamic[k] = v;
-      } else {
-        draftStatic[k] = v;
+    for (const candidate of collectImportCandidates(parsed, entryByKey)) {
+      if (processImportCandidate(candidate, existingTable, localPatch)) {
+        synced += 1;
       }
-      if (matched && !matched.hit) {
-        matched.hit = true;
-        hitCount += 1;
-      }
-      applied += 1;
     }
 
-    for (const [k, v] of Object.entries(parsed.dynamic)) {
-      draftDynamic[k] = v;
-      const matched = entryByKey.get(k);
-      if (matched && !matched.hit) {
-        matched.hit = true;
-        hitCount += 1;
-      }
-      applied += 1;
-    }
-
-    for (const [selector, sc] of Object.entries(parsed.scoped)) {
-      const curScope = draftScoped[selector] ?? {};
-      if (sc.static) {
-        curScope.static = { ...(curScope.static ?? {}), ...sc.static };
-        applied += Object.keys(sc.static).length;
-      }
-      if (sc.dynamic) {
-        curScope.dynamic = { ...(curScope.dynamic ?? {}), ...sc.dynamic };
-        applied += Object.keys(sc.dynamic).length;
-      }
-      draftScoped[selector] = curScope;
+    if (synced > 0) {
+      syncLocalPatch(localPatch);
+      options.onSiteDictUpdated?.();
+      scanPage();
     }
 
     lastRenderedIdx = -1;
     lastRenderedKey = "";
     patchPanel();
-    return { applied };
+    return { synced, conflicts: pendingConflicts.length, applied: synced };
+  }
+
+  function getPendingConflicts(): readonly VolunteerConflict[] {
+    return [...pendingConflicts];
+  }
+
+  function resolveConflict(id: string, choice: "existing" | "imported"): void {
+    const idx = pendingConflicts.findIndex((c) => c.id === id);
+    if (idx < 0) {
+      return;
+    }
+    const [conflict] = pendingConflicts.splice(idx, 1);
+    if (conflict && choice === "imported") {
+      const patch: SiteLocaleTable = {};
+      addPatchEntry(
+        patch,
+        conflict.kind,
+        conflict.key,
+        conflict.imported,
+        conflict.scope
+      );
+      syncLocalPatch(patch);
+    }
+    options.onSiteDictUpdated?.();
+    scanPage();
+    lastRenderedIdx = -1;
+    lastRenderedKey = "";
+    patchPanel();
+    setTextFast(refs?.msgEl, tr("volConflictResolved"));
+  }
+
+  function resolveAllConflicts(choice: "existing" | "imported"): void {
+    if (pendingConflicts.length === 0) {
+      return;
+    }
+    const items = pendingConflicts;
+    pendingConflicts = [];
+    if (choice === "imported") {
+      const patch: SiteLocaleTable = {};
+      for (const conflict of items) {
+        addPatchEntry(
+          patch,
+          conflict.kind,
+          conflict.key,
+          conflict.imported,
+          conflict.scope
+        );
+      }
+      syncLocalPatch(patch);
+    }
+    options.onSiteDictUpdated?.();
+    scanPage();
+    lastRenderedIdx = -1;
+    lastRenderedKey = "";
+    patchPanel();
+    setTextFast(refs?.msgEl, tr("volConflictResolved"));
   }
 
   function syncClickBlockButton(): void {
@@ -389,6 +607,37 @@ export function createVolunteerController(options: VolunteerControllerOptions) {
     setTextFast(refs.statHitsEl, String(hitCount));
   }
 
+  function patchEditorFields(cur: CapturedEntry, sr: ShadowRoot): void {
+    if (!refs) {
+      return;
+    }
+    const selectionChanged =
+      selectedIdx !== lastRenderedIdx || cur.key !== lastRenderedKey;
+    const table = options.getSiteLocaleTable();
+    const suggestedScope =
+      cur.matchedScope ?? suggestScopeSelector(cur.seg.container);
+
+    if (
+      (selectionChanged || sr.activeElement !== refs.scopeInput) &&
+      (selectionChanged || !refs.scopeInput.value)
+    ) {
+      refs.scopeInput.value = suggestedScope;
+    }
+
+    if (selectionChanged || sr.activeElement !== refs.valInput) {
+      const activeScope = refs.scopeInput.value.trim();
+      const savedOrTable = resolveSavedTranslation(
+        cur,
+        activeScope,
+        getEffectiveLocalTable(),
+        table
+      );
+      const hasPlaceholder =
+        cur.kind === "dynamic" || INLINE_PLACEHOLDER_RE.test(cur.key);
+      refs.valInput.value = savedOrTable ?? (hasPlaceholder ? cur.key : "");
+    }
+  }
+
   function patchPanel(): void {
     if (!(hostEl?.shadowRoot && refs)) {
       return;
@@ -402,7 +651,6 @@ export function createVolunteerController(options: VolunteerControllerOptions) {
     if (cur) {
       refs.editorEl.hidden = false;
       refs.emptyEl.hidden = true;
-
       setTextFast(
         refs.badgeTextEl,
         tr(cur.kind === "dynamic" ? "volBadgeDynamic" : "volBadgeStatic")
@@ -414,43 +662,10 @@ export function createVolunteerController(options: VolunteerControllerOptions) {
         cur.values.length ? `${tr("volValues")}: ${cur.values.join(", ")}` : ""
       );
       setTextFast(refs.keyEl, cur.key);
-
-      const targetLang = options.getTargetLang();
       refs.valInput.placeholder = tr("volTransPlaceholder", {
-        lang: targetLang,
+        lang: options.getTargetLang(),
       });
-
-      const selectionChanged =
-        selectedIdx !== lastRenderedIdx || cur.key !== lastRenderedKey;
-      const table = options.getSiteLocaleTable();
-      const suggestedScope =
-        cur.matchedScope ?? suggestScopeSelector(cur.seg.container);
-
-      if (
-        (selectionChanged || sr.activeElement !== refs.scopeInput) &&
-        (selectionChanged || !refs.scopeInput.value)
-      ) {
-        refs.scopeInput.value = suggestedScope;
-      }
-
-      if (selectionChanged || sr.activeElement !== refs.valInput) {
-        const activeScope = refs.scopeInput.value.trim();
-        const scopedSaved = activeScope
-          ? cur.kind === "static"
-            ? (draftScoped[activeScope]?.static?.[cur.key] ??
-              table?.scoped?.[activeScope]?.static?.[cur.key])
-            : (draftScoped[activeScope]?.dynamic?.[cur.key] ??
-              table?.scoped?.[activeScope]?.dynamic?.[cur.key])
-          : undefined;
-        const savedOrTable =
-          scopedSaved ??
-          (cur.kind === "static"
-            ? (draftStatic[cur.key] ?? table?.static?.[cur.key])
-            : (draftDynamic[cur.key] ?? table?.dynamic?.[cur.key]));
-        const hasPlaceholder =
-          cur.kind === "dynamic" || /<x\s+id="\d+"/u.test(cur.key);
-        refs.valInput.value = savedOrTable ?? (hasPlaceholder ? cur.key : "");
-      }
+      patchEditorFields(cur, sr);
       lastRenderedIdx = selectedIdx;
       lastRenderedKey = cur.key;
     } else {
@@ -459,7 +674,89 @@ export function createVolunteerController(options: VolunteerControllerOptions) {
       lastRenderedIdx = -1;
       lastRenderedKey = "";
     }
+    renderConflicts();
     syncClickBlockButton();
+  }
+
+  function renderConflicts(): void {
+    if (!refs) {
+      return;
+    }
+    const count = pendingConflicts.length;
+    refs.conflictsEl.hidden = count === 0;
+    if (count === 0) {
+      refs.conflictListEl.replaceChildren();
+      return;
+    }
+    setTextFast(refs.conflictHeaderEl, tr("volConflictsHeader", { count }));
+    const frag = options.doc.createDocumentFragment();
+    for (const c of pendingConflicts) {
+      const item = options.doc.createElement("div");
+      item.className = "conflict-item";
+
+      if (c.scope) {
+        const scopeEl = options.doc.createElement("span");
+        scopeEl.className = "ptr-chip ptr-mono";
+        scopeEl.textContent = c.scope;
+        item.appendChild(scopeEl);
+      }
+
+      const keyEl = options.doc.createElement("div");
+      keyEl.className = "conflict-key";
+      keyEl.textContent = c.key;
+      item.appendChild(keyEl);
+
+      const diffEl = options.doc.createElement("div");
+      diffEl.className = "conflict-diff";
+
+      const existingRow = options.doc.createElement("div");
+      existingRow.className = "conflict-val";
+      const existingLbl = options.doc.createElement("span");
+      existingLbl.className = "conflict-lbl";
+      existingLbl.textContent = tr("volConflictExisting");
+      const existingTxt = options.doc.createElement("span");
+      existingTxt.textContent = c.existing;
+      existingRow.append(existingLbl, existingTxt);
+
+      const importedRow = options.doc.createElement("div");
+      importedRow.className = "conflict-val";
+      const importedLbl = options.doc.createElement("span");
+      importedLbl.className = "conflict-lbl";
+      importedLbl.textContent = tr("volConflictImported");
+      const importedTxt = options.doc.createElement("span");
+      importedTxt.textContent = c.imported;
+      importedRow.append(importedLbl, importedTxt);
+
+      diffEl.append(existingRow, importedRow);
+      item.appendChild(diffEl);
+
+      const actionsEl = options.doc.createElement("div");
+      actionsEl.className = "row-between";
+      actionsEl.style.marginTop = "0";
+
+      const btnGroup = options.doc.createElement("div");
+      btnGroup.className = "us-btn-group";
+
+      const keepBtn = options.doc.createElement("button");
+      keepBtn.type = "button";
+      keepBtn.className = "ptr-btn us-btn-sm";
+      keepBtn.dataset.conflictId = c.id;
+      keepBtn.dataset.conflictAction = "existing";
+      keepBtn.textContent = tr("volConflictKeep");
+
+      const overwriteBtn = options.doc.createElement("button");
+      overwriteBtn.type = "button";
+      overwriteBtn.className = "ptr-btn ptr-btn-primary us-btn-sm";
+      overwriteBtn.dataset.conflictId = c.id;
+      overwriteBtn.dataset.conflictAction = "imported";
+      overwriteBtn.textContent = tr("volConflictOverwrite");
+
+      btnGroup.append(keepBtn, overwriteBtn);
+      actionsEl.appendChild(btnGroup);
+      item.appendChild(actionsEl);
+      frag.appendChild(item);
+    }
+    refs.conflictListEl.replaceChildren(frag);
   }
 
   function syncClickBlockMenu(): void {
@@ -567,7 +864,39 @@ export function createVolunteerController(options: VolunteerControllerOptions) {
 .field-lbl { font-size: 11.5px; color: var(--us-muted); }
 .row-between { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 .msg { color: var(--us-muted); font-size: 11.5px; margin-top: 6px; word-break: break-word; }
-.import-box { margin-top: 8px; display: grid; gap: 6px; }`;
+.import-box { margin-top: 8px; display: grid; gap: 6px; }
+.import-box[hidden] { display: none; }
+.conflict-box { display: grid; gap: 6px; }
+.conflict-box[hidden] { display: none; }
+.conflict-list { display: grid; gap: 6px; max-height: 180px; overflow-y: auto; }
+.conflict-item {
+  background: var(--us-surface);
+  border-radius: var(--us-radius-md);
+  padding: 7px 9px;
+  display: grid;
+  gap: 5px;
+}
+.conflict-key {
+  font-family: var(--us-mono);
+  font-size: 11px;
+  word-break: break-word;
+}
+.conflict-diff {
+  display: grid;
+  gap: 3px;
+  font-size: 11px;
+}
+.conflict-val {
+  background: var(--us-surface-2);
+  border-radius: var(--us-radius-sm);
+  padding: 4px 6px;
+  word-break: break-word;
+}
+.conflict-lbl {
+  color: var(--us-muted);
+  font-size: 10.5px;
+  margin-right: 4px;
+}`;
   }
 
   function syncThemeOnVol(): void {
@@ -670,13 +999,23 @@ export function createVolunteerController(options: VolunteerControllerOptions) {
         <button id="ptr-v-import-apply" class="ptr-btn ptr-btn-primary us-btn-sm" type="button"></button>
       </div>
     </div>
+    <div class="conflict-box" id="ptr-v-conflicts" hidden>
+      <div class="row-between" style="margin-top:0">
+        <span class="vol-badge" id="ptr-v-conflict-header"></span>
+        <div class="us-btn-group">
+          <button id="ptr-v-conflict-keep-all" class="ptr-btn us-btn-sm" type="button"></button>
+          <button id="ptr-v-conflict-overwrite-all" class="ptr-btn ptr-btn-primary us-btn-sm" type="button"></button>
+        </div>
+      </div>
+      <div class="conflict-list" id="ptr-v-conflict-list"></div>
+    </div>
     <div class="msg" id="ptr-v-msg"></div>
   </div>
 </aside>`;
     sr.appendChild(tpl.content.cloneNode(true));
 
     const get = <T extends HTMLElement>(id: string): T =>
-      sr.getElementById(id) as T;
+      sr.querySelector(`#${id}`) as T;
 
     setTextFast(get("ptr-v-rescan"), tr("volRescan"));
     setTextFast(get("ptr-v-lbl-static"), tr("volStatStatic"));
@@ -694,6 +1033,11 @@ export function createVolunteerController(options: VolunteerControllerOptions) {
     setTextFast(get("ptr-v-import-toggle"), tr("volImportAi"));
     setTextFast(get("ptr-v-import-cancel"), tr("volImportCancel"));
     setTextFast(get("ptr-v-import-apply"), tr("volImportApply"));
+    setTextFast(get("ptr-v-conflict-keep-all"), tr("volConflictKeepAll"));
+    setTextFast(
+      get("ptr-v-conflict-overwrite-all"),
+      tr("volConflictOverwriteAll")
+    );
     setTextFast(get("ptr-v-msg"), tr("volDraftReady"));
 
     const scopeInput = get<HTMLInputElement>("ptr-v-scope");
@@ -732,6 +1076,13 @@ export function createVolunteerController(options: VolunteerControllerOptions) {
       importInput,
       importApplyBtn: get<HTMLButtonElement>("ptr-v-import-apply"),
       importCancelBtn: get<HTMLButtonElement>("ptr-v-import-cancel"),
+      conflictsEl: get("ptr-v-conflicts"),
+      conflictHeaderEl: get("ptr-v-conflict-header"),
+      conflictKeepAllBtn: get<HTMLButtonElement>("ptr-v-conflict-keep-all"),
+      conflictOverwriteAllBtn: get<HTMLButtonElement>(
+        "ptr-v-conflict-overwrite-all"
+      ),
+      conflictListEl: get("ptr-v-conflict-list"),
       msgEl: get("ptr-v-msg"),
     };
 
@@ -777,19 +1128,10 @@ export function createVolunteerController(options: VolunteerControllerOptions) {
       triggerPulse(refs.saveBtn);
       const val = refs.valInput.value;
       const scopeSel = refs.scopeInput.value.trim();
-      if (scopeSel) {
-        const scope = draftScoped[scopeSel] ?? {};
-        if (cur.kind === "static") {
-          scope.static = { ...(scope.static ?? {}), [cur.key]: val };
-        } else {
-          scope.dynamic = { ...(scope.dynamic ?? {}), [cur.key]: val };
-        }
-        draftScoped[scopeSel] = scope;
-      } else if (cur.kind === "static") {
-        draftStatic[cur.key] = val;
-      } else {
-        draftDynamic[cur.key] = val;
-      }
+      const patch: SiteLocaleTable = {};
+      addPatchEntry(patch, cur.kind, cur.key, val, scopeSel || undefined);
+      syncLocalPatch(patch);
+      options.onSiteDictUpdated?.();
       const wasHit = cur.hit;
       cur.hit = val.trim() !== "";
       if (cur.hit !== wasHit) {
@@ -867,13 +1209,37 @@ export function createVolunteerController(options: VolunteerControllerOptions) {
         return;
       }
       try {
-        const { applied } = importAiJson(refs.importInput.value);
+        const { synced, conflicts } = importAiJson(refs.importInput.value);
         refs.importInput.value = "";
         refs.importBoxEl.hidden = true;
         triggerPulse(refs.importApplyBtn);
-        setTextFast(refs.msgEl, tr("volImported", { count: applied }));
+        setTextFast(
+          refs.msgEl,
+          conflicts > 0
+            ? tr("volImportedSync", { synced, conflicts })
+            : tr("volImported", { count: synced })
+        );
       } catch {
         setTextFast(refs.msgEl, tr("volImportError"));
+      }
+    });
+    refs.conflictKeepAllBtn.addEventListener("click", () => {
+      resolveAllConflicts("existing");
+    });
+    refs.conflictOverwriteAllBtn.addEventListener("click", () => {
+      resolveAllConflicts("imported");
+    });
+    refs.conflictListEl.addEventListener("click", (e) => {
+      const btn = (e.target as Element | null)?.closest?.(
+        "[data-conflict-action]"
+      ) as HTMLButtonElement | null;
+      if (!btn) {
+        return;
+      }
+      const id = btn.dataset.conflictId;
+      const action = btn.dataset.conflictAction;
+      if (id && (action === "existing" || action === "imported")) {
+        resolveConflict(id, action);
       }
     });
 
@@ -961,6 +1327,9 @@ export function createVolunteerController(options: VolunteerControllerOptions) {
     getExportJson,
     exportForAi,
     importAiJson,
+    getPendingConflicts,
+    resolveConflict,
+    resolveAllConflicts,
     refresh() {
       if (options.isEnabled()) {
         scanPage();

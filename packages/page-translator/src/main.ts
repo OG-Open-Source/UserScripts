@@ -4,6 +4,7 @@ import {
   gmMenuCommand,
   gmSet,
   isManagerPage,
+  isTopFrame,
   MANAGER_URL,
   publishPresence,
 } from "@userscripts/shared";
@@ -15,6 +16,7 @@ import {
   GM_unregisterMenuCommand,
   GM_xmlhttpRequest,
   unsafeWindow,
+  // biome-ignore lint/correctness/noUnresolvedImports: vite-plugin-monkey virtual module
 } from "$";
 import type { ViewportObserverHandle } from "./capture/observer";
 import { createViewportObserver } from "./capture/observer";
@@ -36,11 +38,14 @@ import { createBatchRunner } from "./translate/runner";
 import { createTranslatePaProvider } from "./translate/translate-pa";
 import type { SiteTranslationsFile } from "./translations-remote";
 import {
-  deleteCachedSiteTranslations,
-  listCachedSiteTranslations,
+  deleteLayeredSiteTranslations,
+  listLayeredSiteTranslations,
+  loadLocalSiteTranslations,
   loadSiteTranslations,
+  mergeLocalSiteLocaleTable,
+  mergeSiteTranslations,
   pickLocaleTable,
-  saveCachedSiteTranslations,
+  saveLocalSiteTranslations,
 } from "./translations-remote";
 import { createVolunteerController } from "./volunteer";
 
@@ -58,13 +63,6 @@ configureGmApi({
   GM_setValue,
   GM_registerMenuCommand,
   GM_unregisterMenuCommand,
-});
-
-publishPresence({
-  id: __SCRIPT_ID__,
-  name: __SCRIPT_NAME__,
-  description: __SCRIPT_DESCRIPTION__,
-  localeUrl: __LOCALE_URL__,
 });
 
 const ON_MANAGER = isManagerPage();
@@ -104,79 +102,101 @@ function syncAllStyles(cfg = loadConfig()): void {
 
 let onThemeUpdated: (() => void) | null = null;
 
-window.addEventListener("userscript:settings", (event: Event) => {
-  const detail = (
-    event as CustomEvent<{
+if (isTopFrame()) {
+  publishPresence({
+    id: __SCRIPT_ID__,
+    name: __SCRIPT_NAME__,
+    description: __SCRIPT_DESCRIPTION__,
+    localeUrl: __LOCALE_URL__,
+  });
+
+  window.addEventListener("userscript:settings", (event: Event) => {
+    const { detail } = event as CustomEvent<{
       lang?: string;
       ptr?: Partial<TranslatorConfig>;
       themeMode?: TranslatorConfig["themeMode"];
-    }>
-  ).detail;
-  if (detail?.lang) {
-    gmSet("lang", detail.lang);
-  }
-  const ptrPatch: Partial<TranslatorConfig> | undefined = detail?.ptr
-    ? { ...detail.ptr }
-    : detail?.themeMode
-      ? { themeMode: detail.themeMode }
-      : undefined;
-  if (ptrPatch) {
-    const next = saveConfig(ptrPatch);
-    if (!ON_MANAGER) {
-      syncAllStyles(next);
-      onThemeUpdated?.();
+    }>;
+    if (detail?.lang) {
+      gmSet("lang", detail.lang);
     }
-  }
-});
+    let ptrPatch: Partial<TranslatorConfig> | undefined;
+    if (detail?.ptr) {
+      ptrPatch = { ...detail.ptr };
+    } else if (detail?.themeMode) {
+      ptrPatch = { themeMode: detail.themeMode };
+    }
+    if (ptrPatch) {
+      const next = saveConfig(ptrPatch);
+      if (!ON_MANAGER) {
+        syncAllStyles(next);
+        onThemeUpdated?.();
+      }
+    }
+  });
 
-if (ON_MANAGER) {
-  window.addEventListener("userscript:ptr-request-config", () => {
-    window.dispatchEvent(
-      new CustomEvent("userscript:ptr-config", { detail: loadConfig() })
-    );
-  });
-  window.addEventListener("userscript:ptr-request-dicts", () => {
-    window.dispatchEvent(
-      new CustomEvent("userscript:ptr-dicts", {
-        detail: listCachedSiteTranslations(),
-      })
-    );
-  });
-  window.addEventListener("userscript:ptr-save-dict", (event: Event) => {
-    const file = (event as CustomEvent<SiteTranslationsFile>).detail;
-    if (!file) {
-      return;
-    }
-    try {
-      saveCachedSiteTranslations(file);
+  if (ON_MANAGER) {
+    window.addEventListener("userscript:ptr-request-config", () => {
+      window.dispatchEvent(
+        new CustomEvent("userscript:ptr-config", { detail: loadConfig() })
+      );
+    });
+    window.addEventListener("userscript:ptr-request-dicts", () => {
       window.dispatchEvent(
         new CustomEvent("userscript:ptr-dicts", {
-          detail: listCachedSiteTranslations(),
+          detail: listLayeredSiteTranslations(),
         })
       );
-    } catch {
-      // Ignore malformed payloads from untrusted page dispatches
-    }
-  });
-  window.addEventListener("userscript:ptr-delete-dict", (event: Event) => {
-    const host = (event as CustomEvent<{ host?: string }>).detail?.host;
-    if (!host) {
-      return;
-    }
-    deleteCachedSiteTranslations(host);
-    window.dispatchEvent(
-      new CustomEvent("userscript:ptr-dicts", {
-        detail: listCachedSiteTranslations(),
-      })
-    );
-  });
-} else {
-  boot();
+    });
+    window.addEventListener("userscript:ptr-save-dict", (event: Event) => {
+      const file = (event as CustomEvent<SiteTranslationsFile>).detail;
+      if (!file) {
+        return;
+      }
+      try {
+        saveLocalSiteTranslations(file);
+        window.dispatchEvent(
+          new CustomEvent("userscript:ptr-dicts", {
+            detail: listLayeredSiteTranslations(),
+          })
+        );
+      } catch {
+        // Ignore malformed payloads from untrusted page dispatches
+      }
+    });
+    window.addEventListener("userscript:ptr-delete-dict", (event: Event) => {
+      const host = (event as CustomEvent<{ host?: string }>).detail?.host;
+      if (!host) {
+        return;
+      }
+      deleteLayeredSiteTranslations(host);
+      window.dispatchEvent(
+        new CustomEvent("userscript:ptr-dicts", {
+          detail: listLayeredSiteTranslations(),
+        })
+      );
+    });
+  } else {
+    boot();
+  }
 }
 
 async function boot(): Promise<void> {
   let remoteDeltas: RemoteDeltasFile = EMPTY_REMOTE_DELTAS;
-  let siteTranslations: SiteTranslationsFile | null = null;
+  let remoteSiteTranslations: SiteTranslationsFile | null = null;
+  let localSiteTranslations: SiteTranslationsFile | null =
+    loadLocalSiteTranslations(location.hostname);
+  let siteTranslations: SiteTranslationsFile | null = mergeSiteTranslations(
+    remoteSiteTranslations,
+    localSiteTranslations
+  );
+  let onSiteDictUpdated: (() => void) | null = null;
+
+  function recomputeSiteTranslations(): void {
+    siteTranslations = mergeSiteTranslations(
+      remoteSiteTranslations,
+      localSiteTranslations
+    );
+  }
 
   const [i18n, loadedDeltas, loadedSiteTr] = await Promise.all([
     createI18n({
@@ -187,34 +207,45 @@ async function boot(): Promise<void> {
       remoteDeltas = next;
     }),
     loadSiteTranslations(__TRANSLATIONS_BASE__, location.hostname, (next) => {
-      siteTranslations = next;
+      remoteSiteTranslations = next;
+      recomputeSiteTranslations();
+      onSiteDictUpdated?.();
     }),
   ]);
   remoteDeltas = loadedDeltas;
-  siteTranslations = loadedSiteTr;
+  remoteSiteTranslations = loadedSiteTr;
+  recomputeSiteTranslations();
 
   const metrics = createPtrMetrics();
 
   function syncDictMetrics(): void {
     metrics.dictLoaded = siteTranslations !== null;
     const table = getActiveLocaleTable();
-    if (table) {
-      metrics.dictCounts = {
-        static: Object.keys(table.static ?? {}).length,
-        dynamic: Object.keys(table.dynamic ?? {}).length,
-        scoped: Object.keys(table.scoped ?? {}).length,
-      };
-    }
+    metrics.dictCounts = table
+      ? {
+          static: Object.keys(table.static ?? {}).length,
+          dynamic: Object.keys(table.dynamic ?? {}).length,
+          scoped: Object.keys(table.scoped ?? {}).length,
+        }
+      : { static: 0, dynamic: 0, scoped: 0 };
   }
 
   function refreshSiteTranslations(): void {
+    localSiteTranslations = loadLocalSiteTranslations(location.hostname);
+    recomputeSiteTranslations();
+    syncDictMetrics();
     loadSiteTranslations(__TRANSLATIONS_BASE__, location.hostname, (next) => {
-      siteTranslations = next;
-      syncDictMetrics();
+      remoteSiteTranslations = next;
+      recomputeSiteTranslations();
+      onSiteDictUpdated?.();
     }).then((refreshed) => {
-      if (refreshed) {
-        siteTranslations = refreshed;
-        syncDictMetrics();
+      if (
+        refreshed &&
+        JSON.stringify(refreshed) !== JSON.stringify(remoteSiteTranslations)
+      ) {
+        remoteSiteTranslations = refreshed;
+        recomputeSiteTranslations();
+        onSiteDictUpdated?.();
       }
     });
   }
@@ -349,6 +380,19 @@ async function boot(): Promise<void> {
     getTargetLang: () => loadConfig().targetLang,
     getDelta: resolveCurrentDelta,
     getSiteLocaleTable: getActiveLocaleTable,
+    getLocalLocaleTable: () =>
+      pickLocaleTable(localSiteTranslations, loadConfig().targetLang),
+    onSyncLocalTable: (patch) => {
+      localSiteTranslations = mergeLocalSiteLocaleTable(
+        location.hostname,
+        loadConfig().targetLang,
+        patch
+      );
+      recomputeSiteTranslations();
+    },
+    onSiteDictUpdated: () => {
+      onSiteDictUpdated?.();
+    },
     isEnabled: () => loadConfig().volunteerMode,
     setEnabled: (next) => {
       saveConfig({
@@ -369,6 +413,16 @@ async function boot(): Promise<void> {
         state: i18n.t(blocked ? "on" : "off"),
       }),
   });
+
+  onSiteDictUpdated = () => {
+    syncDictMetrics();
+    inspectController.syncFromConfig();
+    volunteerController.refresh();
+    if (translationActive) {
+      activeRunner?.clearCache();
+      startTranslation();
+    }
+  };
 
   onThemeUpdated = () => {
     inspectController.refreshTheme();

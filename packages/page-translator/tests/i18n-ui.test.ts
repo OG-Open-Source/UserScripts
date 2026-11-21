@@ -15,6 +15,15 @@ const zhCn = locales.languages.find((l) => l.code === "zh-Hans-CN")?.messages as
   | Record<string, string>
   | undefined;
 
+const INSPECT_HARDCODED_RE =
+  /["']Capture Preview["']|["']Copy Diagnostics["']/u;
+const VOLUNTEER_HARDCODED_RE =
+  /["']Rescan["']|["']Save & Preview["']|["']Manual Hits:/u;
+
+function noop(): void {
+  // Intentional no-op callback for test fixtures
+}
+
 test("all MESSAGES_EN keys are translated in zh-Hant-TW and zh-Hans-CN locales", () => {
   expect(zhTw).toBeDefined();
   expect(zhCn).toBeDefined();
@@ -35,7 +44,7 @@ test("HUD and Volunteer panels render localized zh-Hant-TW strings when t() is i
     doc: win.document as unknown as Document,
     getDelta: () => ({ addSelectors: [], removeSelectors: [], modRules: [] }),
     isEnabled: () => true,
-    setEnabled: () => {},
+    setEnabled: noop,
     t,
     getStyle: (el) => ({
       display:
@@ -45,7 +54,7 @@ test("HUD and Volunteer panels render localized zh-Hant-TW strings when t() is i
   });
   inspect.syncFromConfig();
   const hudText =
-    win.document.getElementById("ptr-inspect-hud")?.shadowRoot?.textContent ??
+    win.document.querySelector("#ptr-inspect-hud")?.shadowRoot?.textContent ??
     "";
   expect(hudText).toContain("捕捉預覽模式");
   expect(hudText).toContain("全文導出 (AI)");
@@ -59,7 +68,7 @@ test("HUD and Volunteer panels render localized zh-Hant-TW strings when t() is i
     getDelta: () => ({ addSelectors: [], removeSelectors: [], modRules: [] }),
     getSiteLocaleTable: () => null,
     isEnabled: () => true,
-    setEnabled: () => {},
+    setEnabled: noop,
     t,
     getStyle: (el) => ({
       display:
@@ -85,10 +94,6 @@ test("inspect.ts and volunteer.ts contain no hardcoded UI English copy outside i
     resolve(import.meta.dir, "../src/volunteer.ts"),
     "utf8"
   );
-  expect(inspectSrc).not.toMatch(
-    /["']Capture Preview["']|["']Copy Diagnostics["']/u
-  );
-  expect(volSrc).not.toMatch(
-    /["']Rescan["']|["']Save & Preview["']|["']Manual Hits:/u
-  );
+  expect(inspectSrc).not.toMatch(INSPECT_HARDCODED_RE);
+  expect(volSrc).not.toMatch(VOLUNTEER_HARDCODED_RE);
 });
