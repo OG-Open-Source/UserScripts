@@ -1,32 +1,26 @@
 {
-	"name": "userscripts",
-	"version": "1.0.0",
-	"private": true,
-	"description": "Userscripts that blend into the sites they enhance.",
-	"license": "ISC",
-	"workspaces": ["packages/*"],
-	"type": "module",
-	"scripts": {
-		"dev": "bun run --filter '*' dev",
-		"dev:hanime1": "bun run --filter '@userscripts/hanime1-download-manager' dev",
-		"dev:ptr": "bun run --filter '@userscripts/page-translator' dev",
-		"build": "bun run --filter '*' build",
-		"build:hanime1": "bun run --filter '@userscripts/hanime1-download-manager' build",
-		"build:ptr": "bun run --filter '@userscripts/page-translator' build",
-		"typecheck": "bun run --filter '*' typecheck",
-		"lint": "biome lint .",
-		"format": "biome format --write .",
-		"check": "biome check .",
-		"check:fix": "biome check --write .",
-		"test": "bun test ./packages",
-		"new-script": "bun run tools/new-script.mjs",
-		"prepare": "git config core.hooksPath .githooks || true"
-	},
-	"devDependencies": {
-		"@biomejs/biome": "2.6.8",
-		"typescript": "^5.9.0",
-		"vite": "^7.1.0",
-		"vite-plugin-monkey": "^5.0.0"
-	},
-	"engines": { "bun": ">=1.2.0" }
+  "name": "userscripts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Userscripts that blend into the sites they enhance.",
+  "license": "ISC",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "check": "ultracite check",
+    "fix": "ultracite fix",
+    "new": "bun run tools/new-script.mjs"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.8",
+    "typescript": "^5.9.0",
+    "ultracite": "8.3.1",
+    "vite": "^7.1.0",
+    "vite-plugin-monkey": "^5.0.0"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
+  }
 }

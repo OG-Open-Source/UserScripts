@@ -19,7 +19,7 @@ Run feature detection to see if the browser supports the Translator API.
 
 ```js
 if ("Translator" in self) {
-	// The Translator API is supported.
+  // The Translator API is supported.
 }
 ```
 
@@ -41,7 +41,10 @@ Translation is managed with language packs, downloaded on demand. A language pac
 Use [BCP 47](https://www.rfc-editor.org/info/bcp47) language short codes as strings. For example, `'es'` for Spanish or `'fr'` for French.
 
 ```js
-const translatorCapabilities = await Translator.availability({ sourceLanguage: "es", targetLanguage: "fr" });
+const translatorCapabilities = await Translator.availability({
+  sourceLanguage: "es",
+  targetLanguage: "fr",
+});
 // 'available'
 ```
 
@@ -49,13 +52,13 @@ Listen for model download progress with the `downloadprogress` event:
 
 ```js
 const translator = await Translator.create({
-	sourceLanguage: "es",
-	targetLanguage: "fr",
-	monitor(m) {
-		m.addEventListener("downloadprogress", (e) => {
-			console.log(`Downloaded ${e.loaded * 100}%`);
-		});
-	},
+  sourceLanguage: "es",
+  targetLanguage: "fr",
+  monitor(m) {
+    m.addEventListener("downloadprogress", (e) => {
+      console.log(`Downloaded ${e.loaded * 100}%`);
+    });
+  },
 });
 ```
 
@@ -67,7 +70,10 @@ To create a translator, check for [user activation](https://developer.chrome.com
 
 ```js
 // Create a translator that translates from English to French.
-const translator = await Translator.create({ sourceLanguage: "en", targetLanguage: "fr" });
+const translator = await Translator.create({
+  sourceLanguage: "en",
+  targetLanguage: "fr",
+});
 ```
 
 Once you have a translator, call the asynchronous `translate()`.
@@ -82,7 +88,7 @@ Alternatively, if you need to deal with longer texts, you can also use the strea
 ```js
 const stream = translator.translateStreaming(longText);
 for await (const chunk of stream) {
-	console.log(chunk);
+  console.log(chunk);
 }
 ```
 

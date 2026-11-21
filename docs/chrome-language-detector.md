@@ -26,7 +26,7 @@ Run feature detection to see if the browser supports the Language Detector API.
 
 ```js
 if ("LanguageDetector" in self) {
-	// The Language Detector API is available.
+  // The Language Detector API is available.
 }
 ```
 
@@ -40,11 +40,11 @@ To trigger the download and instantiate the language detector, check for [user a
 
 ```js
 const detector = await LanguageDetector.create({
-	monitor(m) {
-		m.addEventListener("downloadprogress", (e) => {
-			console.log(`Downloaded ${e.loaded * 100}%`);
-		});
-	},
+  monitor(m) {
+    m.addEventListener("downloadprogress", (e) => {
+      console.log(`Downloaded ${e.loaded * 100}%`);
+    });
+  },
 });
 ```
 
@@ -58,10 +58,10 @@ The `detect()` function can return either the first result, the likeliest answer
 const someUserText = "Hallo und herzlich willkommen!";
 const results = await detector.detect(someUserText);
 for (const result of results) {
-	// Show the full list of potential languages with their likelihood, ranked
-	// from most likely to least likely. In practice, one would pick the top
-	// language(s) that cross a high enough threshold.
-	console.log(result.detectedLanguage, result.confidence);
+  // Show the full list of potential languages with their likelihood, ranked
+  // from most likely to least likely. In practice, one would pick the top
+  // language(s) that cross a high enough threshold.
+  console.log(result.detectedLanguage, result.confidence);
 }
 // (Output truncated):
 // de 0.9993835687637329
@@ -84,7 +84,10 @@ By default, the Language Detector API is only available to top-level windows and
   at https://cross-origin.example.com/ access to the Language Detector API by
   setting the `allow="language-detector"` attribute.
 -->
-<iframe src="https://cross-origin.example.com/" allow="language-detector"></iframe>
+<iframe
+  src="https://cross-origin.example.com/"
+  allow="language-detector"
+></iframe>
 ```
 
 The Language Detector API isn't available in Web Workers. This is due to the complexity of establishing a responsible document for each worker in order to check the Permissions Policy status.

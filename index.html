@@ -1,82 +1,101 @@
 <!doctype html>
 <html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="userscripts-manager" content="1" />
-		<title>UserScripts</title>
-		<link rel="stylesheet" href="./settings/shared/tokens.css" />
-	</head>
-	<body>
-		<div class="settings-shell">
-			<header class="breadcrumb">
-				<span><strong>UserScripts</strong></span>
-				<span class="us-chip" id="statusChip"><i class="us-dot"></i>Detecting scripts…</span>
-			</header>
+  <head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <meta content="1" name="userscripts-manager">
+    <title>UserScripts</title>
+    <link href="./settings/shared/tokens.css" rel="stylesheet">
+  </head>
+  <body>
+    <div class="settings-shell">
+      <header class="breadcrumb">
+        <span><strong>UserScripts</strong></span>
+        <span class="us-chip" id="statusChip"
+          ><i class="us-dot"></i>Detecting scripts…</span
+        >
+      </header>
 
-			<section class="settings-group">
-				<h1>UserScripts</h1>
-				<p class="lead">Settings for the scripts distributed by OG-Open-Source/UserScripts.</p>
-				<ul class="us-nav-list">
-					<li>
-						<a href="./settings/language/">
-							<span><strong>Language</strong><br /><span class="us-muted">Shared UI language across all installed scripts</span></span>
-							<span class="us-muted">→</span>
-						</a>
-					</li>
-					<li>
-						<a href="./settings/translate/">
-							<span><strong>Page Translator</strong><br /><span class="us-muted">Translation routing, CSS presentation, CJK spacing, inspect HUD &amp; site dictionaries</span></span>
-							<span class="us-muted">→</span>
-						</a>
-					</li>
-				</ul>
-			</section>
+      <section class="settings-group">
+        <h1>UserScripts</h1>
+        <p class="lead">
+          Settings for the scripts distributed by OG-Open-Source/UserScripts.
+        </p>
+        <ul class="us-nav-list">
+          <li>
+            <a href="./settings/language/">
+              <span
+                ><strong>Language</strong><br>
+                <span class="us-muted"
+                  >Shared UI language across all installed scripts</span
+                ></span
+              >
+              <span class="us-muted">→</span>
+            </a>
+          </li>
+          <li>
+            <a href="./settings/translate/">
+              <span
+                ><strong>Page Translator</strong><br>
+                <span class="us-muted"
+                  >Translation routing, CSS presentation, CJK spacing, inspect
+                  HUD &amp; site dictionaries</span
+                ></span
+              >
+              <span class="us-muted">→</span>
+            </a>
+          </li>
+        </ul>
+      </section>
 
-			<section class="settings-group">
-				<h2>Installed Scripts</h2>
-				<div id="scriptsList" class="note">Waiting for userscript manager presence…</div>
-			</section>
-		</div>
+      <section class="settings-group">
+        <h2>Installed Scripts</h2>
+        <div class="note" id="scriptsList">
+          Waiting for userscript manager presence…
+        </div>
+      </section>
+    </div>
 
-		<script type="module">
-			import { onPresence, waitForScripts } from "./settings/shared/bridge.js";
+    <script type="module">
+      import { onPresence, waitForScripts } from "./settings/shared/bridge.js";
 
-			const chip = document.getElementById("statusChip");
-			const listEl = document.getElementById("scriptsList");
+      const chip = document.getElementById("statusChip");
+      const listEl = document.getElementById("scriptsList");
 
-			function renderScripts(scripts) {
-				if (!scripts.length) {
-					chip.innerHTML = '<i class="us-dot warn"></i>No script detected';
-					listEl.textContent = "Open this page through your userscript manager so installed scripts can be detected.";
-					return;
-				}
-				chip.innerHTML = `<i class="us-dot ok"></i>${scripts.length} connected`;
-				const table = document.createElement("table");
-				table.className = "us-table";
-				table.innerHTML = "<thead><tr><th>ID</th><th>Name</th><th>Description</th></tr></thead>";
-				const tbody = document.createElement("tbody");
-				for (const s of scripts) {
-					const tr = document.createElement("tr");
-					const tdId = document.createElement("td");
-					tdId.className = "us-mono";
-					tdId.textContent = s.id;
-					const tdName = document.createElement("td");
-					tdName.textContent = s.name ?? s.id;
-					const tdDesc = document.createElement("td");
-					tdDesc.className = "us-muted";
-					tdDesc.textContent = s.description ?? "";
-					tr.append(tdId, tdName, tdDesc);
-					tbody.append(tr);
-				}
-				table.append(tbody);
-				listEl.innerHTML = "";
-				listEl.append(table);
-			}
+      function renderScripts(scripts) {
+        if (!scripts.length) {
+          chip.innerHTML = '<i class="us-dot warn"></i>No script detected';
+          listEl.textContent =
+            "Open this page through your userscript manager so installed scripts can be detected.";
+          return;
+        }
+        chip.innerHTML = `<i class="us-dot ok"></i>${scripts.length} connected`;
+        const table = document.createElement("table");
+        table.className = "us-table";
+        table.innerHTML =
+          "<thead><tr><th>ID</th><th>Name</th><th>Description</th></tr></thead>";
+        const tbody = document.createElement("tbody");
+        for (const s of scripts) {
+          const tr = document.createElement("tr");
+          const tdId = document.createElement("td");
+          tdId.className = "us-mono";
+          tdId.textContent = s.id;
+          const tdName = document.createElement("td");
+          tdName.textContent = s.name ?? s.id;
+          const tdDesc = document.createElement("td");
+          tdDesc.className = "us-muted";
+          tdDesc.textContent = s.description ?? "";
+          tr.append(tdId, tdName, tdDesc);
+          tbody.append(tr);
+        }
+        table.append(tbody);
+        listEl.innerHTML = "";
+        listEl.append(table);
+      }
 
-			const initial = await waitForScripts(1500);
-			renderScripts(initial);
-			onPresence(renderScripts);
-		</script>
-	</body>
+      const initial = await waitForScripts(1500);
+      renderScripts(initial);
+      onPresence(renderScripts);
+    </script>
+  </body>
 </html>

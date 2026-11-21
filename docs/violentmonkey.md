@@ -1,8 +1,8 @@
-# Violentmonkey 文檔
+# Violentmonkey 參考文件
 
 > 開源使用者腳本管理器（Userscript Manager），支援 Chrome、Firefox、Edge 等所有 WebExtensions 相容瀏覽器。來源：[Context7 `/websites/violentmonkey_github_io`](https://violentmonkey.github.io/)（245 程式碼片段，評分 81.84，信譽 High）與 [`/violentmonkey/violentmonkey`](https://github.com/violentmonkey/violentmonkey)。
 
-## 元數據區塊（Metadata Block）
+## Metadata 區塊（Metadata Block）
 
 腳本開頭必須包含 `==UserScript==` 註解區塊，宣告名稱、命名空間、URL 匹配與版本等資訊。
 
@@ -18,7 +18,7 @@
 // ==/UserScript==
 ```
 
-> 注意：若未使用任何 GM 函數，`@grant` 應設為 `none`。
+> 注意：若未使用任何 GM 函式，`@grant` 應設為 `none`。
 
 ## @grant — 授權 API
 
@@ -45,22 +45,22 @@
 
 兩種寫法差異：
 
-- `GM_setValue`（短語式）：Violentmonkey 與 Tampermonkey 通用
-- `GM.setValue`（點號式）：較新的規範寫法
+- `GM_setValue`（底線式）：Violentmonkey 與 Tampermonkey 通用
+- `GM.setValue`（點號式）：較新的非同步規範寫法
 
 ## GM API
 
 ### GM.xmlHttpRequest / GM_xmlhttpRequest
 
-跨域 HTTP 請求。`onload` 回調處理回應：
+跨域 HTTP 請求。透過 `onload` 回呼處理回應：
 
 ```javascript
 // 相容多種腳本管理器
 GM.xmlHttpRequest({
-	url,
-	onload: (res) => {
-		/* ... */
-	},
+  url,
+  onload: (res) => {
+    /* ... */
+  },
 });
 ```
 
@@ -71,7 +71,7 @@ Violentmonkey 2.18.3+ 與 Tampermonkey 支援直接 `await`：
 const res = await GM.xmlHttpRequest({ url });
 ```
 
-> 注意：`onload` 回調內容可能是可變的（mutable）；如需保留回應內容請立即複製。
+> 注意：`onload` 回呼內容可能是可變的（mutable）；如需保留回應內容請立即複製。
 
 ### GM_registerMenuCommand
 
@@ -86,7 +86,7 @@ GM_registerMenuCommand(caption, onClick, options?)
 **參數**
 
 - `caption`：`string` — 顯示於彈出選單的文字
-- `onClick`：`(event) => void` — 點擊時觸發的回調
+- `onClick`：`(event) => void` — 點擊時觸發的回呼
   - `event`：自 VM2.13.1 起，提供 `event.button`、`event.shiftKey`、`event.key` 等啟動指令的事件細節
 - `options?`：`object` — 自 VM2.15.9 起的進階設定
   - `id?`：`string` — VM2.15.9 新增；預設自 VM2.16.2 起為 `caption` 文字（2.15.9–2.16.1 預設為隨機產生字串）
@@ -111,20 +111,20 @@ const id = "status";
 const inplace = id === GM_registerMenuCommand("Enabled", onClick, { id });
 
 if (inplace) {
-	// 同一 id 會原地取代原指令
-	GM_registerMenuCommand("Disabled", onClick, { id, title: "Status" });
+  // 同一 id 會原地取代原指令
+  GM_registerMenuCommand("Disabled", onClick, { id, title: "Status" });
 } else {
-	// 不支援原地更新時的 fallback
-	GM_unregisterMenuCommand("Enabled");
-	GM_unregisterMenuCommand("Foo");
-	GM_unregisterMenuCommand("Bar");
-	GM_registerMenuCommand("Disabled", onClick);
-	GM_registerMenuCommand("Foo", onClick2);
-	GM_registerMenuCommand("Bar", onClick3);
+  // 不支援原地更新時的 Fallback
+  GM_unregisterMenuCommand("Enabled");
+  GM_unregisterMenuCommand("Foo");
+  GM_unregisterMenuCommand("Bar");
+  GM_registerMenuCommand("Disabled", onClick);
+  GM_registerMenuCommand("Foo", onClick2);
+  GM_registerMenuCommand("Bar", onClick3);
 }
 ```
 
-> 注意：`hanime1-download-manager` 的語言切換選單正是利用此機制——每個語言註冊一個指令，當前語言標記 `✓`，點擊後 `GM_setValue('lang', code)` 並 `location.reload()`。
+> 注意：語言設定採狀態顯示（點擊後開啟 `settings/language/`），其餘開關式指令（如 Capture Preview / Volunteer Mode）則利用 `id` 原地更新狀態。
 
 ### GM_setValue / GM_getValue
 
@@ -141,10 +141,10 @@ const lang = GM_getValue("lang", null); // 第二參數為預設值
 
 ```javascript
 GM_download({
-	url: "https://example.com/video.mp4",
-	name: "video.mp4",
-	onload: () => console.log("done"),
-	onerror: (err) => console.error(err),
+  url: "https://example.com/video.mp4",
+  name: "video.mp4",
+  onload: () => console.log("done"),
+  onerror: (err) => console.error(err),
 });
 ```
 
@@ -157,11 +157,11 @@ GM_download({
 // @match *://hanime1.me/*
 ```
 
-`@match` 採用 URL match pattern 語法（`<scheme>://<host>/<path>`），`@include` 則接受正則表達式或萬用字元。優先使用 `@match`。
+`@match` 採用 URL match pattern 語法（`<scheme>://<host>/<path>`），`@include` 則接受正規表示式或萬用字元。優先使用 `@match`。
 
 ### @connect
 
-宣告 `GM_xmlhttpRequest` 允許跨域請求的目標域名白名單：
+宣告 `GM_xmlhttpRequest` 允許跨域請求的目標網域白名單：
 
 ```javascript
 // @connect hanime1.com
@@ -169,7 +169,7 @@ GM_download({
 // @connect vdownload.hembed.com
 ```
 
-未在 `@connect` 宣告的域名會在首次請求時彈出確認提示。
+未在 `@connect` 宣告的網域會在首次請求時彈出確認提示。
 
 ### @run-at
 
@@ -182,15 +182,15 @@ GM_download({
 // @run-at document-idle    // 頁面閒置時（預設）
 ```
 
-> 注意：`hanime1-download-manager` 使用 `document-idle`，因為需要在完整渲染的 DOM 上做 DOM 手術（DOM Surgery）注入下載按鈕。
+> 注意：`hanime1-download-manager` 使用 `document-idle`，因為需要在完整渲染的 DOM 上注入下載按鈕與批次勾選框。
 
-## 本專案實際使用的元數據
+## 本專案實際使用的 Metadata
 
 ```javascript
 // ==UserScript==
 // @name         Hanime1 Download Manager
 // @namespace    Violentmonkey Scripts
-// @version      1.1
+// @version      1.1.0
 // @description  Replace download links with a native-style quality menu, batch download mode, and in-page downloads without leaving the page.
 // @match        *://hanime1.com/*
 // @match        *://hanime1.me/*
@@ -213,6 +213,6 @@ GM_download({
 ## 參考
 
 - 建立使用者腳本：<https://violentmonkey.github.io/guide/creating-a-userscript>
-- 元數據區塊：<https://violentmonkey.github.io/api/metadata-block>
+- Metadata 區塊：<https://violentmonkey.github.io/api/metadata-block>
 - GM API：<https://violentmonkey.github.io/api/gm>
-- Context7 文檔查詢：`/websites/violentmonkey_github_io`、`/violentmonkey/violentmonkey`
+- Context7 文件查詢：`/websites/violentmonkey_github_io`、`/violentmonkey/violentmonkey`

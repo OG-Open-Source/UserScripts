@@ -1,22 +1,25 @@
 {
-	"version": 1,
-	"glossary": [
-		"GitHub",
-		"TypeScript",
-		"JavaScript",
-		"Violentmonkey",
-		"Tampermonkey",
-		"UserScript",
-		"UserScripts",
-		"OpenAI",
-		"Gemini",
-		"CSS",
-		"HTML",
-		"DOM",
-		"API",
-		"MDN",
-		"Bun",
-		"Vite"
-	],
-	"sites": { "*": "- [translate=\"no\"], .notranslate", "github.com": "- [class*=\"languageList__\"]" }
+  "version": 1,
+  "glossary": [
+    "GitHub",
+    "TypeScript",
+    "JavaScript",
+    "Violentmonkey",
+    "Tampermonkey",
+    "UserScript",
+    "UserScripts",
+    "OpenAI",
+    "Gemini",
+    "CSS",
+    "HTML",
+    "DOM",
+    "API",
+    "MDN",
+    "Bun",
+    "Vite"
+  ],
+  "sites": {
+    "*": "- [translate=\"no\"], .notranslate",
+    "github.com": "- [class*=\"languageList__\"]"
+  }
 }

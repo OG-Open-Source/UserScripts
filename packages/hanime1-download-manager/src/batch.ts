@@ -1,345 +1,561 @@
 /**
- * Batch download — checkboxes on thumbnails + right-side progress bar.
+ * Batch download — checkboxes on thumbnails + slim Curved-Outside right-edge dock.
  *
  * One entry per CARD (the watch page repeats videos in up to three places via
  * responsive copies), downloads de-duplicate by videoId at start time.
  */
 
-import type { BatchEntry, DownloadState } from "@userscripts/shared";
-import { GM_download } from "$";
+import type {
+  BatchEntry,
+  DownloadState,
+  ThemeColors,
+  ThemeMode,
+} from "@userscripts/shared";
+import {
+  applyThemeModeToElement,
+  gmDownload,
+  markUiRoot,
+  probeHostColors,
+  resolveThemeTokens,
+} from "@userscripts/shared";
 import { downloadName, resolveWithFallback } from "./api";
+import { getBatchDockCss } from "./styles";
 
 /** Fallback order for the batch menu (each video falls back per-video). */
 export const QUALITIES = ["1080p", "720p", "480p"];
 
 export interface BatchApi {
-	/** Register a card in the batch state and return its entry. */
-	addEntry: (card: HTMLElement, videoId: string, check: HTMLElement) => BatchEntry;
-	/** Toggle a card's checked state. */
-	setChecked: (entry: BatchEntry, checked: boolean) => void;
-	/** Enter or leave batch mode (shows/hides the bar). */
-	setMode: (on: boolean) => void;
-	/** Whether batch mode is currently on. */
-	isOn: () => boolean;
-	/** The batch bar element, or null if not yet built (used by the MutationObserver). */
-	element: () => HTMLDivElement | null;
-	/** Refresh the bar after DOM mutations. */
-	update: () => void;
-	/** Start downloading all selected entries. */
-	startDownload: () => Promise<void>;
+  /** Register a card in the batch state and return its entry. */
+  addEntry: (
+    card: HTMLElement,
+    videoId: string,
+    check: HTMLElement
+  ) => BatchEntry;
+  /** The batch dock element, or null if not yet built (used by the MutationObserver). */
+  element: () => HTMLDivElement | null;
+  /** Whether batch mode is currently on. */
+  isOn: () => boolean;
+  /** Toggle a card's checked state. */
+  setChecked: (entry: BatchEntry, checked: boolean) => void;
+  /** Enter or leave batch mode (shows/hides the bar). */
+  setMode: (on: boolean) => void;
+  /** Update the dock's 4-mode theme rule dynamically. */
+  setThemeMode: (mode: ThemeMode, hostColors?: ThemeColors | null) => void;
+  /** Start downloading all selected entries. */
+  startDownload: () => Promise<void>;
+  /** Refresh the bar after DOM mutations. */
+  update: () => void;
 }
 
+export interface BatchOptions {
+  getThemeMode?: () => ThemeMode;
+  onThemeModeChange?: (mode: ThemeMode) => void;
+}
+
+const DOCK_ID = "h1dl-dock";
+const DOCK_STYLE_ID = "h1dl-dock-style";
+
 export function createBatch(
-	t: (key: string) => string,
-	menuAskQuality: (qualities: string[]) => Promise<string | null>,
-	onActiveChange: (delta: number) => void,
+  t: (key: string) => string,
+  menuAskQuality: (qualities: string[]) => Promise<string | null>,
+  onActiveChange: (delta: number) => void,
+  options?: BatchOptions
 ): BatchApi {
-	// one entry per CARD (watch page repeats videos)
-	const batchState = new Set<BatchEntry>();
-	let batchBar: HTMLDivElement | null = null;
-	let batchOn = false;
-	let batchQuality: string | null = null; // chosen quality for the batch run
+  // one entry per CARD (watch page repeats videos)
+  const batchState = new Set<BatchEntry>();
+  let dockHost: HTMLDivElement | null = null;
+  let dockShadow: ShadowRoot | null = null;
+  let batchOn = false;
+  let batchQuality: string | null = null; // chosen quality for the batch run
+  let preferredQuality: string | null = null; // optional preset in Options flyout
+  let openTab: "queue" | "prefs" | null = null;
+  const entryRowMap = new Map<
+    BatchEntry,
+    { mini: HTMLElement; row: HTMLElement; pctEl: HTMLElement }
+  >();
 
-	// Native batch bar look comes from theme variables (read off the site's
-	// own .more-horiz-panel values) — we must NOT put the .more-horiz-panel
-	// class itself on the bar: it carries position:absolute and a mobile
-	// left:-122px rule that would break the fixed right rail.
-	const BATCH_BAR_STYLE = [
-		"position:fixed",
-		"right:0",
-		"top:50%",
-		"transform:translateY(-50%)",
-		"z-index:2147483646",
-		"display:flex",
-		"flex-direction:column",
-		"align-items:center",
-		"gap:6px",
-		"padding:8px 6px",
-		"background-color:var(--h1dl-panel-bg)",
-		"-webkit-backdrop-filter:blur(8px)",
-		"backdrop-filter:blur(8px)",
-		"border-radius:8px 0 0 8px",
-		"box-shadow:0 4px 24px rgba(0,0,0,0.5)",
-		"color:var(--h1dl-panel-color)",
-		"font-size:12px",
-		"max-height:70vh",
-	].join(";");
+  function currentThemeMode(): ThemeMode {
+    return options?.getThemeMode?.() ?? "host";
+  }
 
-	function buildBatchBar(): HTMLDivElement {
-		if (batchBar) return batchBar;
-		const bar = document.createElement("div");
-		bar.className = "h1dl-batch-bar";
-		bar.style.cssText = BATCH_BAR_STYLE;
+  function applyDockTheme(
+    mode: ThemeMode = currentThemeMode(),
+    explicitHost?: ThemeColors | null
+  ): void {
+    if (!(dockHost && dockShadow)) {
+      return;
+    }
+    const hostColors =
+      explicitHost ?? (mode === "host" ? probeHostColors(document) : null);
+    const hostTokens =
+      mode === "host" ? resolveThemeTokens("host", hostColors) : null;
+    applyThemeModeToElement(dockHost, mode, hostColors);
+    const styleEl = dockShadow.getElementById(
+      DOCK_STYLE_ID
+    ) as HTMLStyleElement | null;
+    if (styleEl) {
+      styleEl.textContent = getBatchDockCss(hostTokens);
+    }
+    for (const btn of dockShadow.querySelectorAll("[data-theme-opt]")) {
+      btn.setAttribute(
+        "aria-pressed",
+        String((btn as HTMLElement).dataset.themeOpt === mode)
+      );
+    }
+  }
 
-		// Selected count (n).
-		const count = document.createElement("div");
-		count.className = "h1dl-bb-count";
-		count.style.cssText = "font-size:13px;font-weight:bold;line-height:1.2";
-		count.textContent = "0";
-		bar.appendChild(count);
+  // Bootstrap 3 responsive helpers: hidden-* hides an element inside one
+  // breakpoint band (display:none at that band only).
+  const BP_MIN: Record<string, number> = { xs: 0, sm: 768, md: 992, lg: 1200 };
+  const BP_MAX: Record<string, number> = {
+    xs: 768,
+    sm: 992,
+    md: 1200,
+    lg: Number.POSITIVE_INFINITY,
+  };
+  const vw = () =>
+    window.innerWidth || document.documentElement.clientWidth || 1024;
+  const isCardVisible = (card: HTMLElement): boolean => {
+    let el: HTMLElement | null = card;
+    while (el && el !== document.body) {
+      if (el.style?.display === "none") {
+        return false;
+      }
+      const cls = el.classList;
+      for (const bp of Object.keys(BP_MIN)) {
+        if (cls.contains(`hidden-${bp}`)) {
+          const w = vw();
+          if (w >= BP_MIN[bp]! && w < BP_MAX[bp]!) {
+            return false;
+          }
+        }
+      }
+      el = el.parentElement;
+    }
+    return true;
+  };
 
-		const divider1 = document.createElement("div");
-		divider1.style.cssText = "width:70%;height:1px;background:var(--h1dl-item-hover);flex:none";
-		bar.appendChild(divider1);
+  function buildBatchBar(): HTMLDivElement {
+    if (dockHost) {
+      return dockHost;
+    }
+    const host = document.createElement("div");
+    host.id = DOCK_ID;
+    markUiRoot(host, "h1dl");
 
-		const prog = document.createElement("div");
-		prog.className = "h1dl-batch-prog";
-		prog.style.cssText = [
-			"display:flex",
-			"flex-direction:column",
-			"gap:4px",
-			"align-items:center",
-			"max-height:46vh",
-			"overflow-y:auto",
-			"scrollbar-width:thin",
-			"padding:2px 0",
-			"flex:0 1 auto",
-			"min-height:0",
-		].join(";");
-		bar.appendChild(prog);
+    const sr = host.attachShadow({ mode: "open" });
+    const mode = currentThemeMode();
+    const hostColors = mode === "host" ? probeHostColors(document) : null;
+    const hostTokens =
+      mode === "host" ? resolveThemeTokens("host", hostColors) : null;
+    applyThemeModeToElement(host, mode, hostColors);
 
-		const divider2 = divider1.cloneNode();
-		bar.appendChild(divider2);
+    const styleEl = document.createElement("style");
+    styleEl.id = DOCK_STYLE_ID;
+    styleEl.textContent = getBatchDockCss(hostTokens);
+    sr.appendChild(styleEl);
 
-		// Compact custom icon buttons: 28x28 squares that match the bar's own
-		// translucent look.
-		const mkBtn = (title: string, icon: string, onClick: () => void, extraClass?: string): HTMLButtonElement => {
-			const b = document.createElement("button");
-			b.className = "h1dl-bb-btn";
-			if (extraClass) b.classList.add(extraClass);
-			b.title = title;
-			b.innerHTML = `<i class="material-icons">${icon}</i>`;
-			b.addEventListener("click", onClick);
-			return b;
-		};
+    const tpl = document.createElement("template");
+    tpl.innerHTML = `
+<aside class="co-dock" aria-label="${t("queue")}">
+  <div class="co-flyout" id="h1dl-dock-flyout" data-open="false" aria-hidden="true">
+    <div id="h1dl-tab-queue">
+      <div class="co-body-head">
+        <span>${t("queue")}</span>
+        <span class="us-chip us-mono" id="h1dl-queue-count">0</span>
+      </div>
+      <div class="co-body-list" id="h1dl-queue-list"></div>
+    </div>
+    <div id="h1dl-tab-prefs" hidden>
+      <div class="co-body-head">
+        <span>${t("options")}</span>
+        <span class="us-chip us-mono">h1dl</span>
+      </div>
+      <div class="co-body-list">
+        <div class="dl-item">
+          <span class="us-muted" style="font-size:11px">${t("preferredQuality")}</span>
+          <div class="prefs-pills" id="h1dl-qual-pills">
+            <button class="us-btn us-btn-sm" type="button" data-qual="" aria-pressed="true">${t("autoQuality")}</button>
+            ${QUALITIES.map((q) => `<button class="us-btn us-btn-sm" type="button" data-qual="${q}" aria-pressed="false">${q}</button>`).join("")}
+          </div>
+        </div>
+        <div class="dl-item">
+          <span class="us-muted" style="font-size:11px">${t("themeRule")}</span>
+          <div class="prefs-pills" id="h1dl-theme-pills">
+            <button class="us-btn us-btn-sm" type="button" data-theme-opt="host" aria-pressed="${mode === "host"}">${t("themeHost")}</button>
+            <button class="us-btn us-btn-sm" type="button" data-theme-opt="system" aria-pressed="${mode === "system"}">${t("themeSystem")}</button>
+            <button class="us-btn us-btn-sm" type="button" data-theme-opt="light" aria-pressed="${mode === "light"}">${t("themeLight")}</button>
+            <button class="us-btn us-btn-sm" type="button" data-theme-opt="dark" aria-pressed="${mode === "dark"}">${t("themeDark")}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="co-rail">
+    <svg class="co-fillet co-fillet-top" viewBox="0 0 12 12" aria-hidden="true">
+      <path d="M12 0 A12 12 0 0 1 0 12 L12 12 Z" fill="var(--us-bg)" />
+    </svg>
+    <svg class="co-fillet co-fillet-bot" viewBox="0 0 12 12" aria-hidden="true">
+      <path d="M12 0 A12 12 0 0 1 0 12 L12 12 Z" fill="var(--us-bg)" />
+    </svg>
 
-		// Bootstrap 3 responsive helpers: hidden-* hides an element inside one
-		// breakpoint band (display:none at that band only). The watch page's
-		// playlist rail is rendered twice — once inside hidden-md (visible on
-		// desktop) and once inside hidden-xs (visible on mobile) — so half of
-		// the copies are invisible at any viewport. select-all must skip those
-		// invisible copies.
-		// Band edges: hidden-xs [0,768), hidden-sm [768,992),
-		// hidden-md [992,1200), hidden-lg [1200,∞).
-		const BP_MIN: Record<string, number> = { xs: 0, sm: 768, md: 992, lg: 1200 };
-		const BP_MAX: Record<string, number> = { xs: 768, sm: 992, md: 1200, lg: Infinity };
-		const vw = () => window.innerWidth || document.documentElement.clientWidth || 1024;
-		const isCardVisible = (card: HTMLElement): boolean => {
-			let el: HTMLElement | null = card;
-			while (el && el !== document.body) {
-				if (el.style?.display === "none") return false;
-				const cls = el.classList;
-				for (const bp of Object.keys(BP_MIN)) {
-					if (cls.contains("hidden-" + bp)) {
-						const w = vw();
-						if (w >= BP_MIN[bp] && w < BP_MAX[bp]) return false;
-					}
-				}
-				el = el.parentElement;
-			}
-			return true;
-		};
+    <span class="co-count" id="h1dl-count">0</span>
 
-		const selectAll = mkBtn(t("selectAll"), "select_all", () => {
-			batchState.forEach((entry) => {
-				if (!isCardVisible(entry.card)) return;
-				if (entry.state !== "downloading" && entry.state !== "done") setChecked(entry, true);
-			});
-		});
-		bar.appendChild(selectAll);
+    <div class="co-group">
+      <button class="co-group-btn" type="button" id="h1dl-btn-queue" data-co-tab="queue" aria-expanded="false" title="${t("queue")}">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 4h10M3 8h10M3 12h6"/></svg>
+      </button>
+      <button class="co-group-btn" type="button" id="h1dl-btn-prefs" data-co-tab="prefs" aria-expanded="false" title="${t("options")}">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.4M8 12.8v1.4M1.8 8h1.4M12.8 8h1.4M3.6 3.6l1 1M11.4 11.4l1 1M12.4 3.6l-1 1M4.6 11.4l-1 1"/></svg>
+      </button>
+    </div>
 
-		const selectNone = mkBtn(t("selectNone"), "deselect", () => {
-			batchState.forEach((entry) => {
-				if (entry.state !== "downloading") setChecked(entry, false);
-			});
-			// setChecked already exits batch mode when count hits 0.
-		});
-		bar.appendChild(selectNone);
+    <div class="co-mini-ticks" id="h1dl-mini-ticks" title="${t("queue")}"></div>
 
-		const dlBtn = mkBtn(t("downloadSelected"), "download", () => void startBatchDownload(), "h1dl-bb-dl");
-		bar.appendChild(dlBtn);
+    <div class="co-group">
+      <button class="co-group-btn" id="h1dl-select-toggle" type="button" title="${t("selectAll")}">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path id="h1dl-select-path" d="M5.2 8.2l2 2 3.6-4"/></svg>
+      </button>
+      <button class="co-group-btn primary" id="h1dl-dl-btn" type="button" title="${t("downloadSelected")}">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v8M5 7.5l3 3 3-3M3 13.5h10"/></svg>
+      </button>
+    </div>
+  </div>
+</aside>`;
+    sr.appendChild(tpl.content.cloneNode(true));
 
-		document.body.appendChild(bar);
-		batchBar = bar;
-		return bar;
-	}
+    const flyout = sr.getElementById("h1dl-dock-flyout")!;
+    const tabQueue = sr.getElementById("h1dl-tab-queue")!;
+    const tabPrefs = sr.getElementById("h1dl-tab-prefs")!;
 
-	function updateTick(entry: BatchEntry, state: DownloadState, percent?: number): void {
-		const tick = entry.tick;
-		if (!tick) return;
-		const fill = tick.querySelector(".h1dl-batch-fill") as HTMLElement;
-		tick.classList.remove("done", "error");
-		if (state === "downloading") {
-			const ratio = Math.max(0, Math.min(1, (percent || 0) / 100));
-			fill.style.transform = `scaleX(${ratio})`;
-		} else if (state === "done") {
-			tick.classList.add("done");
-			fill.style.transform = "scaleX(1)";
-		} else if (state === "error") {
-			tick.classList.add("error");
-			fill.style.transform = "scaleX(1)";
-		} else {
-			fill.style.transform = "scaleX(0)";
-		}
-	}
+    for (const btn of sr.querySelectorAll("[data-co-tab]")) {
+      btn.addEventListener("click", () => {
+        const next = (btn as HTMLElement).dataset.coTab as "queue" | "prefs";
+        openTab = openTab === next ? null : next;
+        flyout.dataset.open = String(openTab !== null);
+        flyout.setAttribute("aria-hidden", String(openTab === null));
+        for (const b of sr.querySelectorAll("[data-co-tab]")) {
+          b.setAttribute(
+            "aria-expanded",
+            String((b as HTMLElement).dataset.coTab === openTab)
+          );
+        }
+        if (openTab) {
+          tabQueue.hidden = openTab !== "queue";
+          tabPrefs.hidden = openTab !== "prefs";
+        }
+      });
+    }
 
-	function syncTicks(): void {
-		if (!batchBar) return;
-		const prog = batchBar.querySelector(".h1dl-batch-prog") as HTMLElement;
-		const checked = Array.from(batchState).filter((e) => e.checked);
-		checked.forEach((entry) => {
-			if (!entry.tick) {
-				const tick = document.createElement("div");
-				tick.className = "h1dl-batch-tick";
-				tick.innerHTML = '<div class="h1dl-batch-fill"></div><span class="h1dl-batch-name"></span>';
-				const titleEl = entry.card.querySelector(".title, .video-title");
-				const name = titleEl ? ((titleEl as HTMLElement).textContent?.trim() ?? entry.videoId) : entry.videoId;
-				tick.querySelector(".h1dl-batch-name")!.textContent = name;
-				tick.title = name;
-				prog.appendChild(tick);
-				entry.tick = tick;
-				updateTick(entry, entry.state);
-			}
-		});
-		// Remove ticks of unchecked entries.
-		Array.from(batchState).forEach((entry) => {
-			if (!entry.checked && entry.tick) {
-				entry.tick.remove();
-				entry.tick = null;
-			}
-		});
-	}
+    sr.getElementById("h1dl-select-toggle")!.addEventListener("click", () => {
+      const visibleEligible = Array.from(batchState).filter(
+        (entry) =>
+          isCardVisible(entry.card) &&
+          entry.state !== "downloading" &&
+          entry.state !== "done"
+      );
+      const anyChecked = visibleEligible.some((e) => e.checked);
+      if (anyChecked) {
+        for (const entry of batchState) {
+          if (entry.state !== "downloading") {
+            setChecked(entry, false);
+          }
+        }
+      } else {
+        for (const entry of visibleEligible) {
+          setChecked(entry, true);
+        }
+      }
+    });
 
-	function updateBatchBar(): void {
-		if (!batchBar) return;
-		// Count only items that are selected and not yet completed.
-		const pending = Array.from(batchState).filter((e) => e.checked && e.state !== "done");
-		(batchBar.querySelector(".h1dl-bb-count") as HTMLElement).textContent = String(pending.length);
-		const dlBtn = batchBar.querySelector(".h1dl-bb-dl") as HTMLButtonElement;
-		dlBtn.disabled = pending.length === 0 || pending.some((e) => e.state === "downloading");
-		syncTicks();
-	}
+    sr.getElementById("h1dl-dl-btn")!.addEventListener("click", () => {
+      void startBatchDownload();
+    });
 
-	function setChecked(entry: BatchEntry, checked: boolean): void {
-		entry.checked = checked;
-		entry.check.classList.toggle("checked", checked);
-		(entry.check.querySelector(".material-icons") as HTMLElement).textContent = checked ? "check" : "";
-		updateBatchBar();
-		// Unchecking the last selected item exits batch mode automatically.
-		if (!checked && batchOn && !Array.from(batchState).some((e) => e.checked)) {
-			setBatchMode(false);
-		}
-	}
+    for (const qBtn of sr.querySelectorAll("[data-qual]")) {
+      qBtn.addEventListener("click", () => {
+        const q = (qBtn as HTMLElement).dataset.qual || null;
+        preferredQuality = q;
+        for (const b of sr.querySelectorAll("[data-qual]")) {
+          b.setAttribute(
+            "aria-pressed",
+            String(
+              ((b as HTMLElement).dataset.qual || null) === preferredQuality
+            )
+          );
+        }
+      });
+    }
 
-	function setBatchMode(on: boolean): void {
-		batchOn = on;
-		document.body.classList.toggle("h1dl-batch-on", on);
-		if (on) {
-			buildBatchBar();
-			batchBar!.style.display = "flex";
-		} else if (batchBar) {
-			batchBar.style.display = "none";
-		}
-	}
+    for (const tBtn of sr.querySelectorAll("[data-theme-opt]")) {
+      tBtn.addEventListener("click", () => {
+        const nextMode = (tBtn as HTMLElement).dataset.themeOpt as ThemeMode;
+        applyDockTheme(nextMode);
+        options?.onThemeModeChange?.(nextMode);
+      });
+    }
 
-	async function startBatchDownload(): Promise<void> {
-		const selected = Array.from(batchState).filter((e) => e.checked && e.state !== "done");
-		if (!selected.length) return;
-		// Ask quality once for the whole batch via a small menu.
-		if (!batchQuality) {
-			const q = await menuAskQuality(QUALITIES);
-			if (!q) return;
-			batchQuality = q;
-		}
-		// The watch page can hold up to three cards for the same video (playlist
-		// rail's responsive copies). Download each videoId once and mirror the
-		// result onto its other selected copies.
-		const seenIds = new Set<string>();
-		const downgraded: { entry: BatchEntry; from: string; to: string }[] = [];
-		for (const entry of selected) {
-			if (seenIds.has(entry.videoId)) {
-				// A copy of an already-selected video: mark it done without
-				// downloading again.
-				entry.state = "done";
-				updateTick(entry, "done");
-				entry.check.classList.add("completed");
-				continue;
-			}
-			seenIds.add(entry.videoId);
-			entry.state = "downloading";
-			updateTick(entry, "downloading", 0);
-			onActiveChange(1);
-			const videoId = entry.videoId;
-			try {
-				const resolved = await resolveWithFallback(videoId, batchQuality, QUALITIES);
-				if (!resolved) throw new Error("no download link found");
-				if (resolved.quality !== batchQuality) {
-					downgraded.push({ entry, from: batchQuality, to: resolved.quality });
-				}
-				await new Promise<void>((resolve) => {
-					GM_download({
-						url: resolved.info.url,
-						name: downloadName(resolved.info.filename, resolved.info.url),
-						onload: () => {
-							onActiveChange(-1);
-							entry.state = "done";
-							updateTick(entry, "done");
-							entry.check.classList.add("completed");
-							resolve();
-						},
-						onerror: () => {
-							onActiveChange(-1);
-							entry.state = "error";
-							updateTick(entry, "error");
-							resolve();
-						},
-						ontimeout: () => {
-							onActiveChange(-1);
-							entry.state = "error";
-							updateTick(entry, "error");
-							resolve();
-						},
-						onprogress: (e: { lengthComputable: boolean; loaded: number; total: number }) => {
-							if (e?.lengthComputable) {
-								updateTick(entry, "downloading", Math.round((e.loaded / e.total) * 100));
-							}
-						},
-					});
-				});
-			} catch {
-				// The failure is already surfaced as an error tick on the batch bar;
-				// the cause is not actionable per-item.
-				onActiveChange(-1);
-				entry.state = "error";
-				updateTick(entry, "error");
-			}
-		}
-		// Notify the user about quality downgrades.
-		if (downgraded.length) {
-			const names = downgraded
-				.map((d) => {
-					const titleEl = d.entry.card.querySelector(".title, .video-title");
-					return (titleEl ? (titleEl as HTMLElement).textContent?.trim() : d.entry.videoId) + ` (${d.from}→${d.to})`;
-				})
-				.join("\n");
-			console.warn("[h1dl] " + t("downgradeNotice") + "\n" + names);
-		}
-		// Clear quality so a future batch can re-pick.
-		batchQuality = null;
-		updateBatchBar();
-	}
+    document.body.appendChild(host);
+    dockHost = host;
+    dockShadow = sr;
+    return host;
+  }
 
-	return {
-		addEntry(card, videoId, check) {
-			const entry: BatchEntry = { card, check, videoId, checked: false, state: "idle", tick: null };
-			batchState.add(entry);
-			return entry;
-		},
-		setChecked,
-		setMode: setBatchMode,
-		isOn: () => batchOn,
-		element: () => batchBar,
-		update: updateBatchBar,
-		startDownload: startBatchDownload,
-	};
+  function updateTick(
+    entry: BatchEntry,
+    state: DownloadState,
+    percent?: number
+  ): void {
+    const refs = entryRowMap.get(entry);
+    if (!refs) {
+      return;
+    }
+    const { mini, row, pctEl } = refs;
+    const miniFill = mini.querySelector(".h1dl-batch-fill") as HTMLElement;
+    const rowFill = row.querySelector(".h1dl-batch-fill") as HTMLElement;
+    mini.classList.remove("done", "error");
+    row.classList.remove("done", "error");
+    if (state === "downloading") {
+      const pct = Math.max(0, Math.min(100, percent || 0));
+      const tx = `scaleX(${pct / 100})`;
+      miniFill.style.transform = tx;
+      rowFill.style.transform = tx;
+      pctEl.textContent = `${pct}%`;
+    } else if (state === "done") {
+      mini.classList.add("done");
+      row.classList.add("done");
+      miniFill.style.transform = "scaleX(1)";
+      rowFill.style.transform = "scaleX(1)";
+      pctEl.textContent = "100%";
+    } else if (state === "error") {
+      mini.classList.add("error");
+      row.classList.add("error");
+      miniFill.style.transform = "scaleX(1)";
+      rowFill.style.transform = "scaleX(1)";
+      pctEl.textContent = t("error");
+    } else {
+      miniFill.style.transform = "scaleX(0)";
+      rowFill.style.transform = "scaleX(0)";
+      pctEl.textContent = t("queued");
+    }
+  }
+
+  function syncTicks(): void {
+    if (!dockShadow) {
+      return;
+    }
+    const miniWrap = dockShadow.getElementById("h1dl-mini-ticks")!;
+    const queueList = dockShadow.getElementById("h1dl-queue-list")!;
+    const checked = Array.from(batchState).filter((e) => e.checked);
+
+    for (const entry of checked) {
+      if (!entryRowMap.has(entry)) {
+        const titleEl = entry.card.querySelector(".title, .video-title");
+        const name = titleEl
+          ? ((titleEl as HTMLElement).textContent?.trim() ?? entry.videoId)
+          : entry.videoId;
+
+        const mini = document.createElement("div");
+        mini.className = "dl-track h1dl-batch-tick";
+        mini.title = name;
+        mini.innerHTML = '<div class="h1dl-batch-fill"></div>';
+        miniWrap.appendChild(mini);
+
+        const row = document.createElement("div");
+        row.className = "dl-item";
+        row.innerHTML = `<div class="dl-item-row"><span class="dl-item-name"></span><span class="us-mono us-muted h1dl-pct"></span></div><div class="dl-track"><div class="h1dl-batch-fill"></div></div>`;
+        row.querySelector(".dl-item-name")!.textContent = name;
+        const pctEl = row.querySelector(".h1dl-pct") as HTMLElement;
+        queueList.appendChild(row);
+
+        entry.tick = mini;
+        entryRowMap.set(entry, { mini, row, pctEl });
+        updateTick(entry, entry.state);
+      }
+    }
+
+    for (const entry of Array.from(batchState)) {
+      if (!entry.checked && entryRowMap.has(entry)) {
+        const refs = entryRowMap.get(entry)!;
+        refs.mini.remove();
+        refs.row.remove();
+        entryRowMap.delete(entry);
+        entry.tick = null;
+      }
+    }
+  }
+
+  function updateBatchBar(): void {
+    if (!dockShadow) {
+      return;
+    }
+    const pending = Array.from(batchState).filter(
+      (e) => e.checked && e.state !== "done"
+    );
+    const checkedTotal = Array.from(batchState).filter((e) => e.checked).length;
+    dockShadow.getElementById("h1dl-count")!.textContent = String(
+      pending.length
+    );
+    dockShadow.getElementById("h1dl-queue-count")!.textContent =
+      String(checkedTotal);
+
+    const dlBtn = dockShadow.getElementById("h1dl-dl-btn") as HTMLButtonElement;
+    dlBtn.disabled =
+      pending.length === 0 || pending.some((e) => e.state === "downloading");
+
+    const toggleBtn = dockShadow.getElementById(
+      "h1dl-select-toggle"
+    ) as HTMLButtonElement;
+    const togglePath = dockShadow.getElementById("h1dl-select-path");
+    const anyChecked = checkedTotal > 0;
+    toggleBtn.classList.toggle("active", anyChecked);
+    toggleBtn.title = anyChecked ? t("selectNone") : t("selectAll");
+    togglePath?.setAttribute("d", anyChecked ? "M5 8h6" : "M5.2 8.2l2 2 3.6-4");
+
+    syncTicks();
+  }
+
+  function setChecked(entry: BatchEntry, checked: boolean): void {
+    entry.checked = checked;
+    entry.check.classList.toggle("checked", checked);
+    (entry.check.querySelector(".material-icons") as HTMLElement).textContent =
+      checked ? "check" : "";
+    updateBatchBar();
+    // Unchecking the last selected item exits batch mode automatically.
+    if (!checked && batchOn && !Array.from(batchState).some((e) => e.checked)) {
+      setBatchMode(false);
+    }
+  }
+
+  function setBatchMode(on: boolean): void {
+    batchOn = on;
+    document.body.classList.toggle("h1dl-batch-on", on);
+    if (on) {
+      buildBatchBar();
+      dockHost!.style.display = "block";
+      updateBatchBar();
+    } else if (dockHost) {
+      dockHost.style.display = "none";
+    }
+  }
+
+  async function startBatchDownload(): Promise<void> {
+    const selected = Array.from(batchState).filter(
+      (e) => e.checked && e.state !== "done"
+    );
+    if (!selected.length) {
+      return;
+    }
+    if (!batchQuality) {
+      const q = preferredQuality ?? (await menuAskQuality(QUALITIES));
+      if (!q) {
+        return;
+      }
+      batchQuality = q;
+    }
+    const seenIds = new Set<string>();
+    const downgraded: { entry: BatchEntry; from: string; to: string }[] = [];
+    for (const entry of selected) {
+      if (seenIds.has(entry.videoId)) {
+        entry.state = "done";
+        updateTick(entry, "done");
+        entry.check.classList.add("completed");
+        continue;
+      }
+      seenIds.add(entry.videoId);
+      entry.state = "downloading";
+      updateTick(entry, "downloading", 0);
+      onActiveChange(1);
+      const videoId = entry.videoId;
+      try {
+        const resolved = await resolveWithFallback(
+          videoId,
+          batchQuality,
+          QUALITIES
+        );
+        if (!resolved) {
+          throw new Error("no download link found");
+        }
+        if (resolved.quality !== batchQuality) {
+          downgraded.push({
+            entry,
+            from: batchQuality,
+            to: resolved.quality,
+          });
+        }
+        await gmDownload({
+          url: resolved.info.url,
+          name: downloadName(resolved.info.filename, resolved.info.url),
+          onload: () => {
+            onActiveChange(-1);
+            entry.state = "done";
+            updateTick(entry, "done");
+            entry.check.classList.add("completed");
+          },
+          onerror: () => {
+            onActiveChange(-1);
+            entry.state = "error";
+            updateTick(entry, "error");
+          },
+          ontimeout: () => {
+            onActiveChange(-1);
+            entry.state = "error";
+            updateTick(entry, "error");
+          },
+          onprogress: (e: {
+            lengthComputable: boolean;
+            loaded: number;
+            total: number;
+          }) => {
+            if (e?.lengthComputable) {
+              updateTick(
+                entry,
+                "downloading",
+                Math.round((e.loaded / e.total) * 100)
+              );
+            }
+          },
+        }).catch(() => {
+          // Handled via onerror/ontimeout callbacks above
+        });
+      } catch {
+        onActiveChange(-1);
+        entry.state = "error";
+        updateTick(entry, "error");
+      }
+    }
+    if (downgraded.length) {
+      const names = downgraded
+        .map((d) => {
+          const titleEl = d.entry.card.querySelector(".title, .video-title");
+          return `${titleEl ? (titleEl as HTMLElement).textContent?.trim() : d.entry.videoId} (${d.from}→${d.to})`;
+        })
+        .join("\n");
+      console.warn(`[h1dl] ${t("downgradeNotice")}\n${names}`);
+    }
+    batchQuality = null;
+    updateBatchBar();
+  }
+
+  return {
+    addEntry(card, videoId, check) {
+      const entry: BatchEntry = {
+        card,
+        check,
+        videoId,
+        checked: false,
+        state: "idle",
+        tick: null,
+      };
+      batchState.add(entry);
+      return entry;
+    },
+    setChecked,
+    setMode: setBatchMode,
+    setThemeMode: applyDockTheme,
+    isOn: () => batchOn,
+    element: () => dockHost,
+    update: updateBatchBar,
+    startDownload: startBatchDownload,
+  };
 }

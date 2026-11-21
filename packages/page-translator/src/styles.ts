@@ -4,22 +4,23 @@ import type { SpacingMode } from "./config";
 export const STYLE_ELEMENT_ID = "ptr-user-css";
 
 export interface StyleOptions {
-	customCss: string;
-	customFont: string;
-	debugInspect: boolean;
-	spacingMode?: SpacingMode;
+  customCss: string;
+  customFont: string;
+  debugInspect: boolean;
+  spacingMode?: SpacingMode;
 }
 
 const gmInjectedByDoc = new WeakMap<Document, HTMLStyleElement>();
 const shadowSheetByRoot = new WeakMap<ShadowRoot, CSSStyleSheet>();
 
 export function buildStylesheet(opts: StyleOptions): string {
-	const fontVal = opts.customFont.trim() || "inherit";
-	const useW3cAutospace = opts.spacingMode === "w3c" || opts.spacingMode === "both";
-	const autospaceRule = useW3cAutospace ? " text-autospace: normal;" : "";
+  const fontVal = opts.customFont.trim() || "inherit";
+  const useW3cAutospace =
+    opts.spacingMode === "w3c" || opts.spacingMode === "both";
+  const autospaceRule = useW3cAutospace ? " text-autospace: normal;" : "";
 
-	const inspectCss = opts.debugInspect
-		? `
+  const inspectCss = opts.debugInspect
+    ? `
 [data-tr-inspect] {
   outline: 2px dashed #3b82f6 !important;
   outline-offset: 2px !important;
@@ -38,11 +39,11 @@ export function buildStylesheet(opts: StyleOptions): string {
   outline-style: dotted !important;
 }
 `
-		: "";
+    : "";
 
-	const userCss = opts.customCss.trim();
+  const userCss = opts.customCss.trim();
 
-	return `/* Page Translator base styles (overridable via custom CSS) */
+  return `/* Page Translator base styles (overridable via custom CSS) */
 :root { --ptr-font: ${fontVal}; }
 [data-tr-block] { display: contents; }
 [data-tr-orig] { display: none; }
@@ -55,72 +56,81 @@ ${inspectCss}${userCss ? `\n/* User custom CSS */\n${userCss}\n` : ""}`;
 }
 
 function syncShadowRoot(root: ShadowRoot, css: string, doc: Document): void {
-	if (typeof CSSStyleSheet !== "undefined" && Array.isArray(root.adoptedStyleSheets)) {
-		try {
-			let sheet = shadowSheetByRoot.get(root);
-			if (!sheet) {
-				sheet = new CSSStyleSheet();
-				shadowSheetByRoot.set(root, sheet);
-			}
-			sheet.replaceSync(css);
-			if (!root.adoptedStyleSheets.includes(sheet)) {
-				root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet];
-			}
-			return;
-		} catch {
-			// Fall back to <style> inside shadowRoot
-		}
-	}
-	let styleEl = root.getElementById(STYLE_ELEMENT_ID) as HTMLStyleElement | null;
-	if (!styleEl) {
-		styleEl = doc.createElement("style");
-		styleEl.id = STYLE_ELEMENT_ID;
-		root.appendChild(styleEl);
-	}
-	styleEl.textContent = css;
+  if (
+    typeof CSSStyleSheet !== "undefined" &&
+    Array.isArray(root.adoptedStyleSheets)
+  ) {
+    try {
+      let sheet = shadowSheetByRoot.get(root);
+      if (!sheet) {
+        sheet = new CSSStyleSheet();
+        shadowSheetByRoot.set(root, sheet);
+      }
+      sheet.replaceSync(css);
+      if (!root.adoptedStyleSheets.includes(sheet)) {
+        root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet];
+      }
+      return;
+    } catch {
+      // Fall back to <style> inside shadowRoot
+    }
+  }
+  let styleEl = root.getElementById(
+    STYLE_ELEMENT_ID
+  ) as HTMLStyleElement | null;
+  if (!styleEl) {
+    styleEl = doc.createElement("style");
+    styleEl.id = STYLE_ELEMENT_ID;
+    root.appendChild(styleEl);
+  }
+  styleEl.textContent = css;
 }
 
-export function syncShadowRootsOnly(doc: Document, opts: StyleOptions, shadowRoots: Iterable<ShadowRoot>): void {
-	const css = buildStylesheet(opts);
-	for (const root of shadowRoots) {
-		syncShadowRoot(root, css, doc);
-	}
+export function syncShadowRootsOnly(
+  doc: Document,
+  opts: StyleOptions,
+  shadowRoots: Iterable<ShadowRoot>
+): void {
+  const css = buildStylesheet(opts);
+  for (const root of shadowRoots) {
+    syncShadowRoot(root, css, doc);
+  }
 }
 
 export function syncStylesheet(
-	doc: Document,
-	opts: StyleOptions,
-	shadowRoots?: Iterable<ShadowRoot>,
+  doc: Document,
+  opts: StyleOptions,
+  shadowRoots?: Iterable<ShadowRoot>
 ): HTMLStyleElement {
-	const css = buildStylesheet(opts);
+  const css = buildStylesheet(opts);
 
-	if (shadowRoots) {
-		for (const root of shadowRoots) {
-			syncShadowRoot(root, css, doc);
-		}
-	}
+  if (shadowRoots) {
+    for (const root of shadowRoots) {
+      syncShadowRoot(root, css, doc);
+    }
+  }
 
-	const prevGm = gmInjectedByDoc.get(doc);
-	if (prevGm?.isConnected) {
-		prevGm.textContent = css;
-		return prevGm;
-	}
-	if (prevGm) {
-		gmInjectedByDoc.delete(doc);
-	}
-	const viaGm = gmAddStyle(css);
-	if (viaGm) {
-		viaGm.id = STYLE_ELEMENT_ID;
-		gmInjectedByDoc.set(doc, viaGm);
-		return viaGm;
-	}
+  const prevGm = gmInjectedByDoc.get(doc);
+  if (prevGm?.isConnected) {
+    prevGm.textContent = css;
+    return prevGm;
+  }
+  if (prevGm) {
+    gmInjectedByDoc.delete(doc);
+  }
+  const viaGm = gmAddStyle(css);
+  if (viaGm) {
+    viaGm.id = STYLE_ELEMENT_ID;
+    gmInjectedByDoc.set(doc, viaGm);
+    return viaGm;
+  }
 
-	let styleEl = doc.getElementById(STYLE_ELEMENT_ID) as HTMLStyleElement | null;
-	if (!styleEl) {
-		styleEl = doc.createElement("style");
-		styleEl.id = STYLE_ELEMENT_ID;
-		(doc.head ?? doc.documentElement).appendChild(styleEl);
-	}
-	styleEl.textContent = css;
-	return styleEl;
+  let styleEl = doc.getElementById(STYLE_ELEMENT_ID) as HTMLStyleElement | null;
+  if (!styleEl) {
+    styleEl = doc.createElement("style");
+    styleEl.id = STYLE_ELEMENT_ID;
+    (doc.head ?? doc.documentElement).appendChild(styleEl);
+  }
+  styleEl.textContent = css;
+  return styleEl;
 }

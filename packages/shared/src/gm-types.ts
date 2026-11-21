@@ -8,55 +8,59 @@
  */
 
 export interface GMXHRResponse {
-	status: number;
-	responseText: string;
-	responseHeaders?: string;
-	[key: string]: unknown;
+  responseHeaders?: string;
+  responseText: string;
+  status: number;
+  [key: string]: unknown;
 }
 
 export interface GMXHRDetails {
-	method?: "GET" | "POST" | "PUT" | "DELETE" | "HEAD" | "PATCH";
-	url: string;
-	headers?: Record<string, string>;
-	data?: string;
-	timeout?: number;
-	onload?: (res: GMXHRResponse) => void;
-	onerror?: (err: unknown) => void;
-	ontimeout?: () => void;
-	[key: string]: unknown;
+  data?: string;
+  headers?: Record<string, string>;
+  method?: "GET" | "POST" | "PUT" | "DELETE" | "HEAD" | "PATCH";
+  onerror?: (err: unknown) => void;
+  onload?: (res: GMXHRResponse) => void;
+  ontimeout?: () => void;
+  timeout?: number;
+  url: string;
+  [key: string]: unknown;
 }
 
 export interface GMDownloadProgress {
-	loaded: number;
-	total: number;
-	lengthComputable: boolean;
+  lengthComputable: boolean;
+  loaded: number;
+  total: number;
 }
 
 export interface GMDownloadDetails {
-	url: string;
-	name?: string | null;
-	onload?: () => void;
-	onerror?: (err: unknown) => void;
-	ontimeout?: () => void;
-	onprogress?: (e: GMDownloadProgress) => void;
-	[key: string]: unknown;
+  name?: string | null;
+  onerror?: (err: unknown) => void;
+  onload?: () => void;
+  onprogress?: (e: GMDownloadProgress) => void;
+  ontimeout?: () => void;
+  url: string;
+  [key: string]: unknown;
 }
 
 export type GMMenuHandle = string | number;
 
 export interface GMMenuCommandOptions {
-	id?: string;
-	title?: string;
-	autoClose?: boolean;
+  autoClose?: boolean;
+  id?: string;
+  title?: string;
 }
 
 /** The subset of the GM_* API consumed by shared helpers. */
 export interface GMApi {
-	GM_xmlhttpRequest: (details: GMXHRDetails) => void;
-	GM_download: (details: GMDownloadDetails) => void;
-	GM_getValue: <T = unknown>(key: string, defaultValue?: T) => T;
-	GM_setValue: (key: string, value: unknown) => void;
-	GM_registerMenuCommand: (caption: string, onClick: () => void, options?: GMMenuCommandOptions) => GMMenuHandle | void;
-	GM_unregisterMenuCommand?: (menuId: GMMenuHandle) => void;
-	GM_addStyle?: (css: string) => HTMLStyleElement | void;
+  GM_addStyle?: (css: string) => HTMLStyleElement | void;
+  GM_download: (details: GMDownloadDetails) => void;
+  GM_getValue: <T = unknown>(key: string, defaultValue?: T) => T;
+  GM_registerMenuCommand: (
+    caption: string,
+    onClick: () => void,
+    options?: GMMenuCommandOptions
+  ) => GMMenuHandle | void;
+  GM_setValue: (key: string, value: unknown) => void;
+  GM_unregisterMenuCommand?: (menuId: GMMenuHandle) => void;
+  GM_xmlhttpRequest: (details: GMXHRDetails) => void;
 }

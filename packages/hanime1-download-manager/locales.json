@@ -1,41 +1,61 @@
 {
-	"id": "h1dl",
-	"default": "en-US",
-	"languages": [
-		{ "code": "en-US", "name": "English (United States)" },
-		{
-			"code": "zh-Hant-TW",
-			"name": "臺灣繁體中文",
-			"messages": {
-				"download": "下載",
-				"fetching": "解析中",
-				"done": "完成",
-				"error": "失敗",
-				"loadingQualities": "載入畫質…",
-				"noQualities": "無可下載畫質",
-				"selectAll": "全選",
-				"selectNone": "全不選",
-				"downloadSelected": "下載所選選項",
-				"chooseBatchQuality": "選擇批次下載畫質（不足時自動降級）",
-				"downgradeNotice": "畫質降級："
-			}
-		},
-		{
-			"code": "zh-Hans-CN",
-			"name": "大陆简体中文",
-			"messages": {
-				"download": "下载",
-				"fetching": "解析中",
-				"done": "完成",
-				"error": "失败",
-				"loadingQualities": "加载画质…",
-				"noQualities": "无可下载画质",
-				"selectAll": "全选",
-				"selectNone": "全不选",
-				"downloadSelected": "下载已选取项目",
-				"chooseBatchQuality": "选择批量下载画质（不足时自动降级）",
-				"downgradeNotice": "画质降级："
-			}
-		}
-	]
+  "id": "h1dl",
+  "default": "en-US",
+  "languages": [
+    { "code": "en-US", "name": "English (United States)" },
+    {
+      "code": "zh-Hant-TW",
+      "name": "臺灣繁體中文",
+      "messages": {
+        "download": "下載",
+        "fetching": "解析中",
+        "done": "完成",
+        "error": "失敗",
+        "loadingQualities": "載入畫質…",
+        "noQualities": "無可下載畫質",
+        "selectAll": "全選",
+        "selectNone": "全不選",
+        "downloadSelected": "下載所選選項",
+        "chooseBatchQuality": "選擇批次下載畫質（不足時自動降級）",
+        "downgradeNotice": "畫質降級：",
+        "queue": "批次佇列",
+        "options": "選項",
+        "preferredQuality": "偏好畫質",
+        "themeRule": "介面主題規則",
+        "themeSystem": "系統",
+        "themeLight": "淺色",
+        "themeDark": "深色",
+        "themeHost": "宿主網頁",
+        "queued": "等待中",
+        "autoQuality": "自動降級 (1080p → 480p)"
+      }
+    },
+    {
+      "code": "zh-Hans-CN",
+      "name": "大陆简体中文",
+      "messages": {
+        "download": "下载",
+        "fetching": "解析中",
+        "done": "完成",
+        "error": "失败",
+        "loadingQualities": "加载画质…",
+        "noQualities": "无可下载画质",
+        "selectAll": "全选",
+        "selectNone": "全不选",
+        "downloadSelected": "下载已选取项目",
+        "chooseBatchQuality": "选择批量下载画质（不足时自动降级）",
+        "downgradeNotice": "画质降级：",
+        "queue": "批量队列",
+        "options": "选项",
+        "preferredQuality": "偏好画质",
+        "themeRule": "界面主题规则",
+        "themeSystem": "系统",
+        "themeLight": "浅色",
+        "themeDark": "深色",
+        "themeHost": "宿主网页",
+        "queued": "排队中",
+        "autoQuality": "自动降级 (1080p → 480p)"
+      }
+    }
+  ]
 }
