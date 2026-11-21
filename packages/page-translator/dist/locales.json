@@ -1,0 +1,41 @@
+{
+	"id": "ptr",
+	"default": "en-US",
+	"languages": [
+		{ "code": "en-US", "name": "English (United States)" },
+		{
+			"code": "zh-Hant-TW",
+			"name": "臺灣繁體中文",
+			"messages": {
+				"translatePage": "翻譯此頁面",
+				"restorePage": "還原原文",
+				"inspectMode": "捕捉預覽模式：{state}",
+				"volunteerMode": "志工輔助模式：{state}",
+				"volunteerBlockClicks": "志工點擊鎖定：{state}",
+				"openSettings": "開啟設定頁面",
+				"on": "開啟",
+				"off": "關閉",
+				"translating": "翻譯中…",
+				"translated": "已翻譯",
+				"error": "翻譯失敗"
+			}
+		},
+		{
+			"code": "zh-Hans-CN",
+			"name": "简体中文（中国大陆）",
+			"messages": {
+				"translatePage": "翻译此页面",
+				"restorePage": "还原原文",
+				"inspectMode": "捕捉预览模式：{state}",
+				"volunteerMode": "志愿辅助模式：{state}",
+				"volunteerBlockClicks": "志愿点击锁定：{state}",
+				"openSettings": "打开设置页面",
+				"on": "开启",
+				"off": "关闭",
+				"translating": "翻译中…",
+				"translated": "已翻译",
+				"error": "翻译失败"
+			}
+		}
+	]
+}
