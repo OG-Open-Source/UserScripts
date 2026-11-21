@@ -91,15 +91,22 @@ test("slim Curved-Outside batch dock mounts with data-us-ui=h1dl, toggles flyout
     batch.setChecked(e1, true);
     expect(sr.querySelector("#h1dl-count")?.textContent).toBe("1");
 
-    const selectToggle = sr.querySelector(
-      "#h1dl-select-toggle"
+    const selectAllBtn = sr.querySelector(
+      "#h1dl-select-all"
     ) as HTMLElement | null;
-    selectToggle?.click();
-    expect(batch.isOn()).toBe(false);
+    const selectNoneBtn = sr.querySelector(
+      "#h1dl-select-none"
+    ) as HTMLElement | null;
+    expect(selectAllBtn).not.toBeNull();
+    expect(selectNoneBtn).not.toBeNull();
 
-    batch.setMode(true);
-    selectToggle?.click();
+    // With 1 of 2 checked, Select All must select the remaining item -> 2
+    selectAllBtn?.click();
     expect(sr.querySelector("#h1dl-count")?.textContent).toBe("2");
+
+    // Select None clears all and exits batch mode
+    selectNoneBtn?.click();
+    expect(batch.isOn()).toBe(false);
   } finally {
     (globalThis as Record<string, unknown>).document = prevDoc;
     (globalThis as Record<string, unknown>).window = prevWin;

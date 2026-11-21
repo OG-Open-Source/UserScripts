@@ -167,7 +167,20 @@ export function createInject(
           }
           batch.setChecked(entry, !entry.checked);
         });
-        el.appendChild(check);
+        const img = el.querySelector("img");
+        const thumbWrap =
+          (el.querySelector(
+            ".playlist-hover-wrap, .video-thumb-wrap"
+          ) as HTMLElement | null) ??
+          (img?.closest("a") as HTMLElement | null) ??
+          img?.parentElement ??
+          null;
+        if (thumbWrap && el.contains(thumbWrap)) {
+          thumbWrap.classList.add("h1dl-thumb-wrap");
+          thumbWrap.appendChild(check);
+        } else {
+          el.appendChild(check);
+        }
         // NOTE: the watch page renders the same video in up to three places
         // (playlist rail has hidden-md + hidden-xs responsive copies, plus a
         // related-videos copy). One entry per CARD, not per videoId, so every

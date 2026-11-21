@@ -75,6 +75,10 @@ ${inlineVars}
 .h1dl-list-btn {
   display: inline-flex;
   align-items: center;
+  align-self: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 4px;
   gap: 4px;
   padding: 3px 8px;
   border: none;
@@ -99,8 +103,9 @@ ${inlineVars}
 .video-item-container:hover .h1dl-list-btn { opacity: 1; }
 .h1dl-list-btn.h1dl-pinned { opacity: 1 !important; }
 .video-item-container .subtitle { position: relative; }
-.video-item-container .subtitle .h1dl-list-btn { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
+.video-item-container .subtitle .h1dl-list-btn { margin-left: auto; }
 .h1dl-card { position: relative; }
+.h1dl-thumb-wrap { position: relative !important; }
 
 .h1dl-check {
   position: absolute;
@@ -165,7 +170,7 @@ export function getBatchDockCss(hostTokens?: ThemeTokens | null): string {
   align-items: center;
   gap: 6px;
   padding: 10px 5px;
-  background: var(--us-bg);
+  background: var(--us-surface);
   color: var(--us-fg);
   border-radius: var(--us-radius-lg) 0 0 var(--us-radius-lg);
 }

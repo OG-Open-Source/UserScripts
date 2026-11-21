@@ -193,10 +193,10 @@ export function createBatch(
   </div>
   <div class="co-rail">
     <svg class="co-fillet co-fillet-top" viewBox="0 0 12 12" aria-hidden="true">
-      <path d="M12 0 A12 12 0 0 1 0 12 L12 12 Z" fill="var(--us-bg)" />
+      <path d="M12 0 A12 12 0 0 1 0 12 L12 12 Z" fill="var(--us-surface)" />
     </svg>
     <svg class="co-fillet co-fillet-bot" viewBox="0 0 12 12" aria-hidden="true">
-      <path d="M12 0 A12 12 0 0 1 0 12 L12 12 Z" fill="var(--us-bg)" />
+      <path d="M12 0 A12 12 0 0 1 0 12 L12 12 Z" fill="var(--us-surface)" />
     </svg>
 
     <span class="co-count" id="h1dl-count">0</span>
@@ -213,8 +213,11 @@ export function createBatch(
     <div class="co-mini-ticks" id="h1dl-mini-ticks" title="${t("queue")}"></div>
 
     <div class="co-group">
-      <button class="co-group-btn" id="h1dl-select-toggle" type="button" title="${t("selectAll")}">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path id="h1dl-select-path" d="M5.2 8.2l2 2 3.6-4"/></svg>
+      <button class="co-group-btn" id="h1dl-select-all" type="button" title="${t("selectAll")}">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5.2 8.2l2 2 3.6-4"/></svg>
+      </button>
+      <button class="co-group-btn" id="h1dl-select-none" type="button" title="${t("selectNone")}">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 8h6"/></svg>
       </button>
       <button class="co-group-btn primary" id="h1dl-dl-btn" type="button" title="${t("downloadSelected")}">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v8M5 7.5l3 3 3-3M3 13.5h10"/></svg>
@@ -247,23 +250,22 @@ export function createBatch(
       });
     }
 
-    sr.getElementById("h1dl-select-toggle")!.addEventListener("click", () => {
-      const visibleEligible = Array.from(batchState).filter(
-        (entry) =>
+    sr.getElementById("h1dl-select-all")!.addEventListener("click", () => {
+      for (const entry of batchState) {
+        if (
           isCardVisible(entry.card) &&
           entry.state !== "downloading" &&
           entry.state !== "done"
-      );
-      const anyChecked = visibleEligible.some((e) => e.checked);
-      if (anyChecked) {
-        for (const entry of batchState) {
-          if (entry.state !== "downloading") {
-            setChecked(entry, false);
-          }
-        }
-      } else {
-        for (const entry of visibleEligible) {
+        ) {
           setChecked(entry, true);
+        }
+      }
+    });
+
+    sr.getElementById("h1dl-select-none")!.addEventListener("click", () => {
+      for (const entry of batchState) {
+        if (entry.state !== "downloading") {
+          setChecked(entry, false);
         }
       }
     });
@@ -402,15 +404,6 @@ export function createBatch(
     const dlBtn = dockShadow.getElementById("h1dl-dl-btn") as HTMLButtonElement;
     dlBtn.disabled =
       pending.length === 0 || pending.some((e) => e.state === "downloading");
-
-    const toggleBtn = dockShadow.getElementById(
-      "h1dl-select-toggle"
-    ) as HTMLButtonElement;
-    const togglePath = dockShadow.getElementById("h1dl-select-path");
-    const anyChecked = checkedTotal > 0;
-    toggleBtn.classList.toggle("active", anyChecked);
-    toggleBtn.title = anyChecked ? t("selectNone") : t("selectAll");
-    togglePath?.setAttribute("d", anyChecked ? "M5 8h6" : "M5.2 8.2l2 2 3.6-4");
 
     syncTicks();
   }
