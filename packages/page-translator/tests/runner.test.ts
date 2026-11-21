@@ -80,18 +80,19 @@ test("routes zh-TW skip, zh-CN local OpenCC (0 API calls), and volunteer static/
     getConfig: () => ({ ...DEFAULT_CONFIG, targetLang: "zh-TW" }),
     getProvider: () => ({
       id: "mock",
-      async translateBatch(items: string[]) {
+      translateBatch(items: string[]) {
         sentToApi.push(...items);
-        return items.map(() => "歡迎來到開源軟體。");
+        return Promise.resolve(items.map(() => "歡迎來到開源軟體。"));
       },
     }),
-    getOpenCC: async () => ({
-      convert: (s: string) =>
-        s
-          .replace("简体", "繁體")
-          .replace("网页", "網頁")
-          .replace("本地转换", "本地轉換"),
-    }),
+    getOpenCC: () =>
+      Promise.resolve({
+        convert: (s: string) =>
+          s
+            .replace("简体", "繁體")
+            .replace("网页", "網頁")
+            .replace("本地转换", "本地轉換"),
+      }),
     getSiteLocaleTable: () => ({
       static: { "Pull requests": "拉取請求" },
       dynamic: { "{v0} hours ago": "{v0} 小時前" },
@@ -151,21 +152,28 @@ test("pageCache hits still apply opencc post-processing and runner preserves ins
     }),
     getProvider: () => ({
       id: "mock",
-      async translateBatch(items: string[]) {
-        apiCalls++;
-        return items.map((s) =>
-          s.includes("Hello") ? "你好软件" : "更新於 5 小時前"
+      translateBatch(items: string[]) {
+        apiCalls += 1;
+        return Promise.resolve(
+          items.map((s) =>
+            s.includes("Hello") ? "你好软件" : "更新於 5 小時前"
+          )
         );
       },
     }),
-    getOpenCC: async () => ({
-      convert: (s: string) => s.replace("软件", "軟體"),
-    }),
+    getOpenCC: () =>
+      Promise.resolve({
+        convert: (s: string) => s.replace("软件", "軟體"),
+      }),
   });
 
+  const [seg0, seg1, seg2] = segs;
+  if (!(seg0 && seg1 && seg2)) {
+    throw new Error("Expected 3 segments");
+  }
   // Translate first segment (populates pageCache), then translate second (hits pageCache) + third
-  await runner.translateBatch([segs[0]!]);
-  await runner.translateBatch([segs[1]!, segs[2]!]);
+  await runner.translateBatch([seg0]);
+  await runner.translateBatch([seg1, seg2]);
 
   expect(apiCalls).toBe(2);
   const divs = Array.from(win.document.querySelectorAll("body > div"));
@@ -207,9 +215,9 @@ test("runner ignores <html lang> and routes each segment purely by its own conte
     getConfig: () => ({ ...DEFAULT_CONFIG, targetLang: "zh-TW" }),
     getProvider: () => ({
       id: "mock",
-      async translateBatch(items: string[]) {
+      translateBatch(items: string[]) {
         sentToApi.push(...items);
-        return items.map(() => "歡迎查看儲存庫洞察。");
+        return Promise.resolve(items.map(() => "歡迎查看儲存庫洞察。"));
       },
     }),
     getSiteLocaleTable: () => ({
@@ -259,22 +267,26 @@ test("coalesces micro-batches within window, uses context-grouped translateGroup
     getConfig: () => ({ ...DEFAULT_CONFIG, targetLang: "zh-TW" }),
     getProvider: () => ({
       id: "grouped-mock",
-      async translateGrouped(groups) {
+      translateGrouped(groups) {
         groupedCalls += 1;
         // Return first item only so second triggers automatic per-item fallback
-        const firstId = groups[0]![0]!.id;
-        return new Map([[firstId, "儲存"]]);
+        const firstId = groups[0]?.[0]?.id ?? "";
+        return Promise.resolve(new Map([[firstId, "儲存"]]));
       },
-      async translateBatch(items) {
+      translateBatch(items) {
         fallbackBatches.push([...items]);
-        return items.map(() => "取消");
+        return Promise.resolve(items.map(() => "取消"));
       },
     }),
   });
 
-  const p1 = runner.translateBatch([segs[0]!]);
+  const [seg0, seg1] = segs;
+  if (!(seg0 && seg1)) {
+    throw new Error("Expected 2 segments");
+  }
+  const p1 = runner.translateBatch([seg0]);
   await new Promise((r) => setTimeout(r, 10));
-  const p2 = runner.translateBatch([segs[1]!]);
+  const p2 = runner.translateBatch([seg1]);
   await Promise.all([p1, p2]);
 
   expect(groupedCalls).toBe(1);
@@ -285,4 +297,67 @@ test("coalesces micro-batches within window, uses context-grouped translateGroup
   expect(win.document.querySelector("#b [data-tr-dst]")?.textContent).toBe(
     "取消"
   );
+});
+
+test("dictionary manualHit takes precedence over skip and opencc routes with 0 API/OpenCC calls", async () => {
+  const { createPtrMetrics } = await import("../src/metrics");
+  const win = new Window();
+  win.document.body.innerHTML = `
+    <div id="tw">繁體中文名詞</div>
+    <div id="cn">简体中文词条</div>
+  `;
+  const segs = collectSegments(
+    win.document.body as unknown as Element,
+    parseSiteDelta(""),
+    {
+      getStyle: (el) => ({
+        display:
+          el.tagName === "DIV" || el.tagName === "BODY" ? "block" : "inline",
+        visibility: "visible",
+      }),
+    }
+  );
+
+  let apiCalls = 0;
+  let openccCalls = 0;
+  const metrics = createPtrMetrics();
+  const runner = createBatchRunner({
+    doc: win.document as unknown as Document,
+    delta: parseSiteDelta(""),
+    metrics,
+    getConfig: () => ({ ...DEFAULT_CONFIG, targetLang: "zh-TW" }),
+    getProvider: () => ({
+      id: "mock",
+      translateBatch(items: string[]) {
+        apiCalls += items.length;
+        return Promise.resolve(items);
+      },
+    }),
+    getOpenCC: () => {
+      openccCalls += 1;
+      return Promise.resolve({
+        convert: (s: string) => s,
+      });
+    },
+    getSiteLocaleTable: () => ({
+      static: {
+        繁體中文名詞: "自訂繁中譯名",
+        简体中文词条: "自訂簡中譯名",
+      },
+    }),
+  });
+
+  await runner.translateBatch(segs);
+
+  expect(apiCalls).toBe(0);
+  expect(openccCalls).toBe(0);
+  expect(win.document.querySelector("#tw [data-tr-dst]")?.textContent).toBe(
+    "自訂繁中譯名"
+  );
+  expect(win.document.querySelector("#cn [data-tr-dst]")?.textContent).toBe(
+    "自訂簡中譯名"
+  );
+  expect(metrics.segments.manual).toBe(2);
+  expect(metrics.routing.skip).toBe(1);
+  expect(metrics.routing.opencc).toBe(1);
 });

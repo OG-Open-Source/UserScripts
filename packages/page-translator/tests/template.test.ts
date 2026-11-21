@@ -6,7 +6,19 @@ import {
   matchSiteTranslation,
   suggestScopeSelector,
 } from "../src/transform/template";
-import { loadSiteTranslations } from "../src/translations-remote";
+import {
+  deleteCachedSiteTranslations,
+  deleteLayeredSiteTranslations,
+  listCachedSiteTranslations,
+  listLayeredSiteTranslations,
+  loadLocalSiteTranslations,
+  loadSiteTranslations,
+  mergeLocaleTables,
+  mergeLocalSiteLocaleTable,
+  mergeSiteTranslations,
+  saveCachedSiteTranslations,
+  saveLocalSiteTranslations,
+} from "../src/translations-remote";
 
 test("extractTemplate separates static text from dynamic values (numbers, handles, atomic slots)", () => {
   expect(extractTemplate("Pull requests")).toEqual({
@@ -105,7 +117,7 @@ test("loadSiteTranslations caches per-host volunteer JSON in GM storage and hand
     "https://example.com/translations",
     "github.com"
   );
-  expect(gh?.locales["zh-Hant-TW"]?.static["Issues"]).toBe("議題");
+  expect(gh?.locales["zh-Hant-TW"]?.static.Issues).toBe("議題");
 
   const missing = await loadSiteTranslations(
     "https://example.com/translations",
@@ -138,7 +150,7 @@ test("matchSiteTranslation evaluates scoped CSS selectors before global static/d
     matchSiteTranslation(
       "Insights",
       table,
-      win.document.getElementById("nav-ins")
+      win.document.querySelector("#nav-ins")
     )
   ).toEqual({
     kind: "static",
@@ -149,7 +161,7 @@ test("matchSiteTranslation evaluates scoped CSS selectors before global static/d
     matchSiteTranslation(
       "3 items",
       table,
-      win.document.getElementById("doc-ins")
+      win.document.querySelector("#doc-ins")
     )
   ).toEqual({
     kind: "dynamic",
@@ -160,7 +172,7 @@ test("matchSiteTranslation evaluates scoped CSS selectors before global static/d
     matchSiteTranslation(
       "Insights",
       table,
-      win.document.getElementById("other")
+      win.document.querySelector("#other")
     )
   ).toEqual({
     kind: "static",
@@ -172,7 +184,7 @@ test("suggestScopeSelector picks stable ancestor id/data-testid/aria-label witho
   const { Window } = require("happy-dom");
   const win = new Window();
   win.document.body.innerHTML = `<section aria-label="Insights Nav"><div class="Box_1a2b3c"><span id="t">Pulse</span></div></section>`;
-  expect(suggestScopeSelector(win.document.getElementById("t"))).toBe(
+  expect(suggestScopeSelector(win.document.querySelector("#t"))).toBe(
     'section[aria-label="Insights Nav"]'
   );
 
@@ -182,16 +194,16 @@ test("suggestScopeSelector picks stable ancestor id/data-testid/aria-label witho
     <div class="Box_99aabb Layout-sidebar"><span id="c">C</span></div>
     <span id="d">D</span>
   `;
-  expect(suggestScopeSelector(win.document.getElementById("a"))).toBe(
+  expect(suggestScopeSelector(win.document.querySelector("#a"))).toBe(
     "#repo-nav"
   );
-  expect(suggestScopeSelector(win.document.getElementById("b"))).toBe(
+  expect(suggestScopeSelector(win.document.querySelector("#b"))).toBe(
     '[data-testid="card-header"]'
   );
-  expect(suggestScopeSelector(win.document.getElementById("c"))).toBe(
+  expect(suggestScopeSelector(win.document.querySelector("#c"))).toBe(
     ".Layout-sidebar"
   );
-  expect(suggestScopeSelector(win.document.getElementById("d"))).toBe("");
+  expect(suggestScopeSelector(win.document.querySelector("#d"))).toBe("");
   expect(suggestScopeSelector(null)).toBe("");
 });
 
@@ -199,7 +211,7 @@ test("matchSiteTranslation falls through to later matching scopes or global when
   const { Window } = require("happy-dom");
   const win = new Window();
   win.document.body.innerHTML = `<section id="shell"><div id="box"><span id="leaf">Pulse</span></div></section>`;
-  const leaf = win.document.getElementById("leaf");
+  const leaf = win.document.querySelector("#leaf");
 
   const scopedHit = {
     static: { Pulse: "全域脈動" },
@@ -243,7 +255,7 @@ test("matchSiteTranslation skips scoped entries when container is omitted or nul
   const { Window } = require("happy-dom");
   const win = new Window();
   win.document.body.innerHTML = `<nav><a id="pulse">Pulse</a></nav>`;
-  const navEl = win.document.getElementById("pulse");
+  const navEl = win.document.querySelector("#pulse");
 
   const table = {
     static: { Pulse: "全域脈動" },
@@ -286,7 +298,7 @@ test("suggestScopeSelector stops at depth < 5 and escapes quotes/backslashes in 
     node = wrapper;
   }
   doc.body.appendChild(node);
-  expect(suggestScopeSelector(doc.getElementById("deep"))).toBe("");
+  expect(suggestScopeSelector(doc.querySelector("#deep"))).toBe("");
 
   // Boundary: the 5th ancestor (depth 4) is still reached and its id is suggested.
   node = doc.createElement("span");
@@ -300,7 +312,7 @@ test("suggestScopeSelector stops at depth < 5 and escapes quotes/backslashes in 
     node = wrapper;
   }
   doc.body.appendChild(node);
-  expect(suggestScopeSelector(doc.getElementById("deep5"))).toBe("#fifth");
+  expect(suggestScopeSelector(doc.querySelector("#deep5"))).toBe("#fifth");
 
   // Escaped quotes/backslashes in data-testid and aria-label.
   const testIdWrap = doc.createElement("div");
@@ -338,7 +350,7 @@ test("github.com.json has no routes and resolves Insights scoped entries", async
     <div id="outside">Pulse</div>
   `;
   expect(
-    matchSiteTranslation("Pulse", table, win.document.getElementById("pulse"))
+    matchSiteTranslation("Pulse", table, win.document.querySelector("#pulse"))
   ).toEqual({
     kind: "static",
     html: "脈動",
@@ -348,7 +360,7 @@ test("github.com.json has no routes and resolves Insights scoped entries", async
     matchSiteTranslation(
       "Code frequency",
       table,
-      win.document.getElementById("heading")
+      win.document.querySelector("#heading")
     )
   ).toEqual({
     kind: "static",
@@ -356,6 +368,263 @@ test("github.com.json has no routes and resolves Insights scoped entries", async
     scope: "nav[aria-label='Insights'], .Subhead",
   });
   expect(
-    matchSiteTranslation("Pulse", table, win.document.getElementById("outside"))
+    matchSiteTranslation("Pulse", table, win.document.querySelector("#outside"))
   ).toBeNull();
+});
+
+test("loadSiteTranslations caches under ptr:site-tr-remote:<host> and background refresh does not overwrite ptr:site-tr-local:<host>", async () => {
+  const store: Record<string, unknown> = {
+    "ptr:site-tr-remote:example.com": {
+      version: 1,
+      host: "example.com",
+      locales: {
+        "zh-TW": {
+          static: { Issues: "舊議題" },
+        },
+      },
+    },
+    "ptr:site-tr:__index": ["example.com"],
+  };
+  configureGmApi({
+    GM_getValue: (k: string, d?: unknown) => (k in store ? store[k] : d),
+    GM_setValue: (k: string, v: unknown) => {
+      store[k] = v;
+    },
+    GM_xmlhttpRequest(details: Record<string, unknown>) {
+      (details.onload as (r: unknown) => void)({
+        status: 200,
+        responseText: JSON.stringify({
+          version: 1,
+          host: "example.com",
+          locales: {
+            "zh-TW": {
+              static: { Issues: "新議題", Pulls: "合併請求" },
+            },
+          },
+        }),
+      });
+    },
+  });
+
+  saveLocalSiteTranslations({
+    version: 1,
+    host: "example.com",
+    locales: {
+      "zh-TW": {
+        static: { Issues: "自訂議題", Custom: "自訂" },
+      },
+    },
+  });
+
+  let changed: unknown = null;
+  const initial = await loadSiteTranslations(
+    "https://example.com/translations",
+    "example.com",
+    (next) => {
+      changed = next;
+    }
+  );
+  expect(initial?.locales["zh-TW"]?.static?.Issues).toBe("舊議題");
+
+  await new Promise((r) => setTimeout(r, 10));
+
+  expect(changed).not.toBeNull();
+  const storedRemote = store["ptr:site-tr-remote:example.com"] as {
+    locales: Record<string, { static?: Record<string, string> }>;
+  };
+  const storedLocal = store["ptr:site-tr-local:example.com"] as {
+    locales: Record<string, { static?: Record<string, string> }>;
+  };
+  expect(storedRemote.locales["zh-TW"].static?.Issues).toBe("新議題");
+  expect(storedRemote.locales["zh-TW"].static?.Pulls).toBe("合併請求");
+  expect(storedLocal.locales["zh-TW"].static).toEqual({
+    Issues: "自訂議題",
+    Custom: "自訂",
+  });
+
+  const layered = listLayeredSiteTranslations();
+  expect(layered).toHaveLength(1);
+  expect(layered[0]?.hasLocal).toBe(true);
+  expect(layered[0]?.hasRemote).toBe(true);
+  expect(layered[0]?.file.locales["zh-TW"]?.static).toEqual({
+    Issues: "自訂議題",
+    Pulls: "合併請求",
+    Custom: "自訂",
+  });
+});
+
+test("mergeSiteTranslations and mergeLocalSiteLocaleTable layer local over remote per key while preserving untouched remote keys", () => {
+  const store: Record<string, unknown> = {};
+  configureGmApi({
+    GM_getValue: (k: string, d?: unknown) => (k in store ? store[k] : d),
+    GM_setValue: (k: string, v: unknown) => {
+      store[k] = v;
+    },
+  });
+
+  const mergedTable = mergeLocaleTables(
+    {
+      static: { A: "rA", B: "rB" },
+      dynamic: { "{v0} d1": "rD1", "{v0} d2": "rD2" },
+      scoped: {
+        ".nav": {
+          static: { Home: "rHome", Docs: "rDocs" },
+          dynamic: { "{v0} tabs": "rTabs" },
+        },
+        ".footer": { static: { Help: "rHelp" } },
+      },
+    },
+    {
+      static: { B: "lB", C: "lC" },
+      dynamic: { "{v0} d2": "lD2" },
+      scoped: {
+        ".nav": { static: { Home: "lHome" } },
+      },
+    }
+  );
+  expect(mergedTable).toEqual({
+    static: { A: "rA", B: "lB", C: "lC" },
+    dynamic: { "{v0} d1": "rD1", "{v0} d2": "lD2" },
+    scoped: {
+      ".nav": {
+        static: { Home: "lHome", Docs: "rDocs" },
+        dynamic: { "{v0} tabs": "rTabs" },
+      },
+      ".footer": { static: { Help: "rHelp" } },
+    },
+  });
+
+  const mergedFile = mergeSiteTranslations(
+    {
+      version: 1,
+      host: "docs.example",
+      locales: {
+        "zh-TW": { static: { RemoteOnly: "僅遠端", Shared: "遠端" } },
+      },
+    },
+    {
+      version: 1,
+      host: "docs.example",
+      locales: {
+        "zh-TW": { static: { Shared: "本地", LocalOnly: "僅本地" } },
+      },
+    }
+  );
+  expect(mergedFile?.locales["zh-TW"]?.static).toEqual({
+    RemoteOnly: "僅遠端",
+    Shared: "本地",
+    LocalOnly: "僅本地",
+  });
+
+  mergeLocalSiteLocaleTable("docs.example", "zh-TW", {
+    static: { Save: "儲存" },
+    scoped: { "#nav": { static: { Home: "首頁" } } },
+  });
+  mergeLocalSiteLocaleTable("docs.example", "zh-TW", {
+    dynamic: { "{v0} stars": "{v0} 星" },
+    scoped: { "#nav": { static: { About: "關於" } } },
+  });
+  const local = loadLocalSiteTranslations("docs.example");
+  expect(local?.locales["zh-TW"]).toEqual({
+    static: { Save: "儲存" },
+    dynamic: { "{v0} stars": "{v0} 星" },
+    scoped: { "#nav": { static: { Home: "首頁", About: "關於" } } },
+  });
+
+  saveCachedSiteTranslations({
+    version: 1,
+    host: "imported.example",
+    locales: { "zh-TW": { static: { Import: "匯入" } } },
+  });
+  expect(store["ptr:site-tr-local:imported.example"]).toBeDefined();
+  expect(loadLocalSiteTranslations("imported.example")?.host).toBe(
+    "imported.example"
+  );
+});
+
+test("deleteLayeredSiteTranslations clears local first keeping remote, then clears remote on second call", () => {
+  const store: Record<string, unknown> = {
+    "ptr:site-tr-remote:del.example": {
+      version: 1,
+      host: "del.example",
+      locales: { "zh-TW": { static: { Issues: "議題" } } },
+    },
+    "ptr:site-tr:__index": ["del.example"],
+  };
+  configureGmApi({
+    GM_getValue: (k: string, d?: unknown) => (k in store ? store[k] : d),
+    GM_setValue: (k: string, v: unknown) => {
+      store[k] = v;
+    },
+  });
+
+  saveLocalSiteTranslations({
+    version: 1,
+    host: "del.example",
+    locales: { "zh-TW": { static: { Issues: "自訂議題" } } },
+  });
+
+  expect(deleteLayeredSiteTranslations("del.example")).toBe("cleared-local");
+  expect(loadLocalSiteTranslations("del.example")).toBeNull();
+  expect(store["ptr:site-tr-remote:del.example"]).not.toBeNull();
+  expect(listLayeredSiteTranslations()).toHaveLength(1);
+  expect(listLayeredSiteTranslations()[0]?.hasLocal).toBe(false);
+  expect(listLayeredSiteTranslations()[0]?.hasRemote).toBe(true);
+
+  expect(deleteLayeredSiteTranslations("del.example")).toBe("cleared-all");
+  expect(store["ptr:site-tr-remote:del.example"]).toBeNull();
+  expect(listLayeredSiteTranslations()).toEqual([]);
+  expect(deleteLayeredSiteTranslations("del.example")).toBe("noop");
+
+  // deleteCachedSiteTranslations delegates to deleteLayeredSiteTranslations
+  store["ptr:site-tr-remote:del2.example"] = {
+    version: 1,
+    host: "del2.example",
+    locales: { "zh-TW": { static: { A: "甲" } } },
+  };
+  store["ptr:site-tr:__index"] = ["del2.example"];
+  saveLocalSiteTranslations({
+    version: 1,
+    host: "del2.example",
+    locales: { "zh-TW": { static: { A: "乙" } } },
+  });
+  deleteCachedSiteTranslations("del2.example");
+  expect(loadLocalSiteTranslations("del2.example")).toBeNull();
+  expect(listCachedSiteTranslations()).toHaveLength(1);
+  deleteCachedSiteTranslations("del2.example");
+  expect(listCachedSiteTranslations()).toEqual([]);
+});
+
+test("legacy ptr:site-tr:<host> fallback is readable when split keys are absent", async () => {
+  const store: Record<string, unknown> = {
+    "ptr:site-tr:legacy.example": {
+      version: 1,
+      host: "legacy.example",
+      locales: { "zh-TW": { static: { Legacy: "舊鍵" } } },
+    },
+    "ptr:site-tr:__index": ["legacy.example"],
+  };
+  configureGmApi({
+    GM_getValue: (k: string, d?: unknown) => (k in store ? store[k] : d),
+    GM_setValue: (k: string, v: unknown) => {
+      store[k] = v;
+    },
+    GM_xmlhttpRequest(details: Record<string, unknown>) {
+      (details.onload as (r: unknown) => void)({
+        status: 404,
+        responseText: "Not Found",
+      });
+    },
+  });
+
+  expect(listCachedSiteTranslations()[0]?.locales["zh-TW"]?.static).toEqual({
+    Legacy: "舊鍵",
+  });
+
+  const loaded = await loadSiteTranslations(
+    "https://example.com/translations",
+    "legacy.example"
+  );
+  expect(loaded?.locales["zh-TW"]?.static?.Legacy).toBe("舊鍵");
+  expect(store["ptr:site-tr-remote:legacy.example"]).toBeDefined();
 });

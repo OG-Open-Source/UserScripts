@@ -159,6 +159,64 @@ export interface InspectControllerOptions {
 
 const hudSheetCache = new WeakMap<ShadowRoot, CSSStyleSheet>();
 
+const INSPECT_DOT_CLASS: Record<InspectKind, string> = {
+  "auto-dynamic": "dyn",
+  "+": "plus",
+  manual: "manual",
+  "auto-static": "static",
+};
+
+function compareStrings(a: string, b: string): number {
+  if (a === b) {
+    return 0;
+  }
+  return a < b ? -1 : 1;
+}
+
+function formatSpacingDiff(
+  previewSource: string,
+  out: string,
+  spacingMode: SpacingMode
+): string {
+  if (out !== previewSource) {
+    return `${previewSource.slice(0, 36)} -> ${out.slice(0, 36)}`;
+  }
+  return spacingMode === "w3c" ? "CSS text-autospace" : "—";
+}
+
+function isIgnoredInspectTarget(target: Element): boolean {
+  return (
+    target.id === "ptr-user-css" ||
+    target.id === HUD_ID ||
+    target.hasAttribute("data-tr-block") ||
+    target.hasAttribute("data-tr-orig") ||
+    target.hasAttribute("data-tr-dst") ||
+    target.hasAttribute("data-ptr-ui") ||
+    target.hasAttribute("data-us-ui") ||
+    target.closest?.("[data-ptr-ui],[data-us-ui]") !== null
+  );
+}
+
+function isUiMutationElement(el: Element | null): boolean {
+  return Boolean(
+    el &&
+      (el.hasAttribute("data-ptr-ui") ||
+        el.hasAttribute("data-us-ui") ||
+        el.closest?.("[data-ptr-ui],[data-us-ui]"))
+  );
+}
+
+function hasAncestorInSet(el: Element, rootSet: Set<Element>): boolean {
+  let p = el.parentElement;
+  while (p) {
+    if (rootSet.has(p)) {
+      return true;
+    }
+    p = p.parentElement;
+  }
+  return false;
+}
+
 function applyHudCss(sr: ShadowRoot, doc: Document, css: string): void {
   if (
     typeof CSSStyleSheet !== "undefined" &&
@@ -179,7 +237,7 @@ function applyHudCss(sr: ShadowRoot, doc: Document, css: string): void {
       // Fall back to <style> node
     }
   }
-  let styleEl = sr.getElementById(HUD_STYLE_ID) as HTMLStyleElement | null;
+  let styleEl = sr.querySelector(`#${HUD_STYLE_ID}`) as HTMLStyleElement | null;
   if (!styleEl) {
     styleEl = doc.createElement("style");
     styleEl.id = HUD_STYLE_ID;
@@ -243,39 +301,33 @@ export function createInspectController(options: InspectControllerOptions) {
     if (!hudRefs) {
       return;
     }
-    if (meta) {
-      hudRefs.hoverHintEl.hidden = true;
-      hudRefs.hoverKvEl.hidden = false;
-      const dotClass =
-        meta.kind === "auto-dynamic"
-          ? "dyn"
-          : meta.kind === "+"
-            ? "plus"
-            : meta.kind === "manual"
-              ? "manual"
-              : "static";
-      hudRefs.hoverDotEl.className = `us-dot ${dotClass}`;
-      setTextFast(hudRefs.hoverKindEl, meta.kind);
-      setTextFast(hudRefs.hoverRouteEl, meta.route);
-      setTextFast(hudRefs.hoverSpaceEl, meta.spacingSummary);
-      setTextFast(hudRefs.hoverScopeEl, meta.scope || "—");
+    if (!meta) {
+      hudRefs.hoverHintEl.hidden = false;
+      hudRefs.hoverKvEl.hidden = true;
+      const suffix = preview ? ` — ${preview}` : "";
       setTextFast(
-        hudRefs.hoverTplEl,
-        meta.template.slice(0, 120) || preview || "—"
+        hudRefs.hoverHintEl,
+        label ? `${label}${suffix}` : tr("hoverHint")
       );
-      setTextFast(
-        hudRefs.hoverValsEl,
-        meta.values.length > 0 ? meta.values.join(", ") : "—"
-      );
-      setTextFast(hudRefs.hoverSpacingDiffEl, meta.spacingDiff || "—");
       return;
     }
-    hudRefs.hoverHintEl.hidden = false;
-    hudRefs.hoverKvEl.hidden = true;
+    hudRefs.hoverHintEl.hidden = true;
+    hudRefs.hoverKvEl.hidden = false;
+    const dotClass = INSPECT_DOT_CLASS[meta.kind] ?? "static";
+    hudRefs.hoverDotEl.className = `us-dot ${dotClass}`;
+    setTextFast(hudRefs.hoverKindEl, meta.kind);
+    setTextFast(hudRefs.hoverRouteEl, meta.route);
+    setTextFast(hudRefs.hoverSpaceEl, meta.spacingSummary);
+    setTextFast(hudRefs.hoverScopeEl, meta.scope || "—");
     setTextFast(
-      hudRefs.hoverHintEl,
-      label ? `${label}${preview ? ` — ${preview}` : ""}` : tr("hoverHint")
+      hudRefs.hoverTplEl,
+      meta.template.slice(0, 120) || preview || "—"
     );
+    setTextFast(
+      hudRefs.hoverValsEl,
+      meta.values.length > 0 ? meta.values.join(", ") : "—"
+    );
+    setTextFast(hudRefs.hoverSpacingDiffEl, meta.spacingDiff || "—");
   }
 
   function flushTelemetry(force = false): void {
@@ -436,7 +488,7 @@ export function createInspectController(options: InspectControllerOptions) {
       flushTelemetry(false);
       return;
     }
-    const existing = options.doc.getElementById(HUD_ID);
+    const existing = options.doc.querySelector(`#${HUD_ID}`);
     if (existing) {
       existing.remove();
     }
@@ -537,7 +589,7 @@ export function createInspectController(options: InspectControllerOptions) {
     sr.appendChild(tpl.content.cloneNode(true));
 
     const get = <T extends HTMLElement>(id: string): T =>
-      sr.getElementById(id) as T;
+      sr.querySelector(`#${id}`) as T;
 
     setTextFast(get("ptr-h-title"), tr("hudTitle"));
     setTextFast(get("ptr-h-l-static"), tr("segStatic"));
@@ -764,26 +816,146 @@ export function createInspectController(options: InspectControllerOptions) {
       hoverListenerAttached = false;
     }
     hudEl?.remove();
-    options.doc.getElementById(HUD_ID)?.remove();
+    options.doc.querySelector(`#${HUD_ID}`)?.remove();
     hudEl = null;
     hudRefs = null;
   }
 
+  function recordSegmentMetrics(
+    metrics: PtrMetrics | undefined,
+    kind: InspectKind,
+    manualHit: ReturnType<typeof matchSiteTranslation>,
+    routeAction: "opencc" | "skip" | "translate"
+  ): void {
+    if (!metrics) {
+      return;
+    }
+    metrics.segments.total += 1;
+    if (kind === "manual") {
+      metrics.segments.manual += 1;
+    } else if (kind === "+") {
+      metrics.segments.plus += 1;
+    } else if (kind === "auto-dynamic") {
+      metrics.segments.autoDynamic += 1;
+    } else {
+      metrics.segments.autoStatic += 1;
+    }
+    if (kind === "manual" && manualHit?.scope) {
+      metrics.segments.scopedHits += 1;
+    }
+    if (routeAction === "skip") {
+      metrics.routing.skip += 1;
+    } else if (routeAction === "opencc") {
+      metrics.routing.opencc += 1;
+    } else {
+      metrics.routing.api += 1;
+    }
+  }
+
+  function inspectOneSegment(
+    s: ReturnType<typeof collectSegments>[number],
+    ctx: {
+      delta: CompiledSiteDelta;
+      metrics: PtrMetrics | undefined;
+      plainTexts: string[] | null;
+      punctNorm: PunctNormMode;
+      siteTable: SiteLocaleTable | null;
+      spacingMode: SpacingMode;
+      targetLang: string;
+    }
+  ): void {
+    const encoded = encodeInlineNodes(s.nodes, ctx.delta);
+    const plain = s.nodes
+      .map((n) => n.textContent ?? "")
+      .join("")
+      .trim();
+    ctx.plainTexts?.push(plain);
+    // Route purely by the segment's own text; page-level <html lang> or
+    // ancestor [lang] attributes are intentionally ignored here.
+    const route = routeSegment(plain, ctx.targetLang);
+    const manualHit = ctx.siteTable
+      ? matchSiteTranslation(encoded.payloadHtml, ctx.siteTable, s.container)
+      : null;
+    const ext = extractTemplate(encoded.payloadHtml);
+    let kind: InspectKind = s.sourceRule === "+" ? "+" : "auto-static";
+    if (manualHit) {
+      kind = "manual";
+    } else if (s.sourceRule === "auto" && ext.kind === "dynamic") {
+      kind = "auto-dynamic";
+    }
+
+    recordSegmentMetrics(ctx.metrics, kind, manualHit, route.action);
+
+    const previewSource = manualHit?.html
+      ? manualHit.html.replace(/<[^>]+>/gu, "")
+      : plain;
+    const spaceCheck = inspectTextSpacing(
+      previewSource,
+      ctx.punctNorm,
+      ctx.spacingMode
+    );
+    const spacingSummary =
+      ctx.spacingMode === "off"
+        ? "off"
+        : `+${spaceCheck.insertedSpaces} JS · ${ctx.spacingMode}`;
+    const spacingDiff = formatSpacingDiff(
+      previewSource,
+      spaceCheck.out,
+      ctx.spacingMode
+    );
+
+    hoverMeta.set(s.container, {
+      kind,
+      route: manualHit
+        ? `${detectSegmentBcp47(plain).lang} -> manual (${route.action})`
+        : `${detectSegmentBcp47(plain).lang} -> ${route.action}`,
+      spacingMode: ctx.spacingMode,
+      spacingSummary,
+      spacingDiff,
+      mods: [...s.modifiers].sort(compareStrings),
+      template: ext.template,
+      values: ext.values,
+      scope: manualHit?.scope ?? null,
+      snippet: plain.replace(/\s+/gu, " ").slice(0, 60),
+    });
+
+    renderInspectMarker(s, options.doc, { kind, spacingMode: ctx.spacingMode });
+  }
+
+  function registerDiscoveredShadows(shadowRoots: Set<ShadowRoot>): void {
+    if (shadowRoots.size === 0) {
+      return;
+    }
+    for (const sr of shadowRoots) {
+      discoveredShadows.add(sr);
+      ensureObserved(sr);
+    }
+    options.onShadowRoots?.(shadowRoots);
+  }
+
+  function finalizeInspectTelemetry(
+    isInitialRoot: boolean,
+    plainTexts: string[] | null
+  ): void {
+    const { metrics } = options;
+    if (metrics && plainTexts && plainTexts.length > 0) {
+      metrics.keywordsSample = extractPageKeywords(plainTexts);
+    }
+    if (isInitialRoot) {
+      flushTelemetry(false);
+      return;
+    }
+    if (!telemetryDirty || hudRefs?.detailsEl.dataset.collapsed === "false") {
+      scheduleTelemetryFlush();
+    }
+  }
+
   function markSubtree(target: Element, isInitialRoot = false): void {
-    if (
-      target.id === "ptr-user-css" ||
-      target.id === HUD_ID ||
-      target.hasAttribute("data-tr-block") ||
-      target.hasAttribute("data-tr-orig") ||
-      target.hasAttribute("data-tr-dst") ||
-      target.hasAttribute("data-ptr-ui") ||
-      target.hasAttribute("data-us-ui") ||
-      target.closest?.("[data-ptr-ui],[data-us-ui]") !== null
-    ) {
+    if (isIgnoredInspectTarget(target)) {
       return;
     }
     const delta = options.getDelta();
-    const metrics = options.metrics;
+    const { metrics } = options;
     const scanStartedAt = nowMs();
     const shadowRoots = new Set<ShadowRoot>();
     const segs = collectSegments(target, delta, {
@@ -799,114 +971,29 @@ export function createInspectController(options: InspectControllerOptions) {
       recordScanTiming(metrics, nowMs() - scanStartedAt, segs.length);
       metrics.shadowRootCount += shadowRoots.size;
     }
-    if (shadowRoots.size > 0) {
-      for (const sr of shadowRoots) {
-        discoveredShadows.add(sr);
-        ensureObserved(sr);
-      }
-      options.onShadowRoots?.(shadowRoots);
-    }
+    registerDiscoveredShadows(shadowRoots);
 
     const siteTable = options.getSiteLocaleTable?.() ?? null;
     const spacingMode = options.getSpacingMode?.() ?? "both";
     const punctNorm = options.getPunctNorm?.() ?? "zh-norm";
     const targetLang = options.getTargetLang?.() ?? "";
-    const plainTexts: string[] | null =
-      metrics && (isInitialRoot || metrics.keywordsSample.length === 0)
-        ? []
-        : null;
+    const needsKeywords =
+      Boolean(metrics) &&
+      (isInitialRoot || metrics?.keywordsSample.length === 0);
+    const plainTexts: string[] | null = needsKeywords ? [] : null;
 
     for (const s of segs) {
-      const encoded = encodeInlineNodes(s.nodes, delta);
-      const plain = s.nodes
-        .map((n) => n.textContent ?? "")
-        .join("")
-        .trim();
-      if (plainTexts) {
-        plainTexts.push(plain);
-      }
-      // Route purely by the segment's own text; page-level <html lang> or
-      // ancestor [lang] attributes are intentionally ignored here.
-      const route = routeSegment(plain, targetLang);
-      const manualHit = siteTable
-        ? matchSiteTranslation(encoded.payloadHtml, siteTable, s.container)
-        : null;
-      const ext = extractTemplate(encoded.payloadHtml);
-      let kind: InspectKind = s.sourceRule === "+" ? "+" : "auto-static";
-      if (manualHit) {
-        kind = "manual";
-      } else if (s.sourceRule === "auto" && ext.kind === "dynamic") {
-        kind = "auto-dynamic";
-      }
-
-      if (metrics) {
-        metrics.segments.total += 1;
-        if (kind === "manual") {
-          metrics.segments.manual += 1;
-        } else if (kind === "+") {
-          metrics.segments.plus += 1;
-        } else if (kind === "auto-dynamic") {
-          metrics.segments.autoDynamic += 1;
-        } else {
-          metrics.segments.autoStatic += 1;
-        }
-        if (kind === "manual" && manualHit?.scope) {
-          metrics.segments.scopedHits += 1;
-        }
-        if (route.action === "skip") {
-          metrics.routing.skip += 1;
-        } else if (route.action === "opencc") {
-          metrics.routing.opencc += 1;
-        } else {
-          metrics.routing.api += 1;
-        }
-      }
-
-      const previewSource = manualHit?.html
-        ? manualHit.html.replace(/<[^>]+>/gu, "")
-        : plain;
-      const spaceCheck = inspectTextSpacing(
-        previewSource,
+      inspectOneSegment(s, {
+        delta,
+        metrics,
+        plainTexts,
         punctNorm,
-        spacingMode
-      );
-      const spacingSummary =
-        spacingMode === "off"
-          ? "off"
-          : `+${spaceCheck.insertedSpaces} JS · ${spacingMode}`;
-      const spacingDiff =
-        spaceCheck.out === previewSource
-          ? spacingMode === "w3c"
-            ? "CSS text-autospace"
-            : "—"
-          : `${previewSource.slice(0, 36)} -> ${spaceCheck.out.slice(0, 36)}`;
-
-      hoverMeta.set(s.container, {
-        kind,
-        route: `${detectSegmentBcp47(plain).lang} -> ${route.action}`,
+        siteTable,
         spacingMode,
-        spacingSummary,
-        spacingDiff,
-        mods: [...s.modifiers].sort(),
-        template: ext.template,
-        values: ext.values,
-        scope: manualHit?.scope ?? null,
-        snippet: plain.replace(/\s+/gu, " ").slice(0, 60),
+        targetLang,
       });
-
-      renderInspectMarker(s, options.doc, { kind, spacingMode });
     }
-    if (metrics && plainTexts && plainTexts.length > 0) {
-      metrics.keywordsSample = extractPageKeywords(plainTexts);
-    }
-    if (isInitialRoot) {
-      flushTelemetry(false);
-    } else if (
-      !telemetryDirty ||
-      hudRefs?.detailsEl.dataset.collapsed === "false"
-    ) {
-      scheduleTelemetryFlush();
-    }
+    finalizeInspectTelemetry(isInitialRoot, plainTexts);
   }
 
   function stopObserver(): void {
@@ -920,6 +1007,48 @@ export function createInspectController(options: InspectControllerOptions) {
     removeHud();
   }
 
+  function flushPendingRoots(): void {
+    flushTimer = null;
+    const roots = Array.from(pendingRoots);
+    pendingRoots.clear();
+    const rootSet = new Set(roots);
+    for (const r of roots) {
+      if (r.isConnected && !hasAncestorInSet(r, rootSet)) {
+        markSubtree(r, false);
+      }
+    }
+  }
+
+  function collectAddedNodes(addedNodes: NodeList, target: Node): void {
+    for (const added of Array.from(addedNodes)) {
+      if (added.nodeType === 1) {
+        const addedEl = added as Element;
+        if (!isUiMutationElement(addedEl)) {
+          pendingRoots.add(addedEl);
+        }
+      } else if (added.nodeType === 3 && target.nodeType === 1) {
+        pendingRoots.add(target as Element);
+      }
+    }
+  }
+
+  function collectMutationRecord(rec: MutationRecord): void {
+    const recEl =
+      rec.target.nodeType === 1
+        ? (rec.target as Element)
+        : rec.target.parentElement;
+    if (isUiMutationElement(recEl)) {
+      return;
+    }
+    if (rec.type === "attributes" && rec.target.nodeType === 1) {
+      pendingRoots.add(rec.target as Element);
+      return;
+    }
+    if (rec.type === "childList") {
+      collectAddedNodes(rec.addedNodes, rec.target);
+    }
+  }
+
   function startObserver(root: Element): void {
     if (mutationObserver || typeof MutationObserver === "undefined") {
       return;
@@ -929,66 +1058,10 @@ export function createInspectController(options: InspectControllerOptions) {
         return;
       }
       for (const rec of records) {
-        const recEl =
-          rec.target.nodeType === 1
-            ? (rec.target as Element)
-            : rec.target.parentElement;
-        if (
-          recEl &&
-          (recEl.hasAttribute("data-ptr-ui") ||
-            recEl.hasAttribute("data-us-ui") ||
-            recEl.closest?.("[data-ptr-ui],[data-us-ui]"))
-        ) {
-          continue;
-        }
-        if (rec.type === "attributes" && rec.target.nodeType === 1) {
-          pendingRoots.add(rec.target as Element);
-          continue;
-        }
-        if (rec.type !== "childList") {
-          continue;
-        }
-        for (const added of Array.from(rec.addedNodes)) {
-          if (added.nodeType === 1) {
-            const addedEl = added as Element;
-            if (
-              !(
-                addedEl.hasAttribute("data-ptr-ui") ||
-                addedEl.hasAttribute("data-us-ui") ||
-                addedEl.closest?.("[data-ptr-ui],[data-us-ui]")
-              )
-            ) {
-              pendingRoots.add(addedEl);
-            }
-          } else if (added.nodeType === 3 && rec.target.nodeType === 1) {
-            pendingRoots.add(rec.target as Element);
-          }
-        }
+        collectMutationRecord(rec);
       }
       if (pendingRoots.size > 0 && flushTimer === null) {
-        flushTimer = setTimeout(() => {
-          flushTimer = null;
-          const roots = Array.from(pendingRoots);
-          pendingRoots.clear();
-          const rootSet = new Set(roots);
-          for (const r of roots) {
-            if (!r.isConnected) {
-              continue;
-            }
-            let hasAncestor = false;
-            let p = r.parentElement;
-            while (p) {
-              if (rootSet.has(p)) {
-                hasAncestor = true;
-                break;
-              }
-              p = p.parentElement;
-            }
-            if (!hasAncestor) {
-              markSubtree(r, false);
-            }
-          }
-        }, 120);
+        flushTimer = setTimeout(flushPendingRoots, 120);
       }
     });
     ensureObserved(root);

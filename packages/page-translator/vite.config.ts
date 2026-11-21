@@ -44,6 +44,8 @@ const DELTAS_FILE = "deltas.json";
 const DELTAS_MAIN_URL = `https://raw.githubusercontent.com/${REPO}/main/${PACKAGE_PATH}/${DELTAS_FILE}`;
 const TRANSLATIONS_DIR = "translations";
 const TRANSLATIONS_MAIN_URL = `https://raw.githubusercontent.com/${REPO}/main/${PACKAGE_PATH}/${TRANSLATIONS_DIR}`;
+const LEADING_SLASHES_RE = /^\/+/u;
+const DOT_DOT_RE = /\.\./gu;
 
 function staticAssetsPlugin(): Plugin {
   const files = [LOCALES_FILE, DELTAS_FILE].map((name) => ({
@@ -61,7 +63,9 @@ function staticAssetsPlugin(): Plugin {
         });
       }
       server.middlewares.use(`/${TRANSLATIONS_DIR}/`, (req, res, next) => {
-        const rel = (req.url ?? "").replace(/^\/+/u, "").replace(/\.\./gu, "");
+        const rel = (req.url ?? "")
+          .replace(LEADING_SLASHES_RE, "")
+          .replace(DOT_DOT_RE, "");
         const target = resolve(trDir, rel);
         if (rel && existsSync(target)) {
           res.setHeader("content-type", "application/json");
@@ -130,6 +134,7 @@ export default defineConfig(({ command }) => ({
         author: "OG-Open-Source",
         description: USERSCRIPT_DESCRIPTION,
         match: [...USERSCRIPT_MATCH],
+        noframes: true,
         connect: [
           "translate-pa.googleapis.com",
           "raw.githubusercontent.com",
