@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hanime1 Download Manager
 // @namespace    Violentmonkey Scripts
-// @version      1.0.2
+// @version      1.1.0
 // @author       OG-Open-Source
 // @description  Replace download links with a native-style quality menu, batch download mode, and in-page downloads without leaving the page.
 // @icon         https://vdownload.hembed.com/image/icon/nav_logo.png?secure=HxkFdqiVxMMXXjau9riwGg==,4855471889
@@ -11,8 +11,7 @@
 // @match        *://hanime1.me/*
 // @match        *://hanimeone.com/*
 // @match        *://hanimeone.me/*
-// @match        https://og-open-source.github.io/UserScripts/
-// @match        https://og-open-source.github.io/UserScripts/settings/*
+// @match        https://og-open-source.github.io/UserScripts/*
 // @connect      hanime1.com
 // @connect      hanime1.me
 // @connect      hanimeone.com
@@ -31,31 +30,26 @@
 (function () {
   'use strict';
 
-  var _GM_download = /* @__PURE__ */ (() => typeof GM_download != "undefined" ? GM_download : void 0)();
-  var _GM_getValue = /* @__PURE__ */ (() => typeof GM_getValue != "undefined" ? GM_getValue : void 0)();
-  var _GM_registerMenuCommand = /* @__PURE__ */ (() => typeof GM_registerMenuCommand != "undefined" ? GM_registerMenuCommand : void 0)();
-  var _GM_setValue = /* @__PURE__ */ (() => typeof GM_setValue != "undefined" ? GM_setValue : void 0)();
-  var _GM_xmlhttpRequest = /* @__PURE__ */ (() => typeof GM_xmlhttpRequest != "undefined" ? GM_xmlhttpRequest : void 0)();
   let api = null;
   function configureGmApi(gm) {
     api = gm;
   }
   function getApi() {
     if (!api) {
-      throw new Error(
-        "[@userscripts/shared] GM API not configured — call configureGmApi() at script entry."
-      );
+      throw new Error("[@userscripts/shared] GM API not configured — call configureGmApi() at script entry.");
     }
     return api;
   }
-  function gmFetch(url, timeout = 2e4) {
+  function gmRequest(options) {
     return new Promise((resolve, reject) => {
       const details = {
-        method: "GET",
-        url,
-        timeout,
+        method: options.method ?? "GET",
+        url: options.url,
+        timeout: options.timeout ?? 2e4,
+        ...options.headers ? { headers: options.headers } : {},
+        ...options.data !== void 0 ? { data: options.data } : {},
         onload: (res) => {
-          if (res.status >= 200 && res.status < 400) resolve(res.responseText);
+          if (res.status >= 200 && res.status < 400) resolve(res);
           else reject(new Error("HTTP " + res.status));
         },
         onerror: () => reject(new Error("network error")),
@@ -64,14 +58,18 @@
       getApi().GM_xmlhttpRequest(details);
     });
   }
+  function gmFetch(url, timeout = 2e4) {
+    return gmRequest({ method: "GET", url, timeout }).then((res) => res.responseText);
+  }
   function gmGet(key, defaultValue) {
     return getApi().GM_getValue(key, defaultValue);
   }
   function gmSet(key, value) {
     getApi().GM_setValue(key, value);
   }
-  function gmMenuCommand(caption, onClick) {
-    getApi().GM_registerMenuCommand(caption, onClick);
+  function gmMenuCommand(caption, onClick, options) {
+    const res = getApi().GM_registerMenuCommand(caption, onClick, options);
+    return typeof res === "string" || typeof res === "number" ? res : void 0;
   }
   const MANAGER_URL = "https://og-open-source.github.io/UserScripts";
   const CACHE_KEY = (scriptId) => `i18n:${scriptId}`;
@@ -135,8 +133,17 @@
     return root[PRESENCE_GLOBAL];
   }
   function publishPresence(presence) {
-    const list = all();
-    if (!list.some((item) => item.id === presence.id)) list.push(presence);
+    const merged = [];
+    for (const item of [...readPresence(), ...all()]) {
+      if (!merged.some((existing) => existing.id === item.id)) {
+        merged.push(item);
+      }
+    }
+    const idx = merged.findIndex((item) => item.id === presence.id);
+    if (idx >= 0) merged[idx] = presence;
+    else merged.push(presence);
+    const root = globalThis;
+    root[PRESENCE_GLOBAL] = merged;
     let el = document.getElementById(REGISTRY_ELEMENT_ID);
     if (!el) {
       el = document.createElement("script");
@@ -144,8 +151,23 @@
       el.id = REGISTRY_ELEMENT_ID;
       document.head.append(el);
     }
-    el.textContent = JSON.stringify(list);
+    el.textContent = JSON.stringify(merged);
     window.dispatchEvent(new CustomEvent(PRESENCE_EVENT));
+  }
+  function readPresence() {
+    const el = document.getElementById(REGISTRY_ELEMENT_ID);
+    if (!el?.textContent) return all();
+    try {
+      return JSON.parse(el.textContent);
+    } catch {
+      return all();
+    }
+  }
+  function isManagerPage(doc = document, loc = location) {
+    if (loc.hostname === "og-open-source.github.io" && loc.pathname.startsWith("/UserScripts")) {
+      return true;
+    }
+    return Boolean(doc.querySelector?.('meta[name="userscripts-manager"][content="1"]'));
   }
   function probeTheme(options) {
     const { panelClass, actionClass, itemHover = "hsla(0,0%,100%,.2)" } = options;
@@ -155,12 +177,7 @@
     document.body.appendChild(probe);
     probe.offsetLeft;
     const cs = getComputedStyle(probe);
-    const theme = {
-      panelBg: cs.backgroundColor,
-      panelColor: cs.color,
-      itemHover,
-      actionBg: "rgb(0,0,0)"
-    };
+    const theme = { panelBg: cs.backgroundColor, panelColor: cs.color, itemHover, actionBg: "rgb(0,0,0)" };
     probe.remove();
     if (actionClass) {
       const probe2 = document.createElement("div");
@@ -175,6 +192,11 @@
     }
     return theme;
   }
+  var _GM_download = /* @__PURE__ */ (() => typeof GM_download != "undefined" ? GM_download : void 0)();
+  var _GM_getValue = /* @__PURE__ */ (() => typeof GM_getValue != "undefined" ? GM_getValue : void 0)();
+  var _GM_registerMenuCommand = /* @__PURE__ */ (() => typeof GM_registerMenuCommand != "undefined" ? GM_registerMenuCommand : void 0)();
+  var _GM_setValue = /* @__PURE__ */ (() => typeof GM_setValue != "undefined" ? GM_setValue : void 0)();
+  var _GM_xmlhttpRequest = /* @__PURE__ */ (() => typeof GM_xmlhttpRequest != "undefined" ? GM_xmlhttpRequest : void 0)();
   const DL_PATH = "/download?v=";
   const qualityCache = /* @__PURE__ */ new Map();
   function queryQualities(videoId) {
@@ -323,18 +345,8 @@
         b.addEventListener("click", onClick);
         return b;
       };
-      const BP_MIN = {
-        xs: 0,
-        sm: 768,
-        md: 992,
-        lg: 1200
-      };
-      const BP_MAX = {
-        xs: 768,
-        sm: 992,
-        md: 1200,
-        lg: Infinity
-      };
+      const BP_MIN = { xs: 0, sm: 768, md: 992, lg: 1200 };
+      const BP_MAX = { xs: 768, sm: 992, md: 1200, lg: Infinity };
       const vw = () => window.innerWidth || document.documentElement.clientWidth || 1024;
       const isCardVisible = (card) => {
         let el = card;
@@ -364,12 +376,7 @@
         });
       });
       bar.appendChild(selectNone);
-      const dlBtn = mkBtn(
-        t("downloadSelected"),
-        "download",
-        () => void startBatchDownload(),
-        "h1dl-bb-dl"
-      );
+      const dlBtn = mkBtn(t("downloadSelected"), "download", () => void startBatchDownload(), "h1dl-bb-dl");
       bar.appendChild(dlBtn);
       document.body.appendChild(bar);
       batchBar = bar;
@@ -381,15 +388,16 @@
       const fill = tick.querySelector(".h1dl-batch-fill");
       tick.classList.remove("done", "error");
       if (state === "downloading") {
-        fill.style.width = (percent || 0) + "%";
+        const ratio = Math.max(0, Math.min(1, (percent || 0) / 100));
+        fill.style.transform = `scaleX(${ratio})`;
       } else if (state === "done") {
         tick.classList.add("done");
-        fill.style.width = "100%";
+        fill.style.transform = "scaleX(1)";
       } else if (state === "error") {
         tick.classList.add("error");
-        fill.style.width = "100%";
+        fill.style.transform = "scaleX(1)";
       } else {
-        fill.style.width = "0%";
+        fill.style.transform = "scaleX(0)";
       }
     }
     function syncTicks() {
@@ -520,14 +528,7 @@
     }
     return {
       addEntry(card, videoId, check) {
-        const entry = {
-          card,
-          check,
-          videoId,
-          checked: false,
-          state: "idle",
-          tick: null
-        };
+        const entry = { card, check, videoId, checked: false, state: "idle", tick: null };
         batchState.add(entry);
         return entry;
       },
@@ -744,8 +745,8 @@
 .h1dl-check.checked,.h1dl-check.checked .material-icons{background:#2196f3;border-color:#2196f3;color:#fff}
 .h1dl-check.completed{opacity:.35!important;cursor:default;pointer-events:none}
 .h1dl-batch-tick{position:relative;height:6px;width:20px;border-radius:2px;background:var(--h1dl-action-bg);overflow:visible;flex:none}
-.h1dl-batch-tick .h1dl-batch-fill{position:absolute;left:0;top:0;bottom:0;background:#2196f3;width:0%;transition:width .2s linear;border-radius:inherit}
-.h1dl-batch-tick.done .h1dl-batch-fill,.h1dl-batch-tick.error .h1dl-batch-fill{width:100%}
+.h1dl-batch-tick .h1dl-batch-fill{position:absolute;inset:0;width:100%;background:#2196f3;transform-origin:left center;transform:scaleX(0);will-change:transform;transition:transform .2s linear;border-radius:inherit}
+.h1dl-batch-tick.done .h1dl-batch-fill,.h1dl-batch-tick.error .h1dl-batch-fill{transform:scaleX(1)} 
 .h1dl-batch-tick.done .h1dl-batch-fill{background:#33CC55}
 .h1dl-batch-tick.error .h1dl-batch-fill{background:#CC3333}
 .h1dl-batch-name{display:none;position:absolute;right:calc(100% + 6px);top:50%;transform:translateY(-50%);height:24px;line-height:24px;padding:0 8px;background:var(--h1dl-panel-bg);color:var(--h1dl-panel-color);border-radius:4px;white-space:nowrap;font-size:12px;pointer-events:none;box-shadow:0 2px 10px rgba(0,0,0,.6)}
@@ -908,13 +909,7 @@
     };
   }
   const HOSTS = ["hanime1.com", "hanime1.me", "hanimeone.com", "hanimeone.me"];
-  configureGmApi({
-    GM_xmlhttpRequest: _GM_xmlhttpRequest,
-    GM_download: _GM_download,
-    GM_getValue: _GM_getValue,
-    GM_setValue: _GM_setValue,
-    GM_registerMenuCommand: _GM_registerMenuCommand
-  });
+  configureGmApi({ GM_xmlhttpRequest: _GM_xmlhttpRequest, GM_download: _GM_download, GM_getValue: _GM_getValue, GM_setValue: _GM_setValue, GM_registerMenuCommand: _GM_registerMenuCommand });
   publishPresence({
     id: "h1dl",
     name: "Hanime1 Download Manager",
@@ -925,7 +920,7 @@
     const lang = event.detail?.lang;
     if (lang) gmSet("lang", lang);
   });
-  const ON_MANAGER = location.hostname === "og-open-source.github.io" && location.pathname.startsWith("/UserScripts");
+  const ON_MANAGER = isManagerPage();
   if (ON_MANAGER) ;
   else if (!HOSTS.includes(location.hostname)) {
     throw new Error("[h1dl] not a hanime1 host");
@@ -996,10 +991,7 @@
       }
       scheduleScan();
     });
-    observer.observe(document.documentElement, {
-      childList: true,
-      subtree: true
-    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
     document.addEventListener("keydown", (e) => {
       if (e.key.toLowerCase() === "d" && (e.ctrlKey || e.metaKey) && e.shiftKey) {
         e.preventDefault();

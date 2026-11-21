@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hanime1 Download Manager
 // @namespace    Violentmonkey Scripts
-// @version      1.0.2
+// @version      1.1.0
 // @author       OG-Open-Source
 // @description  Replace download links with a native-style quality menu, batch download mode, and in-page downloads without leaving the page.
 // @icon         https://vdownload.hembed.com/image/icon/nav_logo.png?secure=HxkFdqiVxMMXXjau9riwGg==,4855471889
@@ -11,8 +11,7 @@
 // @match        *://hanime1.me/*
 // @match        *://hanimeone.com/*
 // @match        *://hanimeone.me/*
-// @match        https://og-open-source.github.io/UserScripts/
-// @match        https://og-open-source.github.io/UserScripts/settings/*
+// @match        https://og-open-source.github.io/UserScripts/*
 // @connect      hanime1.com
 // @connect      hanime1.me
 // @connect      hanimeone.com
