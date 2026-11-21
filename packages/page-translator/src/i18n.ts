@@ -84,7 +84,7 @@ export const MESSAGES_EN = {
     "Paste AI JSON ({ translations } or SiteTranslationsFile)…",
   volImportApply: "Apply Import",
   volImportCancel: "Cancel",
-  volImported: "Imported {count} draft translation(s).",
+  volImported: "Synced {count} translation(s) into the local dictionary.",
   volImportedSync:
     "Synced {synced} translation(s); {conflicts} conflict(s) pending.",
   volImportError: "Invalid AI JSON payload.",

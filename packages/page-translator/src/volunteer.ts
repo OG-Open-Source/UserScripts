@@ -477,7 +477,7 @@ export function createVolunteerController(options: VolunteerControllerOptions) {
       addPatchEntry(localPatch, kind, key, imported, scope);
       return true;
     }
-    if (existing === imported) {
+    if (existingTrimmed === imported.trim()) {
       return false;
     }
     upsertConflict({

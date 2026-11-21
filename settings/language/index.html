@@ -126,7 +126,7 @@
       const loadedScriptIds = new Set();
       const chip = document.querySelector("#statusChip");
       const note = document.querySelector("#note");
-      const saved = localStorage.getItem(KEY) ?? "";
+      let saved = localStorage.getItem(KEY) ?? "";
 
       const langSelect = createCustomSelect(
         document.querySelector("#langSelect"),
@@ -212,13 +212,11 @@
           return;
         }
         localStorage.setItem(KEY, value);
+        saved = value;
         dispatchSettings({ lang: value });
         i18n = createSettingsTranslator(DICT);
         i18n.applyDom();
         updateChip(currentScripts);
-        if (languages.size === 0) {
-          renderOptions();
-        }
         note.textContent = currentScripts.length
           ? i18n.t("appliedCount", {
               lang: value,

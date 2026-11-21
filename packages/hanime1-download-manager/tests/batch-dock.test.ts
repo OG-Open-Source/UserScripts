@@ -214,27 +214,33 @@ test("createInject mounts bottom-right .h1dl-card-capsule on .video-meta-data ca
     (globalThis as Record<string, unknown>).document = prevDoc;
     (globalThis as Record<string, unknown>).window = prevWin;
     (globalThis as Record<string, unknown>).location = prevLoc;
+    mock.restore();
   }
 });
 
 test("createStateMachine updates btn.title on icon-only buttons when .h1dl-label is absent", async () => {
   mock.module("$", () => ({ GM_download: noop }));
-  const { createStateMachine } = await import("../src/download");
 
-  const win = new Window();
-  const btn = win.document.createElement("div") as unknown as HTMLElement;
-  btn.className = "h1dl-list-btn h1dl-icon-only";
-  btn.innerHTML = '<i class="material-icons h1dl-icon">download</i>';
+  try {
+    const { createStateMachine } = await import("../src/download");
 
-  const t = (k: string) => MESSAGES[k as keyof typeof MESSAGES] ?? k;
-  const setState = createStateMachine(t);
+    const win = new Window();
+    const btn = win.document.createElement("div") as unknown as HTMLElement;
+    btn.className = "h1dl-list-btn h1dl-icon-only";
+    btn.innerHTML = '<i class="material-icons h1dl-icon">download</i>';
 
-  setState(btn, "fetching");
-  expect(btn.title).toBe(MESSAGES.fetching);
+    const t = (k: string) => MESSAGES[k as keyof typeof MESSAGES] ?? k;
+    const setState = createStateMachine(t);
 
-  setState(btn, "downloading", 42);
-  expect(btn.title).toBe("42%");
+    setState(btn, "fetching");
+    expect(btn.title).toBe(MESSAGES.fetching);
 
-  setState(btn, "done");
-  expect(btn.title).toBe(MESSAGES.done);
+    setState(btn, "downloading", 42);
+    expect(btn.title).toBe("42%");
+
+    setState(btn, "done");
+    expect(btn.title).toBe(MESSAGES.done);
+  } finally {
+    mock.restore();
+  }
 });
