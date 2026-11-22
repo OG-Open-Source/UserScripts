@@ -35,6 +35,21 @@ test("preserves pure-ASCII halfwidth brackets", () => {
   expect(normalizeChineseText("arr[0]", NORMALIZE_OPTIONS)).toBe("arr[0]");
 });
 
+test("normalizes CJK-adjacent brackets across inline tags only", () => {
+  expect(
+    normalizeChineseText('文字<x id="0">[English]</x>', NORMALIZE_OPTIONS)
+  ).toBe('文字<x id="0">【English】</x>');
+  expect(
+    normalizeChineseText('<x id="0">文字</x>[English]', NORMALIZE_OPTIONS)
+  ).toBe('<x id="0">文字</x>【English】');
+  expect(
+    normalizeChineseText('文字[<x id="0">English</x>]', NORMALIZE_OPTIONS)
+  ).toBe('文字【<x id="0">English</x>】');
+  expect(
+    normalizeChineseText('Use <x id="0">[JSON]</x> in doc', NORMALIZE_OPTIONS)
+  ).toBe('Use <x id="0">[JSON]</x> in doc');
+});
+
 test("applies punctuation normalization before CJK spacing", () => {
   expect(normalizeChineseText("GLM 5.3的确…", NORMALIZE_OPTIONS)).toBe(
     "GLM 5.3 的确…"

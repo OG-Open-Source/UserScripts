@@ -31,6 +31,7 @@ const FW_ALNUM_RE = /[\uFF10-\uFF19\uFF21-\uFF3A\uFF41-\uFF5A]/gu;
 const CJK_PARENS_RE =
   /[ \t]*\((?<inner>[^()]*?[\u4E00-\u9FFF\u3400-\u4DBF\u3105-\u312F\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF][^()]*?)\)[ \t]*/gu;
 const CJK_BRACKETS_RE = /[ \t]*\[(?<inner>[^[\]\r\n]*?)\][ \t]*/gu;
+const CJK_BRACKET_SEAM_RE = /[ \t]*\[(?<inner>[^[\]\r\n]*?)\][ \t]*/gu;
 const CJK_ADJ_PUNCT_RE =
   /(?<cjk>[\u4E00-\u9FFF\u3400-\u4DBF\u3105-\u312F\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF）】])(?<punct>[,.!?:;])[ \t]*/gu;
 const FW_PUNCT_TRAIL_SPACE_RE = /(?<punct>[，。！？：；（）])[ \t]+/gu;
@@ -39,6 +40,16 @@ const LATIN_PERIOD_SPACE_RE = /(?<left>[a-z])\.(?<right>[A-Z][a-z])/gu;
 const LEADING_ADJ_PUNCT_RE = /^(?<punct>[,.!?:;])[ \t]*/u;
 const URL_PLACEHOLDER_RE = /\uE000U(?<index>\d+)\uE001/gu;
 const TAG_START_RE = /[A-Za-z/!]/u;
+const BASIC_ENTITY_RE = /&(?<name>amp|apos|gt|lt|nbsp|quot);/giu;
+
+const BASIC_ENTITIES: Record<string, string> = {
+  amp: "&",
+  apos: "'",
+  gt: ">",
+  lt: "<",
+  nbsp: " ",
+  quot: '"',
+};
 
 const HALF_TO_FULL_PUNCT: Record<string, string> = {
   ",": "，",
@@ -270,6 +281,123 @@ function splitHtml(html: string): HtmlToken[] {
   return tokens;
 }
 
+export function extractVisibleText(html: string): string {
+  let visible = "";
+  for (const token of splitHtml(html)) {
+    if (token.kind === "text") {
+      visible += token.value;
+    }
+  }
+  return visible.replace(
+    BASIC_ENTITY_RE,
+    (entity, name: string) => BASIC_ENTITIES[name.toLowerCase()] ?? entity
+  );
+}
+
+interface VisibleCharacter {
+  index: number;
+  token: TextToken;
+}
+
+type BracketEdits = Map<TextToken, Map<number, string>>;
+
+function queueBracketEdit(
+  characters: readonly VisibleCharacter[],
+  edits: BracketEdits,
+  start: number,
+  end: number,
+  replacement: string
+): void {
+  if (end <= start) {
+    return;
+  }
+  for (let position = start; position < end; position += 1) {
+    const character = characters[position];
+    if (!character) {
+      continue;
+    }
+    let tokenEdits = edits.get(character.token);
+    if (!tokenEdits) {
+      tokenEdits = new Map<number, string>();
+      edits.set(character.token, tokenEdits);
+    }
+    tokenEdits.set(character.index, position === start ? replacement : "");
+  }
+}
+
+function applyBracketEdits(edits: BracketEdits): void {
+  for (const [token, tokenEdits] of edits) {
+    let value = "";
+    for (let index = 0; index < token.value.length; index += 1) {
+      value += tokenEdits.get(index) ?? token.value[index] ?? "";
+    }
+    token.value = value;
+  }
+}
+
+function normalizeCjkBracketSeams(textTokens: TextToken[]): void {
+  let visible = "";
+  const characters: VisibleCharacter[] = [];
+  for (const token of textTokens) {
+    visible += token.value;
+    for (let index = 0; index < token.value.length; index += 1) {
+      characters.push({ index, token });
+    }
+  }
+
+  const edits: BracketEdits = new Map<TextToken, Map<number, string>>();
+  for (const match of visible.matchAll(CJK_BRACKET_SEAM_RE)) {
+    const matchStart = match.index;
+    if (matchStart === undefined) {
+      continue;
+    }
+    const [fullMatch] = match;
+    const bracketStart = matchStart + fullMatch.indexOf("[");
+    const bracketEnd = matchStart + fullMatch.lastIndexOf("]");
+    const inner = match.groups?.inner ?? "";
+    const left = visible[matchStart - 1] ?? "";
+    const right = visible[matchStart + fullMatch.length] ?? "";
+    const leftIsCjk = CJK_RE.test(left);
+    const rightIsCjk = CJK_RE.test(right);
+    if (!(leftIsCjk || rightIsCjk || CJK_RE.test(inner))) {
+      continue;
+    }
+
+    const innerStart = bracketStart + 1;
+    const innerLeading = inner.length - inner.trimStart().length;
+    const innerTrailing = inner.length - inner.trimEnd().length;
+    if (leftIsCjk) {
+      queueBracketEdit(characters, edits, matchStart, bracketStart, "");
+    }
+    if (rightIsCjk) {
+      queueBracketEdit(
+        characters,
+        edits,
+        bracketEnd + 1,
+        matchStart + fullMatch.length,
+        ""
+      );
+    }
+    queueBracketEdit(
+      characters,
+      edits,
+      innerStart,
+      innerStart + innerLeading,
+      ""
+    );
+    queueBracketEdit(
+      characters,
+      edits,
+      bracketEnd - innerTrailing,
+      bracketEnd,
+      ""
+    );
+    queueBracketEdit(characters, edits, bracketStart, innerStart, "【");
+    queueBracketEdit(characters, edits, bracketEnd, bracketEnd + 1, "】");
+  }
+  applyBracketEdits(edits);
+}
+
 function normalizePunctuationSeams(textTokens: TextToken[]): void {
   forEachPair(textTokens, (current, next) => {
     const left = current.value.at(-1) ?? "";
@@ -314,6 +442,7 @@ export function normalizeChineseText(
     for (const token of textTokens) {
       token.value = normalizePunctuation(token.value, opts.punctNorm);
     }
+    normalizeCjkBracketSeams(textTokens);
     normalizePunctuationSeams(textTokens);
   }
 

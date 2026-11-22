@@ -1,5 +1,5 @@
 import type { TranslatorConfig } from "../legacy/config";
-import { normalizeChineseText } from "../text/normalize";
+import { extractVisibleText, normalizeChineseText } from "../text/normalize";
 import type { OpenCCConverter } from "../text/opencc";
 import { scheduleOpenCC } from "../text/opencc";
 import type { PrimaryRoute } from "./router";
@@ -36,7 +36,7 @@ export async function runSegmentPipeline(
   cfg: SegmentPipelineConfig,
   hooks: SegmentPipelineHooks = {}
 ): Promise<SegmentPipelineResult> {
-  const route = routePrimary(sourceHtml, cfg.targetLang);
+  const route = routePrimary(extractVisibleText(sourceHtml), cfg.targetLang);
   if (route === "skip") {
     return { html: sourceHtml, route };
   }
@@ -62,7 +62,12 @@ export async function runSegmentPipeline(
   });
 
   const opencc = scheduleOpenCC(cfg);
-  if (opencc.enabled && hooks.createOpenCC) {
+  if (opencc.enabled) {
+    if (!hooks.createOpenCC) {
+      throw new Error(
+        `OpenCC mode "${opencc.mode}" requires hooks.createOpenCC`
+      );
+    }
     const converter = await hooks.createOpenCC(opencc.mode);
     html = converter.convert(html);
   }

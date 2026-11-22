@@ -84,6 +84,30 @@ test("translate route applies dictionary and provider hooks then zh output stage
   ]);
 });
 
+test("pipeline routes visible non-enumerated scripts instead of markup", async () => {
+  const source = '<x id="0">বাংলা</x>';
+  let providerInput = "";
+  const result = await runSegmentPipeline(
+    source,
+    { ...ZH_CONFIG, targetLang: "en-US" },
+    {
+      provider: (html) => {
+        providerInput = html;
+        return "Bengali";
+      },
+    }
+  );
+
+  expect(result).toEqual({ html: "Bengali", route: "translate" });
+  expect(providerInput).toBe(source);
+});
+
+test("enabled OpenCC requires a converter factory", async () => {
+  await expect(
+    runSegmentPipeline("软件", { ...ZH_CONFIG, openccMode: "s2t" })
+  ).rejects.toThrow('OpenCC mode "s2t" requires hooks.createOpenCC');
+});
+
 test("non-zh translate output skips normalization and OpenCC", async () => {
   let conversions = 0;
   const result = await runSegmentPipeline(
