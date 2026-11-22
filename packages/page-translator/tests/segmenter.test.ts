@@ -3,9 +3,9 @@ import { Window } from "happy-dom";
 import {
   decodeTranslatedHtml,
   encodeInlineNodes,
-} from "../src/capture/inline-codec";
-import { collectSegments } from "../src/capture/segmenter";
-import { parseSiteDelta } from "../src/site-rules";
+} from "../src/legacy/capture/inline-codec";
+import { collectSegments } from "../src/legacy/capture/segmenter";
+import { parseSiteDelta } from "../src/legacy/site-rules";
 
 function setupDoc(html: string) {
   const win = new Window();

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { configureGmApi } from "@userscripts/shared";
-import { createInspectProvider } from "../src/translate/provider";
-import { createTranslatePaProvider } from "../src/translate/translate-pa";
+import { createInspectProvider } from "../src/legacy/translate/provider";
+import { createTranslatePaProvider } from "../src/legacy/translate/translate-pa";
 
 test("translate-pa sends POST with X-Goog-Api-Key and parses translated array", async () => {
   let req: Record<string, unknown> | null = null;

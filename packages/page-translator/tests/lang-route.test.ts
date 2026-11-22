@@ -3,7 +3,7 @@ import {
   detectSegmentBcp47,
   parseBcp47,
   routeSegment,
-} from "../src/transform/lang-route";
+} from "../src/legacy/transform/lang-route";
 
 test("parseBcp47 normalizes Chinese script/region tags accurately", () => {
   expect(parseBcp47("zh-TW")).toEqual({

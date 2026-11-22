@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { configureGmApi } from "@userscripts/shared";
-import { DEFAULT_CONFIG, loadConfig, saveConfig } from "../src/config";
+import { DEFAULT_CONFIG, loadConfig, saveConfig } from "../src/legacy/config";
 
 test("loadConfig merges stored partial overrides with defaults", () => {
   const store: Record<string, unknown> = {

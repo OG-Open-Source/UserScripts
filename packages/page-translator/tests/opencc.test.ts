@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { configureGmApi } from "@userscripts/shared";
-import { createOpenCC } from "../src/transform/opencc";
+import { createOpenCC } from "../src/legacy/transform/opencc";
 
 test("converts via OpenCC dictionaries fetched and cached in GM storage", async () => {
   const store: Record<string, unknown> = {};

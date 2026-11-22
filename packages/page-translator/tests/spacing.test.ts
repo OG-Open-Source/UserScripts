@@ -5,7 +5,7 @@ import {
   formatDebugSpacingMarks,
   normalizePunctuation,
   spaceCjkText,
-} from "../src/transform/spacing";
+} from "../src/legacy/transform/spacing";
 
 test("spaces Han/Bopomofo against ASCII words and numbers", () => {
   expect(spaceCjkText("使用CSS設定")).toBe("使用 CSS 設定");

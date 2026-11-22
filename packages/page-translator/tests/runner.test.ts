@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
 import { Window } from "happy-dom";
-import { collectSegments } from "../src/capture/segmenter";
-import { DEFAULT_CONFIG } from "../src/config";
-import { parseSiteDelta } from "../src/site-rules";
-import { createBatchRunner } from "../src/translate/runner";
+import { collectSegments } from "../src/legacy/capture/segmenter";
+import { DEFAULT_CONFIG } from "../src/legacy/config";
+import { parseSiteDelta } from "../src/legacy/site-rules";
+import { createBatchRunner } from "../src/legacy/translate/runner";
 
 test("invalidate() cancels in-flight translation batch so restored DOM stays untouched", async () => {
   const win = new Window();
@@ -41,7 +41,7 @@ test("invalidate() cancels in-flight translation batch so restored DOM stays unt
 
   // User clicks Restore Original while API request is still in-flight
   runner.cancelAll();
-  const { restoreAll } = await import("../src/renderer");
+  const { restoreAll } = await import("../src/legacy/renderer");
   restoreAll(win.document.body as unknown as ParentNode);
   expect(win.document.querySelector("[data-tr-block]")).toBeNull();
 
@@ -185,7 +185,7 @@ test("pageCache hits still apply opencc post-processing and runner preserves ins
 });
 
 test("runner ignores <html lang> and routes each segment purely by its own content + scoped dictionary + metrics", async () => {
-  const { createPtrMetrics } = await import("../src/metrics");
+  const { createPtrMetrics } = await import("../src/legacy/metrics");
   const win = new Window();
   win.document.documentElement.setAttribute("lang", "zh-TW");
   win.document.body.innerHTML = `
@@ -300,7 +300,7 @@ test("coalesces micro-batches within window, uses context-grouped translateGroup
 });
 
 test("dictionary manualHit takes precedence over skip and opencc routes with 0 API/OpenCC calls", async () => {
-  const { createPtrMetrics } = await import("../src/metrics");
+  const { createPtrMetrics } = await import("../src/legacy/metrics");
   const win = new Window();
   win.document.body.innerHTML = `
     <div id="tw">繁體中文名詞</div>

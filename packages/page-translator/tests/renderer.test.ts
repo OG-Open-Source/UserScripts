@@ -1,20 +1,20 @@
 import { expect, test } from "bun:test";
 import { Window } from "happy-dom";
-import { encodeInlineNodes } from "../src/capture/inline-codec";
-import { collectSegments } from "../src/capture/segmenter";
+import { encodeInlineNodes } from "../src/legacy/capture/inline-codec";
+import { collectSegments } from "../src/legacy/capture/segmenter";
 import {
   renderError,
   renderInspectMarker,
   renderPending,
   renderTranslated,
   restoreAll,
-} from "../src/renderer";
-import { parseSiteDelta } from "../src/site-rules";
+} from "../src/legacy/renderer";
+import { parseSiteDelta } from "../src/legacy/site-rules";
 import {
   buildStylesheet,
   STYLE_ELEMENT_ID,
   syncStylesheet,
-} from "../src/styles";
+} from "../src/legacy/styles";
 
 test("buildStylesheet defaults to replacing original and applies --ptr-font plus user CSS", () => {
   const css = buildStylesheet({

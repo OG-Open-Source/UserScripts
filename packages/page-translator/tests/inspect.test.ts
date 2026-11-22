@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { configureGmApi } from "@userscripts/shared";
 import { Window } from "happy-dom";
-import { createInspectController } from "../src/inspect";
+import { createInspectController } from "../src/legacy/inspect";
 
 test("auto-marks page on startup when debugInspect is already true across page loads", () => {
   const win = new Window();
@@ -125,7 +125,7 @@ test("classifies inspect markers into auto-static, auto-dynamic, +, and manual k
 });
 
 test("inspect HUD displays capability and performance telemetry and toggles compact/detailed views", async () => {
-  const { createPtrMetrics } = await import("../src/metrics");
+  const { createPtrMetrics } = await import("../src/legacy/metrics");
   const win = new Window();
   win.document.body.innerHTML = `<nav aria-label="Repository"><div id="m1">Insights</div></nav><div id="d1">Updated 5 hours ago</div>`;
   const metrics = createPtrMetrics();

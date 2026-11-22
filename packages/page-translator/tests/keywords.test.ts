@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test";
 import { Window } from "happy-dom";
-import { decodeTranslatedHtml } from "../src/capture/inline-codec";
+import { decodeTranslatedHtml } from "../src/legacy/capture/inline-codec";
 import {
   extractPageKeywords,
   maskKeywordsInHtml,
-} from "../src/transform/keywords";
+} from "../src/legacy/transform/keywords";
 
 test("extractPageKeywords detects repeated CamelCase/brand/proper nouns across segments", () => {
   const kw = extractPageKeywords([

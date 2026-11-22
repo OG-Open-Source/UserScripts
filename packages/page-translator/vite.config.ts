@@ -126,7 +126,7 @@ export default defineConfig(({ command }) => ({
   plugins: [
     staticAssetsPlugin(),
     monkey({
-      entry: "./src/main.ts",
+      entry: "./src/legacy/main.ts",
       userscript: {
         name: USERSCRIPT_NAME,
         namespace: "Violentmonkey Scripts",

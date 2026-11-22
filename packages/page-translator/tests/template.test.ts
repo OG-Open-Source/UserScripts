@@ -5,7 +5,7 @@ import {
   interpolateTemplate,
   matchSiteTranslation,
   suggestScopeSelector,
-} from "../src/transform/template";
+} from "../src/legacy/transform/template";
 import {
   deleteCachedSiteTranslations,
   deleteLayeredSiteTranslations,
@@ -18,7 +18,7 @@ import {
   mergeSiteTranslations,
   saveCachedSiteTranslations,
   saveLocalSiteTranslations,
-} from "../src/translations-remote";
+} from "../src/legacy/translations-remote";
 
 test("extractTemplate separates static text from dynamic values (numbers, handles, atomic slots)", () => {
   expect(extractTemplate("Pull requests")).toEqual({

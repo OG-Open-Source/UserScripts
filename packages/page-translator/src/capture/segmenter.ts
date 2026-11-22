@@ -1,6 +1,6 @@
 import { isForeignUi } from "@userscripts/shared";
-import type { CompiledSiteDelta, SiteModifier } from "../site-rules";
-import { matchesAny, matchModifiers } from "../site-rules";
+import type { CompiledSiteDelta, SiteModifier } from "../legacy/site-rules";
+import { matchesAny, matchModifiers } from "../legacy/site-rules";
 import type { StyleReader } from "./display-role";
 import { createRoleClassifier, isNonProsePrimitive } from "./display-role";
 
@@ -166,14 +166,14 @@ export function collectSegments(
       run[start]?.nodeType === 3 &&
       !(run[start]?.nodeValue ?? "").trim()
     ) {
-      start++;
+      start += 1;
     }
     while (
       end > start &&
       run[end - 1]?.nodeType === 3 &&
       !(run[end - 1]?.nodeValue ?? "").trim()
     ) {
-      end--;
+      end -= 1;
     }
     const trimmed = run.slice(start, end);
     if (trimmed.length === 0) {
@@ -183,14 +183,17 @@ export function collectSegments(
       return;
     }
 
-    const displayVal = options?.getStyle
-      ? options.getStyle(container).display
-      : typeof getComputedStyle === "function"
-        ? getComputedStyle(container).display
-        : "";
+    let displayVal = "";
+    if (options?.getStyle) {
+      displayVal = options.getStyle(container).display;
+    } else if (typeof getComputedStyle === "function") {
+      displayVal = getComputedStyle(container).display;
+    }
 
+    const id = `seg-${nextSegmentSeq}`;
+    nextSegmentSeq += 1;
     segments.push({
-      id: `seg-${nextSegmentSeq++}`,
+      id,
       container,
       nodes: trimmed,
       sourceRule,
@@ -199,6 +202,7 @@ export function collectSegments(
     });
   }
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Verbatim legacy port covered by parity tests.
   function walkChildList(
     hostContainer: Element,
     childNodes: NodeListOf<ChildNode>,

@@ -25,12 +25,13 @@ const NON_PROSE_TAGS = new Set([
 
 function defaultGetStyle(el: Element): { display: string; visibility: string } {
   const view = el.ownerDocument?.defaultView;
-  const gcs =
+  const viewGetStyle =
     view && typeof view.getComputedStyle === "function"
       ? view.getComputedStyle.bind(view)
-      : typeof getComputedStyle === "function"
-        ? getComputedStyle
-        : null;
+      : null;
+  const gcs =
+    viewGetStyle ??
+    (typeof getComputedStyle === "function" ? getComputedStyle : null);
   if (!gcs) {
     return { display: "block", visibility: "visible" };
   }

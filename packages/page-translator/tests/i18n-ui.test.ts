@@ -3,10 +3,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Window } from "happy-dom";
 import locales from "../locales.json" with { type: "json" };
-import type { PtrMessageKey } from "../src/i18n";
-import { MESSAGES_EN } from "../src/i18n";
-import { createInspectController } from "../src/inspect";
-import { createVolunteerController } from "../src/volunteer";
+import type { PtrMessageKey } from "../src/legacy/i18n";
+import { MESSAGES_EN } from "../src/legacy/i18n";
+import { createInspectController } from "../src/legacy/inspect";
+import { createVolunteerController } from "../src/legacy/volunteer";
 
 const zhTw = locales.languages.find((l) => l.code === "zh-Hant-TW")?.messages as
   | Record<string, string>
@@ -87,11 +87,11 @@ test("HUD and Volunteer panels render localized zh-Hant-TW strings when t() is i
 
 test("inspect.ts and volunteer.ts contain no hardcoded UI English copy outside i18n keys", () => {
   const inspectSrc = readFileSync(
-    resolve(import.meta.dir, "../src/inspect.ts"),
+    resolve(import.meta.dir, "../src/legacy/inspect.ts"),
     "utf8"
   );
   const volSrc = readFileSync(
-    resolve(import.meta.dir, "../src/volunteer.ts"),
+    resolve(import.meta.dir, "../src/legacy/volunteer.ts"),
     "utf8"
   );
   expect(inspectSrc).not.toMatch(INSPECT_HARDCODED_RE);

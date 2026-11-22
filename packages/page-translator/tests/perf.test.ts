@@ -3,10 +3,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { configureGmApi } from "@userscripts/shared";
 import { Window } from "happy-dom";
-import { collectSegments } from "../src/capture/segmenter";
-import { parseSiteDelta } from "../src/site-rules";
-import { syncShadowRootsOnly } from "../src/styles";
-import { createOpenCC } from "../src/transform/opencc";
+import { collectSegments } from "../src/legacy/capture/segmenter";
+import { parseSiteDelta } from "../src/legacy/site-rules";
+import { syncShadowRootsOnly } from "../src/legacy/styles";
+import { createOpenCC } from "../src/legacy/transform/opencc";
 
 test("createOpenCC memoizes converter instance per mode/fetcher (no repeated GM/Trie rebuild)", async () => {
   const store: Record<string, unknown> = {};

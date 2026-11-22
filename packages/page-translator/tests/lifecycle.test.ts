@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { Window } from "happy-dom";
-import { watchSpaNavigation } from "../src/lifecycle";
+import { watchSpaNavigation } from "../src/legacy/lifecycle";
 
 test("watchSpaNavigation triggers onBeforeLeave synchronously on pushState and onSettled after debounce", async () => {
   const win = new Window({ url: "https://github.com/owner/repo" });
@@ -118,9 +118,9 @@ test("turbo:frame-load triggers onSettled without breaking non-writable history 
 });
 
 test("observer ignores [data-ptr-ui] mutations and records scan metrics", async () => {
-  const { createViewportObserver } = await import("../src/capture/observer");
-  const { createPtrMetrics } = await import("../src/metrics");
-  const { parseSiteDelta } = await import("../src/site-rules");
+  const { createViewportObserver } = await import("../src/legacy/capture/observer");
+  const { createPtrMetrics } = await import("../src/legacy/metrics");
+  const { parseSiteDelta } = await import("../src/legacy/site-rules");
   const win = new Window();
   win.document.body.innerHTML = `<div id="main">Hello</div><div id="hud" data-ptr-ui="1">HUD</div>`;
   const metrics = createPtrMetrics();

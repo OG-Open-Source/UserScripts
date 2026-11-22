@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { Window } from "happy-dom";
-import { collectSegments } from "../src/capture/segmenter";
-import { parseSiteDelta } from "../src/site-rules";
+import { collectSegments } from "../src/legacy/capture/segmenter";
+import { parseSiteDelta } from "../src/legacy/site-rules";
 
 test("collectSegments skips foreign [data-us-ui] roots and icon fonts while capturing real prose", () => {
   const win = new Window();

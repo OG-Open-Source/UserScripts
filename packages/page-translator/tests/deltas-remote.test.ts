@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { configureGmApi } from "@userscripts/shared";
-import { loadRemoteDeltas } from "../src/deltas-remote";
+import { loadRemoteDeltas } from "../src/legacy/deltas-remote";
 
 test("loadRemoteDeltas returns cached data immediately and refreshes in background", async () => {
   const store: Record<string, unknown> = {

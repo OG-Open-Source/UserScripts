@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
 import { configureGmApi } from "@userscripts/shared";
 import { Window } from "happy-dom";
-import type { SiteLocaleTable } from "../src/transform/template";
-import { mergeLocaleTables } from "../src/translations-remote";
-import { createVolunteerController } from "../src/volunteer";
+import type { SiteLocaleTable } from "../src/legacy/transform/template";
+import { mergeLocaleTables } from "../src/legacy/translations-remote";
+import { createVolunteerController } from "../src/legacy/volunteer";
 
 function getShadowRoot(win: Window): ShadowRoot {
   const host = win.document.querySelector("[data-ptr-ui]");

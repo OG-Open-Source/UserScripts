@@ -5,8 +5,8 @@ import {
   recordApiBatch,
   recordMutationBatch,
   recordScanTiming,
-} from "../src/metrics";
-import { getSharedPanelCss } from "../src/ui-theme";
+} from "../src/legacy/metrics";
+import { getSharedPanelCss } from "../src/legacy/ui-theme";
 
 test("getSharedPanelCss exposes borderless NovaKit light/dark CSS tokens", () => {
   const css = getSharedPanelCss();

@@ -4,7 +4,7 @@ import {
   matchModifiers,
   parseSiteDelta,
   resolveSiteDeltaForHost,
-} from "../src/site-rules";
+} from "../src/legacy/site-rules";
 
 test("parseSiteDelta parses +, -, * lines and ignores comments/blanks", () => {
   const delta = parseSiteDelta(`

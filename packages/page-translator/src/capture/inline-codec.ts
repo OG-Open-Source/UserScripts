@@ -1,5 +1,5 @@
-import type { CompiledSiteDelta, SiteModifier } from "../site-rules";
-import { matchesAny, matchModifiers } from "../site-rules";
+import type { CompiledSiteDelta, SiteModifier } from "../legacy/site-rules";
+import { matchesAny, matchModifiers } from "../legacy/site-rules";
 import { isNonProsePrimitive } from "./display-role";
 
 export interface InlineSlot {
@@ -78,13 +78,17 @@ export function decodeTranslatedHtml(
   const tpl = doc.createElement("template");
   // HTML5 parser ignores `/>` self-closing on non-void tags; expand `<x .../>`
   // before parsing so trailing text is never swallowed as a child of `<x>`.
-  tpl.innerHTML = translatedHtml.replace(/<x(\b[^>]*)?\/>/giu, "<x$1></x>");
+  tpl.innerHTML = translatedHtml.replace(
+    /<x(?<attributes>\b[^>]*)?\/>/giu,
+    "<x$<attributes>></x>"
+  );
 
   const slotMap = new Map<number, InlineSlot>();
   for (const s of slots) {
     slotMap.set(s.id, s);
   }
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Verbatim legacy port covered by parity tests.
   function rebuild(sourceParent: ParentNode): DocumentFragment {
     const out = doc.createDocumentFragment();
     for (const child of Array.from(sourceParent.childNodes)) {
