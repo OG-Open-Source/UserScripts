@@ -14,15 +14,20 @@
     "nav": [".nav-pills", ".navigation-controls"]
   },
   "captureSelectors": [
-    "#main-outlet .cooked",
-    "#main-outlet .topic-title",
-    "#main-outlet .badge-wrapper"
+    "#main-outlet",
+    ".cooked",
+    ".topic-title",
+    ".badge-wrapper"
   ],
   "excludeSelectors": [
     "header.d-header",
     ".sidebar-wrapper",
     "footer",
+    ".copyright",
+    ".site-copyright",
     ".navigation-controls",
+    ".nav-pills",
+    ".nav-chrome",
     "code",
     "pre"
   ],

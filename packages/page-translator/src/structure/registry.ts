@@ -1,8 +1,9 @@
 import type { SiteStructureAdapter, StructureAdapterContext } from "./adapter";
+import { discourseAdapter } from "./discourse";
 import { fallbackAdapter } from "./fallback";
 
-/** Tasks for concrete frameworks register their adapters in this ordered list. */
-export const defaultAdapters: SiteStructureAdapter[] = [];
+/** Concrete framework adapters run before the generic fallback. */
+export const defaultAdapters: SiteStructureAdapter[] = [discourseAdapter];
 
 export function resolveAdapter(
   ctx: StructureAdapterContext,
