@@ -118,8 +118,15 @@ export function decodeTranslatedHtml(
         }
         if (slot.atomic) {
           const clone = slot.element.cloneNode(true) as Element;
-          clone.setAttribute("data-tr-no-space", "1");
-          clone.setAttribute("data-tr-no-opencc", "1");
+          const excluded =
+            isNonProsePrimitive(slot.element) ||
+            !HAS_LETTER.test(slot.element.textContent ?? "");
+          if (excluded || slot.modifiers.has("no-spacing")) {
+            clone.setAttribute("data-tr-no-space", "1");
+          }
+          if (excluded || slot.modifiers.has("no-opencc")) {
+            clone.setAttribute("data-tr-no-opencc", "1");
+          }
           out.appendChild(clone);
         } else {
           const clone = slot.element.cloneNode(false) as Element;
