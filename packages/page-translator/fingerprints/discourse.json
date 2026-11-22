@@ -1,0 +1,37 @@
+{
+  "id": "discourse",
+  "version": 1,
+  "detectSelectors": [
+    "meta[name='generator'][content*='Discourse']",
+    ".discourse-root",
+    "[data-discourse]"
+  ],
+  "regions": {
+    "topbar": ["header.d-header"],
+    "sidebar": [".sidebar-wrapper"],
+    "content": ["#main-outlet"],
+    "footer": ["footer"],
+    "nav": [".nav-pills", ".navigation-controls"]
+  },
+  "captureSelectors": [
+    "#main-outlet .cooked",
+    "#main-outlet .topic-title",
+    "#main-outlet .badge-wrapper"
+  ],
+  "excludeSelectors": [
+    "header.d-header",
+    ".sidebar-wrapper",
+    "footer",
+    ".navigation-controls",
+    "code",
+    "pre"
+  ],
+  "spaRescanSelectors": ["#main-outlet"],
+  "policies": {
+    ".badge-wrapper": "badge",
+    "button": "button",
+    ".menu-panel": "menu",
+    ".topic-title": "title",
+    ".cooked": "prose"
+  }
+}

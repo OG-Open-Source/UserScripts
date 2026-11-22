@@ -1,8 +1,19 @@
 import { isForeignUi } from "@userscripts/shared";
-import type { CompiledSiteDelta, SiteModifier } from "../legacy/site-rules";
-import { matchesAny, matchModifiers } from "../legacy/site-rules";
+import type {
+  ElementTreatment,
+  SiteStructureAdapter,
+} from "../structure/adapter";
+import type { CompiledSiteDelta, SiteModifier } from "../structure/site-rules";
+import { matchesAny, matchModifiers } from "../structure/site-rules";
 import type { StyleReader } from "./display-role";
-import { createRoleClassifier, isNonProsePrimitive } from "./display-role";
+import {
+  createRoleClassifier,
+  defaultGetStyle,
+  isCodeOrMonospace,
+  isNonProsePrimitive,
+} from "./display-role";
+
+export { isCodeOrMonospace } from "./display-role";
 
 export interface TranslationSegment {
   container: Element;
@@ -39,6 +50,93 @@ function getLogicalParent(node: Node): Element | null {
   }
   return null;
 }
+
+export type CaptureExcludeReason =
+  | "mono"
+  | "hidden"
+  | "foreign-ui"
+  | "translator-managed"
+  | "removed"
+  | "non-prose"
+  | "out-of-scope"
+  | "adapter-skip";
+
+export interface ComputedStyleSummary {
+  display: string;
+  fontFamily: string;
+  visibility: string;
+}
+
+export interface CaptureCandidateDecision {
+  classification: ElementTreatment;
+  computedStyleSummary: ComputedStyleSummary;
+  excludeReason: CaptureExcludeReason | null;
+  included: boolean;
+}
+
+export interface CaptureCandidateOptions {
+  adapter?: SiteStructureAdapter;
+  getStyle?: StyleReader;
+  scope?: readonly Element[];
+}
+
+function isInScope(el: Element, scope: readonly Element[]): boolean {
+  let current: Element | null = el;
+  while (current) {
+    if (scope.includes(current)) {
+      return true;
+    }
+    current = getLogicalParent(current);
+  }
+  return false;
+}
+
+export function evaluateCaptureCandidate(
+  el: Element,
+  delta: CompiledSiteDelta,
+  options: CaptureCandidateOptions = {}
+): CaptureCandidateDecision {
+  const getStyle = options.getStyle ?? defaultGetStyle;
+  const style = getStyle(el);
+  const role = createRoleClassifier(() => style).getRole(el);
+  let classification =
+    options.adapter?.elementPolicy(el) ??
+    (isNonProsePrimitive(el) ? "atomic" : "prose");
+  let excludeReason: CaptureExcludeReason | null = null;
+
+  if (isCodeOrMonospace(el, () => style)) {
+    classification = "skip";
+    excludeReason = "mono";
+  } else if (isForeignUi(el)) {
+    excludeReason = "foreign-ui";
+  } else if (isTranslatorManaged(el)) {
+    excludeReason = "translator-managed";
+  } else if (role === "hidden") {
+    excludeReason = "hidden";
+  } else if (matchesAny(el, delta.removeSelectors)) {
+    excludeReason = "removed";
+  } else if (options.scope && !isInScope(el, options.scope)) {
+    excludeReason = "out-of-scope";
+  } else if (classification === "skip") {
+    excludeReason = "adapter-skip";
+  } else if (isNonProsePrimitive(el) && role !== "inline") {
+    excludeReason = "non-prose";
+  }
+
+  return {
+    included: excludeReason === null,
+    excludeReason,
+    classification,
+    computedStyleSummary: {
+      display: style.display,
+      visibility: style.visibility,
+      fontFamily: style.fontFamily ?? "",
+    },
+  };
+}
+
+export const evaluateElementCandidate = evaluateCaptureCandidate;
+export const classifyCaptureNode = evaluateCaptureCandidate;
 
 function collectTranslatableText(node: Node, delta: CompiledSiteDelta): string {
   if (node.nodeType === 3) {
@@ -88,6 +186,7 @@ export function collectSegments(
   root: Element,
   delta: CompiledSiteDelta,
   options?: {
+    adapter?: SiteStructureAdapter;
     getStyle?: StyleReader;
     shadowRoots?: Set<ShadowRoot>;
     onExcluded?: () => void;
@@ -99,18 +198,18 @@ export function collectSegments(
   const segments: TranslationSegment[] = [];
 
   function isExcludedSubtree(el: Element): boolean {
-    const managed = isTranslatorManaged(el);
-    const excluded =
-      managed ||
-      classifier.getRole(el) === "hidden" ||
-      matchesAny(el, delta.removeSelectors) ||
-      (classifier.isNonProsePrimitive(el) &&
-        classifier.getRole(el) !== "inline");
-    if (excluded && !managed && !excludedCounted.has(el)) {
+    const decision = evaluateCaptureCandidate(el, delta, {
+      adapter: options?.adapter,
+      getStyle: options?.getStyle,
+    });
+    const managed =
+      decision.excludeReason === "foreign-ui" ||
+      decision.excludeReason === "translator-managed";
+    if (!(decision.included || managed || excludedCounted.has(el))) {
       excludedCounted.add(el);
       options?.onExcluded?.();
     }
-    return excluded;
+    return !decision.included;
   }
 
   const rootAncestorMods = new Set<SiteModifier>();

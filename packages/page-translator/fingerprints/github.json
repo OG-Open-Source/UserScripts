@@ -1,0 +1,38 @@
+{
+  "id": "github",
+  "version": 1,
+  "detectSelectors": [
+    "meta[name='hostname'][content='github.com']",
+    "meta[name='apple-itunes-app'][content*='GitHub']",
+    "body[data-turbo-body]"
+  ],
+  "regions": {
+    "topbar": ["header.AppHeader", "header.Header"],
+    "sidebar": [".Layout-sidebar"],
+    "content": ["main", ".markdown-body"],
+    "footer": ["footer"],
+    "nav": ["nav[aria-label='Repository']", "nav[aria-label='Insights']"]
+  },
+  "captureSelectors": [
+    "main .markdown-body",
+    "main .js-comment-body",
+    "main .Subhead",
+    "#repository-container-header"
+  ],
+  "excludeSelectors": [
+    "header.AppHeader",
+    "header.Header",
+    "footer",
+    "nav[aria-label='Insights']",
+    "code",
+    "pre"
+  ],
+  "spaRescanSelectors": ["main", ".markdown-body"],
+  "policies": {
+    "nav": "menu",
+    "button": "button",
+    ".Subhead": "title",
+    ".Counter": "badge",
+    ".markdown-body": "prose"
+  }
+}

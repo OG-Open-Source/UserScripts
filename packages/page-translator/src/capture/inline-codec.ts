@@ -1,5 +1,5 @@
-import type { CompiledSiteDelta, SiteModifier } from "../legacy/site-rules";
-import { matchesAny, matchModifiers } from "../legacy/site-rules";
+import type { CompiledSiteDelta, SiteModifier } from "../structure/site-rules";
+import { matchesAny, matchModifiers } from "../structure/site-rules";
 import { isNonProsePrimitive } from "./display-role";
 
 export interface InlineSlot {

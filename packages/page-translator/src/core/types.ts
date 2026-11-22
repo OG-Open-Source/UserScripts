@@ -1,6 +1,6 @@
 import type { TranslatorConfig } from "../legacy/config";
 import type { PtrMetrics } from "../legacy/metrics";
-import type { CompiledSiteDelta, SiteModifier } from "../legacy/site-rules";
+import type { CompiledSiteDelta, SiteModifier } from "../structure/site-rules";
 
 export interface TranslationSegment {
   container: Element;
