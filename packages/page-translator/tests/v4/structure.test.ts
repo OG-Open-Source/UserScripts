@@ -181,3 +181,40 @@ test("fingerprint loader returns cached data while SWR stores and publishes fres
   });
   expect(reloaded.version).toBe(3);
 });
+
+test("fingerprint SWR reports onUpdate failures through onUpdateError", async () => {
+  const storage = new MemoryStorage();
+  const bundled = await load("discourse", {
+    fetchText: () => Promise.reject(new Error("offline")),
+    storage: new MemoryStorage(),
+  });
+  const cachedRemote: FingerprintData = { ...bundled, version: 2 };
+  const freshRemote: FingerprintData = { ...bundled, version: 3 };
+  await load("discourse", {
+    fetchText: () => Promise.resolve(JSON.stringify(cachedRemote)),
+    storage,
+  });
+
+  const updateError = new Error("apply refreshed fingerprint failed");
+  const reported: unknown[] = [];
+  let markAttempted: (() => void) | undefined;
+  const attempted = new Promise<void>((resolve) => {
+    markAttempted = resolve;
+  });
+  const cached = await load("discourse", {
+    fetchText: () => Promise.resolve(JSON.stringify(freshRemote)),
+    storage,
+    onUpdate: () => {
+      markAttempted?.();
+      throw updateError;
+    },
+    onUpdateError: (error) => {
+      reported.push(error);
+    },
+  });
+  expect(cached.version).toBe(2);
+
+  await attempted;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(reported).toEqual([updateError]);
+});

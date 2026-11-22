@@ -24,6 +24,7 @@ export interface FingerprintStorage {
 export interface FingerprintLoadOptions {
   fetchText?: (url: string) => Promise<string>;
   onUpdate?: (next: FingerprintData) => void;
+  onUpdateError?: (error: unknown) => void;
   remoteBaseUrl?: string;
   remoteUrl?: string;
   storage?: FingerprintStorage;
@@ -130,6 +131,21 @@ function writeCached(
   }
 }
 
+function reportUpdateError(
+  error: unknown,
+  options: FingerprintLoadOptions
+): void {
+  if (options.onUpdateError) {
+    options.onUpdateError(error);
+    return;
+  }
+  if (typeof globalThis.reportError === "function") {
+    globalThis.reportError(error);
+    return;
+  }
+  console.error(error);
+}
+
 async function fetchFresh(
   id: string,
   url: string,
@@ -160,16 +176,21 @@ export async function load(
   const cached = readCached(id, storage);
 
   if (cached) {
-    void fetchFresh(id, url, fetchText)
-      .then((refreshed) => {
+    void fetchFresh(id, url, fetchText).then(
+      (refreshed) => {
         if (refreshed && JSON.stringify(refreshed) !== JSON.stringify(cached)) {
           writeCached(id, storage, refreshed);
-          options.onUpdate?.(refreshed);
+          try {
+            options.onUpdate?.(refreshed);
+          } catch (error) {
+            reportUpdateError(error, options);
+          }
         }
-      })
-      .catch(() => {
+      },
+      () => {
         // Stale data remains valid when a background refresh fails.
-      });
+      }
+    );
     return cached;
   }
 
