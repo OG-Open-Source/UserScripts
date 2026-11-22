@@ -1,9 +1,13 @@
 import type { SiteStructureAdapter, StructureAdapterContext } from "./adapter";
 import { discourseAdapter } from "./discourse";
 import { fallbackAdapter } from "./fallback";
+import { githubAdapter } from "./github";
 
 /** Concrete framework adapters run before the generic fallback. */
-export const defaultAdapters: SiteStructureAdapter[] = [discourseAdapter];
+export const defaultAdapters: SiteStructureAdapter[] = [
+  discourseAdapter,
+  githubAdapter,
+];
 
 export function resolveAdapter(
   ctx: StructureAdapterContext,

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta content="github.com" name="hostname">
+    <meta content="app-id=1477376905, app-name=GitHub" name="apple-itunes-app">
+    <title>GitHub repository adapter fixture</title>
+  </head>
+  <body data-turbo-body>
+    <header class="AppHeader" id="topbar">
+      <span>Site header chrome</span>
+    </header>
+    <header class="Header" id="legacy-topbar">
+      <span>Legacy site header chrome</span>
+    </header>
+    <aside class="Layout-sidebar" id="sidebar">
+      <span>Repository sidebar</span>
+    </aside>
+    <main id="main-content">
+      <div id="repository-container-header">
+        <span id="stars">12 stars</span>
+      </div>
+      <nav aria-label="Repository" id="repo-nav">
+        <ul>
+          <li id="issues-item">
+            <a href="/issues" id="issues-link">Issues</a>
+          </li>
+          <li><a href="/pulls">Pull requests</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Insights" id="insights-nav">
+        <ul>
+          <li id="pulse-item"><a href="/pulse" id="pulse-link">Pulse</a></li>
+          <li><a href="/contributors">Contributors</a></li>
+        </ul>
+      </nav>
+      <div class="Subhead" id="subhead">
+        <h2 id="code-frequency">Code frequency</h2>
+      </div>
+      <article class="markdown-body" id="readme">
+        <p>README repository documentation.</p>
+        <pre
+          id="readme-pre"
+        ><code id="readme-code">DO_NOT_TRANSLATE_CODE</code></pre>
+        <p id="monospace" style="font-family: Consolas, monospace">
+          DO_NOT_TRANSLATE_MONOSPACE
+        </p>
+      </article>
+      <section class="js-comment-body" id="issue-body">
+        <p>Issue report body.</p>
+      </section>
+      <section class="js-comment-body" id="pr-body">
+        <p>Pull request discussion body.</p>
+      </section>
+      <span class="Counter" id="counter">7</span>
+      <button id="repo-button" type="button">Star</button>
+      <div id="outside-scope"><span id="outside-pulse">Pulse</span></div>
+      <footer id="main-footer">Nested footer chrome</footer>
+    </main>
+    <footer id="site-footer">Site footer chrome</footer>
+  </body>
+</html>

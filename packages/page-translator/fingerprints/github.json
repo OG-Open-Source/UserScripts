@@ -9,25 +9,32 @@
   "regions": {
     "topbar": ["header.AppHeader", "header.Header"],
     "sidebar": [".Layout-sidebar"],
-    "content": ["main", ".markdown-body"],
+    "content": ["main", "#repo-content-turbo-frame"],
     "footer": ["footer"],
-    "nav": ["nav[aria-label='Repository']", "nav[aria-label='Insights']"]
+    "nav": ["nav[aria-label='Repository']"],
+    "insights": ["nav[aria-label='Insights']"],
+    "markdownBody": [".markdown-body"]
   },
   "captureSelectors": [
+    "main",
+    "#repo-content-turbo-frame",
     "main .markdown-body",
     "main .js-comment-body",
-    "main .Subhead",
-    "#repository-container-header"
+    ".markdown-body",
+    ".js-comment-body",
+    ".Subhead",
+    "#repository-container-header",
+    "nav[aria-label='Repository']",
+    "nav[aria-label='Insights']"
   ],
   "excludeSelectors": [
     "header.AppHeader",
     "header.Header",
     "footer",
-    "nav[aria-label='Insights']",
     "code",
     "pre"
   ],
-  "spaRescanSelectors": ["main", ".markdown-body"],
+  "spaRescanSelectors": ["main", "#repo-content-turbo-frame", ".markdown-body"],
   "policies": {
     "nav": "menu",
     "button": "button",
