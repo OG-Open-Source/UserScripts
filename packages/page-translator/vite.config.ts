@@ -44,8 +44,23 @@ const DELTAS_FILE = "deltas.json";
 const DELTAS_MAIN_URL = `https://raw.githubusercontent.com/${REPO}/main/${PACKAGE_PATH}/${DELTAS_FILE}`;
 const TRANSLATIONS_DIR = "translations";
 const TRANSLATIONS_MAIN_URL = `https://raw.githubusercontent.com/${REPO}/main/${PACKAGE_PATH}/${TRANSLATIONS_DIR}`;
+const FINGERPRINTS_DIR = "fingerprints";
+const FINGERPRINTS_MAIN_URL = `https://raw.githubusercontent.com/${REPO}/main/${PACKAGE_PATH}/${FINGERPRINTS_DIR}`;
 const LEADING_SLASHES_RE = /^\/+/u;
 const DOT_DOT_RE = /\.\./gu;
+
+function copyJsonTree(src: string, dst: string): void {
+  mkdirSync(dst, { recursive: true });
+  for (const entry of readdirSync(src, { withFileTypes: true })) {
+    const sPath = resolve(src, entry.name);
+    const dPath = resolve(dst, entry.name);
+    if (entry.isDirectory()) {
+      copyJsonTree(sPath, dPath);
+    } else if (entry.name.endsWith(".json")) {
+      cpSync(sPath, dPath);
+    }
+  }
+}
 
 function staticAssetsPlugin(): Plugin {
   const files = [LOCALES_FILE, DELTAS_FILE].map((name) => ({
@@ -53,6 +68,11 @@ function staticAssetsPlugin(): Plugin {
     source: resolve(__dirname, name),
   }));
   const trDir = resolve(__dirname, TRANSLATIONS_DIR);
+  const fpDir = resolve(__dirname, FINGERPRINTS_DIR);
+  const jsonDirs = [
+    { prefix: TRANSLATIONS_DIR, dir: trDir },
+    { prefix: FINGERPRINTS_DIR, dir: fpDir },
+  ];
   return {
     name: "static-assets",
     configureServer(server) {
@@ -62,18 +82,20 @@ function staticAssetsPlugin(): Plugin {
           res.end(readFileSync(f.source));
         });
       }
-      server.middlewares.use(`/${TRANSLATIONS_DIR}/`, (req, res, next) => {
-        const rel = (req.url ?? "")
-          .replace(LEADING_SLASHES_RE, "")
-          .replace(DOT_DOT_RE, "");
-        const target = resolve(trDir, rel);
-        if (rel && existsSync(target)) {
-          res.setHeader("content-type", "application/json");
-          res.end(readFileSync(target));
-          return;
-        }
-        next();
-      });
+      for (const { prefix, dir } of jsonDirs) {
+        server.middlewares.use(`/${prefix}/`, (req, res, next) => {
+          const rel = (req.url ?? "")
+            .replace(LEADING_SLASHES_RE, "")
+            .replace(DOT_DOT_RE, "");
+          const target = resolve(dir, rel);
+          if (rel && existsSync(target)) {
+            res.setHeader("content-type", "application/json");
+            res.end(readFileSync(target));
+            return;
+          }
+          next();
+        });
+      }
     },
     closeBundle() {
       const outDir = resolve(__dirname, OUT_DIR);
@@ -81,21 +103,10 @@ function staticAssetsPlugin(): Plugin {
       for (const f of files) {
         cpSync(f.source, resolve(outDir, f.name));
       }
-      if (existsSync(trDir)) {
-        const outTr = resolve(outDir, TRANSLATIONS_DIR);
-        const copyJsonTree = (src: string, dst: string) => {
-          mkdirSync(dst, { recursive: true });
-          for (const entry of readdirSync(src, { withFileTypes: true })) {
-            const sPath = resolve(src, entry.name);
-            const dPath = resolve(dst, entry.name);
-            if (entry.isDirectory()) {
-              copyJsonTree(sPath, dPath);
-            } else if (entry.name.endsWith(".json")) {
-              cpSync(sPath, dPath);
-            }
-          }
-        };
-        copyJsonTree(trDir, outTr);
+      for (const { prefix, dir } of jsonDirs) {
+        if (existsSync(dir)) {
+          copyJsonTree(dir, resolve(outDir, prefix));
+        }
       }
     },
   };
@@ -119,6 +130,11 @@ export default defineConfig(({ command }) => ({
         ? `http://localhost:5173/${TRANSLATIONS_DIR}`
         : TRANSLATIONS_MAIN_URL
     ),
+    __FINGERPRINTS_BASE__: JSON.stringify(
+      command === "serve"
+        ? `http://localhost:5173/${FINGERPRINTS_DIR}`
+        : FINGERPRINTS_MAIN_URL
+    ),
     __SCRIPT_ID__: JSON.stringify(USERSCRIPT_ID),
     __SCRIPT_NAME__: JSON.stringify(USERSCRIPT_NAME),
     __SCRIPT_DESCRIPTION__: JSON.stringify(USERSCRIPT_DESCRIPTION),
@@ -126,7 +142,7 @@ export default defineConfig(({ command }) => ({
   plugins: [
     staticAssetsPlugin(),
     monkey({
-      entry: "./src/legacy/main.ts",
+      entry: "./src/main.ts",
       userscript: {
         name: USERSCRIPT_NAME,
         namespace: "Violentmonkey Scripts",

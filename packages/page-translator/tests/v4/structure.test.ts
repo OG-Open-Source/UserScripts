@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test";
 import { Window } from "happy-dom";
 import { collectSegments } from "../../src/capture/segmenter";
-import { collectSegments as collectLegacySegments } from "../../src/legacy/capture/segmenter";
 import type { SiteStructureAdapter } from "../../src/structure/adapter";
 import type {
   FingerprintData,
@@ -78,26 +77,26 @@ function createGate() {
   return { promise, release: () => release?.() };
 }
 
-test("unknown hosts use fallback and reproduce legacy segment output", () => {
-  const legacy = setupFixture();
-  const ported = setupFixture();
+test("unknown hosts use fallback and reproduce unadapted segment output", () => {
+  const unadapted = setupFixture();
+  const adapted = setupFixture();
   const delta = parseSiteDelta("");
   const adapter = resolveAdapter({
     host: "unknown.example",
-    doc: ported.doc,
+    doc: adapted.doc,
   });
 
   expect(adapter.id).toBe("fallback");
-  expect(adapter.captureScope(ported.doc)).toEqual([ported.body]);
-  const legacySegments = collectLegacySegments(legacy.body, delta, {
-    getStyle: legacy.getStyle,
+  expect(adapter.captureScope(adapted.doc)).toEqual([adapted.body]);
+  const baseSegments = collectSegments(unadapted.body, delta, {
+    getStyle: unadapted.getStyle,
   });
-  const portedSegments = collectSegments(ported.body, delta, {
+  const adaptedSegments = collectSegments(adapted.body, delta, {
     adapter,
-    getStyle: ported.getStyle,
+    getStyle: adapted.getStyle,
   });
-  expect(segmentSnapshot(portedSegments)).toEqual(
-    segmentSnapshot(legacySegments)
+  expect(segmentSnapshot(adaptedSegments)).toEqual(
+    segmentSnapshot(baseSegments)
   );
 });
 

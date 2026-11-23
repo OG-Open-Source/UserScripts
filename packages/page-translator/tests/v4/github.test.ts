@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { Window } from "happy-dom";
 import githubJson from "../../fingerprints/github.json" with { type: "json" };
 import { collectSegments } from "../../src/capture/segmenter";
-import { matchSiteTranslation } from "../../src/legacy/transform/template";
+import { matchSiteTranslation } from "../../src/dict/template";
 import { createSpaRescanController } from "../../src/platform/lifecycle";
 import { discourseAdapter } from "../../src/structure/discourse";
 import { fallbackAdapter } from "../../src/structure/fallback";

@@ -62,8 +62,19 @@ UserScripts/
 │   │   ├── vite.config.ts
 │   │   ├── package.json
 │   │   └── tsconfig.json
-│   └── page-translator/               # 腳本套件（USERSCRIPT_ID: ptr）
+│   └── page-translator/               # 腳本套件（USERSCRIPT_ID: ptr，v4 架構）
 │       ├── src/
+│       │   ├── main.ts                # 精簡組合根（Composition Root）
+│       │   ├── core/                  # 五系統管線、BCP47 主語言路由、批次排程
+│       │   ├── capture/               # 顯示角色分類、等寬/程式碼硬跳過、行內編解碼、觀察器與匯出
+│       │   ├── structure/             # 頁面結構適配器（Discourse/GitHub/Fallback）與差異規則
+│       │   ├── text/                  # 中文正規化（標點 + 間距）、關鍵詞遮罩、OpenCC 排程與轉換
+│       │   ├── dict/                  # 分層詞典儲存、模板比對、延遲載入遠端詞典（TTL + 去重）
+│       │   ├── providers/             # translate-pa、inspect、human-only（僅詞典命中）
+│       │   ├── render/                # DOM 渲染（正規化優先於 OpenCC）與樣式同步
+│       │   ├── ui/                    # Basic / Studio 雙層 UI（logic + view 分離）
+│       │   └── platform/              # 設定、i18n、SPA 生命週期、分頁啟用、指標、設定橋接
+│       ├── fingerprints/              # 遠端可更新框架指紋 JSON（discourse.json, github.json）
 │       ├── translations/              # 站點翻譯詞典（<host>.json，支援 scoped 選擇器）
 │       ├── deltas.json                # 站點 +-* 擷取差異規則
 │       ├── locales.json
@@ -129,7 +140,16 @@ const OUT_DIR = IS_RELEASE ? "dist" : ".dist-dev";
 
 - **原生優先**：網站已有成熟元件時沿用其 class 與樣式
 - **NovaKit Borderless（Oklab / Oklch）**：所有自訂浮層面板（Shadow DOM）、設定頁面（`settings/`）與非原生互動元件統一採用 `@userscripts/shared` 的 `color.ts`、`theme-mode.ts`、`ui-tokens.ts` 與 `settings/shared/tokens.css`（無邊框 tonal 階層、圓角 `12/8/6px`、`tabular-nums` 數字、無 `scale()` 變形、跨腳本 `[data-us-ui]` 隔離標記）
-- **四種主題規則**：`dark`（強制深色）、`light`（強制淺色）、`system`（跟隨 `prefers-color-scheme`）與 `host`（宿主網頁／父頁面，透過 Oklab 引擎讀取目標網頁色票推導對比層級）
+- **四種主題規則**：`@userscripts/shared` 與 `h1dl` 保留四種模式：`dark`（強制深色）、`light`（強制淺色）、`system`（跟隨 `prefers-color-scheme`）與 `host`（宿主網頁／父頁面，透過 Oklab 引擎讀取目標網頁色票推導對比層級）；`page-translator`（`ptr` v4）則收斂為 `PtrThemeMode` 三種模式（`dark` / `light` / `system`）
+
+## Page Translator v4 架構設計
+
+`packages/page-translator` 採用顯式五系統功能模型與頁面結構適配器：
+
+- **五系統功能模型**：字體修改（`--ptr-font`）正交獨立；主語言翻譯（依 BCP 47 主語言標籤路由，不混入書寫系統/地區）；中文正規化單元（標點寬度正規化與中西文間距，於 OpenCC 之前執行）；OpenCC 繁簡與地區轉換（僅在 `openccMode !== "off"` 時排程並於正規化後執行）
+- **頁面結構適配器與 SWR 指紋**：內建 `discourse`（LINUX.DO）與 `github` 適配器及通用 `fallback` 適配器，結構選擇器與區域定義存放於 `fingerprints/*.json` 並採 SWR 背景更新；SPA 導航僅針對受影響區域進行局部重掃（`createSpaRescanController`）
+- **詞典與 Provider 管線**：本地覆寫詞典優先 → miss 時依 Host 延遲載入上游詞典（含 TTL 與並發去重）→ 仍 miss 時依 `provider` 執行（`human-only` 保持原文且零 API 請求，其餘呼叫 `translate-pa` / `inspect`）
+- **Basic / Studio 雙層 UI 與分頁獨立啟用**：預設僅顯示 Basic 控制列，切換 Studio 即時掛載 Inspect HUD 與 Volunteer Workbench（免重載）；Inspect/Volunteer 啟用狀態改為 `sessionStorage` 分頁隔離，設定頁僅控制新分頁預設值
 
 ## 多語言（i18n）
 

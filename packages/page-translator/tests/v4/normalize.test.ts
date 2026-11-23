@@ -4,7 +4,7 @@ import {
   decodeTranslatedHtml,
   encodeInlineNodes,
 } from "../../src/capture/inline-codec";
-import { parseSiteDelta } from "../../src/legacy/site-rules";
+import { parseSiteDelta } from "../../src/structure/site-rules";
 import {
   applyNormalizationToFragment,
   normalizeChineseText,

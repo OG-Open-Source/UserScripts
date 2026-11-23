@@ -5,12 +5,7 @@ import {
   encodeInlineNodes,
 } from "../../src/capture/inline-codec";
 import { collectSegments } from "../../src/capture/segmenter";
-import {
-  decodeTranslatedHtml as decodeLegacyTranslatedHtml,
-  encodeInlineNodes as encodeLegacyInlineNodes,
-} from "../../src/legacy/capture/inline-codec";
-import { collectSegments as collectLegacySegments } from "../../src/legacy/capture/segmenter";
-import { parseSiteDelta } from "../../src/legacy/site-rules";
+import { parseSiteDelta } from "../../src/structure/site-rules";
 
 const FIXTURE =
   '<div>Plain <span>nested <strong>inline</strong></span> <x data-atomic="">*</x> tail</div>';
@@ -32,91 +27,51 @@ function setupFixture() {
   return { body, doc, getStyle };
 }
 
-function segmentSnapshot(segments: ReturnType<typeof collectSegments>) {
-  return segments.map((segment) => ({
-    container: segment.container.outerHTML,
-    displayContents: segment.displayContents,
-    modifiers: [...segment.modifiers].sort((a, b) => a.localeCompare(b)),
-    nodes: segment.nodes.map((node) =>
-      node.nodeType === 1 ? (node as Element).outerHTML : node.nodeValue
-    ),
-    sourceRule: segment.sourceRule,
-  }));
-}
-
 function fragmentHtml(fragment: DocumentFragment, doc: Document): string {
   const container = doc.createElement("div");
   container.appendChild(fragment);
   return container.innerHTML;
 }
 
-test("ported collectSegments matches legacy structure for the fixed fixture", () => {
-  const legacy = setupFixture();
-  const ported = setupFixture();
+test("v4 collectSegments captures plain, nested inline, and atomic nodes in one segment", () => {
+  const { body, getStyle } = setupFixture();
   const delta = parseSiteDelta("");
-  const legacySegments = collectLegacySegments(legacy.body, delta, {
-    getStyle: legacy.getStyle,
-  });
-  const portedSegments = collectSegments(ported.body, delta, {
-    getStyle: ported.getStyle,
-  });
+  const segments = collectSegments(body, delta, { getStyle });
 
-  for (const segment of [...legacySegments, ...portedSegments]) {
-    expect(segment.id).toMatch(SEGMENT_ID_PATTERN);
+  expect(segments).toHaveLength(1);
+  const [segment] = segments;
+  if (!segment) {
+    throw new Error("Expected one segment");
   }
-  expect(segmentSnapshot(portedSegments)).toEqual(
-    segmentSnapshot(legacySegments)
-  );
+  expect(segment.id).toMatch(SEGMENT_ID_PATTERN);
+  expect(segment.container.tagName).toBe("DIV");
+  expect(segment.sourceRule).toBe("auto");
+  expect(segment.displayContents).toBe(false);
+  expect(segment.nodes).toHaveLength(5);
 });
 
-test("ported inline codec matches legacy encoding and decoding", () => {
-  const legacy = setupFixture();
-  const ported = setupFixture();
+test("v4 inline codec round-trips plain, nested inline, and atomic slots", () => {
+  const { body, doc, getStyle } = setupFixture();
   const delta = parseSiteDelta("");
-  const legacySegments = collectLegacySegments(legacy.body, delta, {
-    getStyle: legacy.getStyle,
-  });
-  const portedSegments = collectSegments(ported.body, delta, {
-    getStyle: ported.getStyle,
-  });
-  expect(legacySegments).toHaveLength(1);
-  expect(portedSegments).toHaveLength(1);
-  const [legacySegment] = legacySegments;
-  const [portedSegment] = portedSegments;
-  if (!(legacySegment && portedSegment)) {
-    throw new Error("Expected one segment from each implementation");
+  const segments = collectSegments(body, delta, { getStyle });
+  expect(segments).toHaveLength(1);
+  const [segment] = segments;
+  if (!segment) {
+    throw new Error("Expected one segment");
   }
-  const legacyEncoded = encodeLegacyInlineNodes(legacySegment.nodes, delta);
-  const portedEncoded = encodeInlineNodes(portedSegment.nodes, delta);
 
-  expect(portedEncoded.payloadHtml).toBe(legacyEncoded.payloadHtml);
-  expect(
-    portedEncoded.slots.map((slot) => ({
-      atomic: slot.atomic,
-      element: slot.element.outerHTML,
-      id: slot.id,
-      modifiers: [...slot.modifiers].sort((a, b) => a.localeCompare(b)),
-    }))
-  ).toEqual(
-    legacyEncoded.slots.map((slot) => ({
-      atomic: slot.atomic,
-      element: slot.element.outerHTML,
-      id: slot.id,
-      modifiers: [...slot.modifiers].sort((a, b) => a.localeCompare(b)),
-    }))
+  const encoded = encodeInlineNodes(segment.nodes, delta);
+  expect(encoded.payloadHtml).toBe(
+    'Plain <x id="0">nested <x id="1">inline</x></x> <x id="2"/> tail'
   );
+  expect(encoded.slots.map((s) => ({ id: s.id, atomic: s.atomic }))).toEqual([
+    { id: 0, atomic: false },
+    { id: 1, atomic: false },
+    { id: 2, atomic: true },
+  ]);
 
-  const legacyDecoded = decodeLegacyTranslatedHtml(
-    TRANSLATED_HTML,
-    legacyEncoded.slots,
-    legacy.doc
-  );
-  const portedDecoded = decodeTranslatedHtml(
-    TRANSLATED_HTML,
-    portedEncoded.slots,
-    ported.doc
-  );
-  expect(fragmentHtml(portedDecoded, ported.doc)).toBe(
-    fragmentHtml(legacyDecoded, legacy.doc)
+  const decoded = decodeTranslatedHtml(TRANSLATED_HTML, encoded.slots, doc);
+  expect(fragmentHtml(decoded, doc)).toBe(
+    '译文 <span>嵌套 <strong>行内</strong></span> <x data-atomic="" data-tr-no-space="1" data-tr-no-opencc="1">*</x> 末尾'
   );
 });
