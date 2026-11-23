@@ -25,6 +25,11 @@ export type CaptureCandidateExcludeReason = CaptureExcludeReason | "atomic";
 export interface CaptureCandidate {
   classification: ElementTreatment;
   computedStyleSummary: ComputedStyleSummary;
+  /**
+   * CSS-escaped path from the document root. `#shadow-root` marks an open
+   * shadow-tree boundary after its host; tooling must follow `host.shadowRoot`
+   * for that segment instead of treating the whole path as one CSS selector.
+   */
   domPath: string;
   excludeReason: CaptureCandidateExcludeReason | null;
   included: boolean;
@@ -64,19 +69,68 @@ function getSameTagSiblings(el: Element): Element[] {
   return children.filter((sibling) => sibling.tagName === el.tagName);
 }
 
+function fallbackCssEscape(value: string): string {
+  let escaped = "";
+  for (let index = 0; index < value.length; index += 1) {
+    const codeUnit = value.charCodeAt(index);
+    const character = value.charAt(index);
+
+    if (codeUnit === 0) {
+      escaped += "�";
+      continue;
+    }
+    if (
+      (codeUnit >= 1 && codeUnit <= 31) ||
+      codeUnit === 127 ||
+      (index === 0 && codeUnit >= 48 && codeUnit <= 57) ||
+      (index === 1 &&
+        codeUnit >= 48 &&
+        codeUnit <= 57 &&
+        value.charCodeAt(0) === 45)
+    ) {
+      escaped += `\\${codeUnit.toString(16)} `;
+      continue;
+    }
+    if (index === 0 && codeUnit === 45 && value.length === 1) {
+      escaped += `\\${character}`;
+      continue;
+    }
+    if (
+      codeUnit >= 128 ||
+      codeUnit === 45 ||
+      codeUnit === 95 ||
+      (codeUnit >= 48 && codeUnit <= 57) ||
+      (codeUnit >= 65 && codeUnit <= 90) ||
+      (codeUnit >= 97 && codeUnit <= 122)
+    ) {
+      escaped += character;
+      continue;
+    }
+    escaped += `\\${character}`;
+  }
+  return escaped;
+}
+
+function escapeCssIdentifier(el: Element, value: string): string {
+  const css = el.ownerDocument.defaultView?.CSS ?? globalThis.CSS;
+  if (typeof css?.escape === "function") {
+    return css.escape(value);
+  }
+  return fallbackCssEscape(value);
+}
+
 function getDomPath(el: Element): string {
   const segments: string[] = [];
   let current: Element | null = el;
 
   while (current) {
     let segment = current.tagName.toLowerCase();
+    const sameTagSiblings = getSameTagSiblings(current);
     if (current.id) {
-      segment += `#${current.id}`;
-    } else {
-      const sameTagSiblings = getSameTagSiblings(current);
-      if (sameTagSiblings.length > 1) {
-        segment += `:nth-of-type(${sameTagSiblings.indexOf(current) + 1})`;
-      }
+      segment += `#${escapeCssIdentifier(current, current.id)}`;
+    }
+    if (sameTagSiblings.length > 1) {
+      segment += `:nth-of-type(${sameTagSiblings.indexOf(current) + 1})`;
     }
     segments.unshift(segment);
 
@@ -95,14 +149,23 @@ function getDomPath(el: Element): string {
   return segments.join(" > ");
 }
 
+function isWithinLogicalTree(el: Element, root: Element): boolean {
+  let current: Element | null = el;
+  while (current) {
+    if (current === root) {
+      return true;
+    }
+    current = getLogicalParent(current);
+  }
+  return false;
+}
+
 function getRegion(
   el: Element,
   regions: Readonly<Record<string, Element[]>>
 ): string | string[] | null {
   const matches = Object.entries(regions)
-    .filter(([, roots]) =>
-      roots.some((root) => root === el || root.contains(el))
-    )
+    .filter(([, roots]) => roots.some((root) => isWithinLogicalTree(el, root)))
     .map(([name]) => name)
     .sort((a, b) => a.localeCompare(b));
 

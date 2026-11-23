@@ -4,6 +4,7 @@ import type { CaptureCandidate } from "../../src/capture/export";
 import { exportCaptureCandidates } from "../../src/capture/export";
 import type { SiteStructureAdapter } from "../../src/structure/adapter";
 import { fallbackAdapter } from "../../src/structure/fallback";
+import { parseSiteDelta } from "../../src/structure/site-rules";
 
 const BLOCK_TAGS = new Set([
   "ARTICLE",
@@ -51,8 +52,10 @@ function candidateById(
   candidates: readonly CaptureCandidate[],
   id: string
 ): CaptureCandidate {
-  const candidate = candidates.find((entry) =>
-    entry.domPath.endsWith(`#${id}`)
+  const candidate = candidates.find(
+    (entry) =>
+      entry.domPath.endsWith(`#${id}`) ||
+      entry.domPath.includes(`#${id}:nth-of-type(`)
   );
   if (!candidate) {
     throw new Error(`Missing exported candidate: ${id}`);
@@ -179,7 +182,7 @@ test("records deterministic DOM paths, region membership, style summaries, and p
 
 test("normalizes and truncates text previews with JSON-serializable output", () => {
   const { doc } = createDocument(
-    '<main><p id="preview">  Alpha\n beta\t gamma </p></main>'
+    '<main><p id="preview">  Alpha\n beta\t gamma </p><div id="empty"></div><div id="whitespace"> \n\t </div></main>'
   );
   const candidates = exportCaptureCandidates(doc, {
     getStyle,
@@ -188,6 +191,8 @@ test("normalizes and truncates text previews with JSON-serializable output", () 
   const preview = candidateById(candidates, "preview");
 
   expect(preview.textPreview).toBe("Alpha be");
+  expect(candidateById(candidates, "empty").textPreview).toBe("");
+  expect(candidateById(candidates, "whitespace").textPreview).toBe("");
   expect(JSON.parse(JSON.stringify(candidates))).toEqual(candidates);
   expect(
     candidateById(exportCaptureCandidates(doc, { getStyle }), "preview")
@@ -304,4 +309,93 @@ test("uses the fallback adapter and honors an explicit traversal root", () => {
   expect(candidateById(candidates, "fallback-inside").excludeReason).toBe(
     "removed"
   );
+});
+
+test("shadow descendants inherit single and overlapping logical regions", () => {
+  const { doc } = createDocument(
+    '<main id="shadow-scope"><div id="shadow-host"></div></main>'
+  );
+  const scope = requireElement(doc, "#shadow-scope");
+  const host = requireElement(doc, "#shadow-host");
+  const shadowRoot = host.attachShadow({ mode: "open" });
+  shadowRoot.innerHTML =
+    '<span id="shadow-single">Single</span><section id="shadow-overlap"><span id="shadow-nested">Nested</span></section>';
+  const overlap = requireElement(shadowRoot, "#shadow-overlap");
+  const adapter: SiteStructureAdapter = {
+    ...fallbackAdapter,
+    id: "shadow-test",
+    captureScope: () => [scope],
+    regions: () => ({ content: [scope], details: [overlap] }),
+  };
+  const candidates = exportCaptureCandidates(doc, {
+    adapter,
+    getStyle,
+    root: scope,
+  });
+
+  expect(candidateById(candidates, "shadow-single").domPath).toBe(
+    "html > body > main#shadow-scope > div#shadow-host > #shadow-root > span#shadow-single"
+  );
+  expect(candidateById(candidates, "shadow-single")).toMatchObject({
+    included: true,
+    region: "content",
+  });
+  expect(candidateById(candidates, "shadow-overlap")).toMatchObject({
+    region: ["content", "details"],
+  });
+  expect(candidateById(candidates, "shadow-nested")).toMatchObject({
+    region: ["content", "details"],
+  });
+});
+
+test("DOM paths disambiguate duplicate and no-ID siblings and escape CSS punctuation", () => {
+  const { doc } = createDocument(`
+    <main id="paths">
+      <div id="dup">First</div>
+      <div id="dup">Second</div>
+      <span>Plain one</span>
+      <span>Plain two</span>
+      <p id="odd:id[0].x">Odd</p>
+    </main>
+  `);
+  const root = requireElement(doc, "#paths");
+  const odd = requireElement(doc, "#odd\\:id\\[0\\]\\.x");
+  const candidates = exportCaptureCandidates(doc, { getStyle, root });
+  const paths = candidates.map((candidate) => candidate.domPath);
+
+  expect(paths).toEqual([
+    "html > body > main#paths",
+    "html > body > main#paths > div#dup:nth-of-type(1)",
+    "html > body > main#paths > div#dup:nth-of-type(2)",
+    "html > body > main#paths > span:nth-of-type(1)",
+    "html > body > main#paths > span:nth-of-type(2)",
+    "html > body > main#paths > p#odd\\:id\\[0\\]\\.x",
+  ]);
+  expect(new Set(paths).size).toBe(paths.length);
+  const oddPath = candidates.find(
+    (candidate) => candidate.textPreview === "Odd"
+  )?.domPath;
+  expect(oddPath).toBeDefined();
+  expect(doc.querySelector(oddPath ?? "")).toBe(odd);
+});
+
+test("explicit delta takes precedence over host site deltas", () => {
+  const { doc } = createDocument(
+    '<main id="delta-root"><p id="delta-explicit">Explicit</p><p id="delta-site">Site</p></main>'
+  );
+  const root = requireElement(doc, "#delta-root");
+  const candidates = exportCaptureCandidates(doc, {
+    delta: parseSiteDelta("- #delta-explicit"),
+    getStyle,
+    root,
+    siteDeltas: { "example.test": "- #delta-site" },
+  });
+
+  expect(candidateById(candidates, "delta-explicit").excludeReason).toBe(
+    "removed"
+  );
+  expect(candidateById(candidates, "delta-site")).toMatchObject({
+    included: true,
+    excludeReason: null,
+  });
 });
