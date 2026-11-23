@@ -61,7 +61,12 @@ export {
 } from "./presence";
 export type { NativeTheme } from "./theme";
 export { probeTheme } from "./theme";
-export type { ThemeColors, ThemeMode, ThemeTokens } from "./theme-mode";
+export type {
+  SimpleCssThemeTokens,
+  ThemeColors,
+  ThemeMode,
+  ThemeTokens,
+} from "./theme-mode";
 export {
   applyThemeModeToElement,
   cssColorToHex,
@@ -70,6 +75,8 @@ export {
   probeHostColors,
   readThemeMode,
   resolveThemeTokens,
+  SIMPLE_CSS_DARK_TOKENS,
+  SIMPLE_CSS_LIGHT_TOKENS,
 } from "./theme-mode";
 export type {
   BatchEntry,
@@ -77,4 +84,4 @@ export type {
   QualityInfo,
   ResolvedQuality,
 } from "./types";
-export { getUiTokensCss } from "./ui-tokens";
+export { getSimpleCssThemeVarsCss, getUiTokensCss } from "./ui-tokens";

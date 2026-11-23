@@ -15,6 +15,7 @@ import {
   getAccessibleTextOklch,
   hexToOklab,
   oklabToOklch,
+  US_PALETTE_OKLCH,
 } from "./color";
 
 export type ThemeMode = "dark" | "light" | "system" | "host";
@@ -37,30 +38,75 @@ export interface ThemeTokens {
   surface3: string;
 }
 
+export interface SimpleCssThemeTokens {
+  accent: string;
+  accentBg: string;
+  accentHover: string;
+  accentText: string;
+  bg: string;
+  border: string;
+  code: string;
+  disabled: string;
+  marked: string;
+  preformatted: string;
+  text: string;
+  textLight: string;
+}
+
 export const DEFAULT_THEME_MODE_STORAGE_KEY = "us:theme-mode";
 
 const THEME_MODES: readonly ThemeMode[] = ["dark", "light", "system", "host"];
 
 const DARK_TOKENS: ThemeTokens = {
-  bg: "oklch(17.00% 0.0140 264.00)",
-  surface: "oklch(22.50% 0.0180 264.00)",
-  surface2: "oklch(27.50% 0.0220 264.00)",
-  surface3: "oklch(33.00% 0.0260 264.00)",
-  fg: "oklch(95.00% 0.0060 264.00)",
-  muted: "oklch(68.00% 0.0220 264.00)",
-  accentBg: "oklch(58.00% 0.1800 255.83)",
-  accentFg: "oklch(98.50% 0.0040 255.83)",
+  bg: US_PALETTE_OKLCH.inkDark,
+  surface: US_PALETTE_OKLCH.surfaceDark,
+  surface2: US_PALETTE_OKLCH.slate,
+  surface3: US_PALETTE_OKLCH.surfaceDark3,
+  fg: US_PALETTE_OKLCH.surfaceLight,
+  muted: US_PALETTE_OKLCH.mutedDark,
+  accentBg: US_PALETTE_OKLCH.accent,
+  accentFg: US_PALETTE_OKLCH.inkDark,
 };
 
 const LIGHT_TOKENS: ThemeTokens = {
-  bg: "oklch(98.00% 0.0040 264.00)",
-  surface: "oklch(94.50% 0.0070 264.00)",
-  surface2: "oklch(90.50% 0.0100 264.00)",
-  surface3: "oklch(86.00% 0.0140 264.00)",
-  fg: "oklch(16.00% 0.0140 264.00)",
-  muted: "oklch(46.00% 0.0240 264.00)",
-  accentBg: "oklch(52.20% 0.1771 255.83)",
-  accentFg: "oklch(98.00% 0.0060 255.83)",
+  bg: US_PALETTE_OKLCH.canvasLight,
+  surface: US_PALETTE_OKLCH.surfaceLight,
+  surface2: US_PALETTE_OKLCH.borderLight,
+  surface3: US_PALETTE_OKLCH.surfaceLight3,
+  fg: US_PALETTE_OKLCH.slate,
+  muted: US_PALETTE_OKLCH.secondary,
+  accentBg: US_PALETTE_OKLCH.accent,
+  accentFg: US_PALETTE_OKLCH.inkDark,
+};
+
+export const SIMPLE_CSS_LIGHT_TOKENS: SimpleCssThemeTokens = {
+  accent: US_PALETTE_OKLCH.accent,
+  accentBg: US_PALETTE_OKLCH.surfaceLight,
+  accentHover: US_PALETTE_OKLCH.accentDeep,
+  accentText: US_PALETTE_OKLCH.inkDark,
+  bg: US_PALETTE_OKLCH.canvasLight,
+  border: US_PALETTE_OKLCH.secondary,
+  code: US_PALETTE_OKLCH.accentDeep,
+  disabled: US_PALETTE_OKLCH.borderLight,
+  marked: US_PALETTE_OKLCH.accent,
+  preformatted: US_PALETTE_OKLCH.slate,
+  text: US_PALETTE_OKLCH.slate,
+  textLight: US_PALETTE_OKLCH.secondary,
+};
+
+export const SIMPLE_CSS_DARK_TOKENS: SimpleCssThemeTokens = {
+  accent: US_PALETTE_OKLCH.accent,
+  accentBg: US_PALETTE_OKLCH.slate,
+  accentHover: US_PALETTE_OKLCH.accentSoft,
+  accentText: US_PALETTE_OKLCH.inkDark,
+  bg: US_PALETTE_OKLCH.inkDark,
+  border: US_PALETTE_OKLCH.secondary,
+  code: US_PALETTE_OKLCH.accent,
+  disabled: US_PALETTE_OKLCH.surfaceDark,
+  marked: US_PALETTE_OKLCH.accent,
+  preformatted: US_PALETTE_OKLCH.surfaceLight,
+  text: US_PALETTE_OKLCH.surfaceLight,
+  textLight: US_PALETTE_OKLCH.mutedDark,
 };
 
 const HEX_6_RE = /^#(?<hex>[a-f\d]{6})$/iu;

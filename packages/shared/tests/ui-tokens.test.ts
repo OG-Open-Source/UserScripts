@@ -1,9 +1,20 @@
 import { expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { US_PALETTE_OKLCH } from "../src/color";
 import { resolveThemeTokens } from "../src/theme-mode";
-import { getUiTokensCss } from "../src/ui-tokens";
+import { getSimpleCssThemeVarsCss, getUiTokensCss } from "../src/ui-tokens";
 
 const BORDER_1PX_RE = /border:\s*1px/u;
 const SCALE_FN_RE = /scale\(/u;
+const FORBIDDEN_SIMPLE_CSS_PATTERNS = [
+  /\bbody\b/u,
+  /\bheader\b/u,
+  /\.us-/u,
+  /(?<![-\w])border:/u,
+  /(?<![-\w])padding:/u,
+  /(?<![-\w])margin:/u,
+] as const;
 
 test("emits borderless NovaKit tokens, radius scale, and pulse keyframes", () => {
   const css = getUiTokensCss(":host");
@@ -55,4 +66,28 @@ test("emits media overlay contrast tokens and variable-driven button hover state
   expect(css).toContain("--_btn-fg");
   expect(css).toContain("--_btn-hover-bg");
   expect(css).toContain("--_btn-hover-fg");
+});
+
+test("getSimpleCssThemeVarsCss emits only Simple.css theme custom properties", () => {
+  const css = getSimpleCssThemeVarsCss();
+  expect(css).toContain(":root");
+  expect(css).toContain("@media (prefers-color-scheme: dark)");
+  expect(css).toContain(':root:not([data-theme-mode="light"])');
+  expect(css).toContain(':root[data-theme-mode="light"]');
+  expect(css).toContain(':root[data-theme-mode="dark"]');
+  expect(css).toContain(`--accent: ${US_PALETTE_OKLCH.accent}`);
+  expect(css).toContain(`--border: ${US_PALETTE_OKLCH.secondary}`);
+
+  for (const forbidden of FORBIDDEN_SIMPLE_CSS_PATTERNS) {
+    expect(css).not.toMatch(forbidden);
+  }
+});
+
+test("settings/shared/tokens.css matches getSimpleCssThemeVarsCss() without drift", () => {
+  const tokensPath = resolve(
+    import.meta.dir,
+    "../../../settings/shared/tokens.css"
+  );
+  const diskCss = readFileSync(tokensPath, "utf8");
+  expect(diskCss).toBe(`${getSimpleCssThemeVarsCss()}\n`);
 });

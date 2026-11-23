@@ -1,20 +1,68 @@
 import { expect, test } from "bun:test";
-import { readThemeMode, resolveThemeTokens } from "../src/theme-mode";
+import { US_PALETTE_OKLCH } from "../src/color";
+import {
+  readThemeMode,
+  resolveThemeTokens,
+  SIMPLE_CSS_DARK_TOKENS,
+  SIMPLE_CSS_LIGHT_TOKENS,
+} from "../src/theme-mode";
 
-test("dark/light return concrete oklch token sets", () => {
+test("dark/light return concrete oklch token sets from US_PALETTE_OKLCH", () => {
   const dark = resolveThemeTokens("dark");
-  expect(dark).not.toBeNull();
-  if (!dark) {
-    throw new Error("expected dark tokens");
-  }
-  expect(dark.fg.startsWith("oklch(")).toBe(true);
-  expect(dark.accentBg.startsWith("oklch(")).toBe(true);
+  expect(dark).toEqual({
+    bg: US_PALETTE_OKLCH.inkDark,
+    surface: US_PALETTE_OKLCH.surfaceDark,
+    surface2: US_PALETTE_OKLCH.slate,
+    surface3: US_PALETTE_OKLCH.surfaceDark3,
+    fg: US_PALETTE_OKLCH.surfaceLight,
+    muted: US_PALETTE_OKLCH.mutedDark,
+    accentBg: US_PALETTE_OKLCH.accent,
+    accentFg: US_PALETTE_OKLCH.inkDark,
+  });
+
   const light = resolveThemeTokens("light");
-  expect(light).not.toBeNull();
-  if (!light) {
-    throw new Error("expected light tokens");
-  }
-  expect(light.bg.startsWith("oklch(")).toBe(true);
+  expect(light).toEqual({
+    bg: US_PALETTE_OKLCH.canvasLight,
+    surface: US_PALETTE_OKLCH.surfaceLight,
+    surface2: US_PALETTE_OKLCH.borderLight,
+    surface3: US_PALETTE_OKLCH.surfaceLight3,
+    fg: US_PALETTE_OKLCH.slate,
+    muted: US_PALETTE_OKLCH.secondary,
+    accentBg: US_PALETTE_OKLCH.accent,
+    accentFg: US_PALETTE_OKLCH.inkDark,
+  });
+});
+
+test("SIMPLE_CSS_LIGHT_TOKENS and SIMPLE_CSS_DARK_TOKENS match spec mapping", () => {
+  expect(SIMPLE_CSS_LIGHT_TOKENS).toEqual({
+    accent: US_PALETTE_OKLCH.accent,
+    accentBg: US_PALETTE_OKLCH.surfaceLight,
+    accentHover: US_PALETTE_OKLCH.accentDeep,
+    accentText: US_PALETTE_OKLCH.inkDark,
+    bg: US_PALETTE_OKLCH.canvasLight,
+    border: US_PALETTE_OKLCH.secondary,
+    code: US_PALETTE_OKLCH.accentDeep,
+    disabled: US_PALETTE_OKLCH.borderLight,
+    marked: US_PALETTE_OKLCH.accent,
+    preformatted: US_PALETTE_OKLCH.slate,
+    text: US_PALETTE_OKLCH.slate,
+    textLight: US_PALETTE_OKLCH.secondary,
+  });
+
+  expect(SIMPLE_CSS_DARK_TOKENS).toEqual({
+    accent: US_PALETTE_OKLCH.accent,
+    accentBg: US_PALETTE_OKLCH.slate,
+    accentHover: US_PALETTE_OKLCH.accentSoft,
+    accentText: US_PALETTE_OKLCH.inkDark,
+    bg: US_PALETTE_OKLCH.inkDark,
+    border: US_PALETTE_OKLCH.secondary,
+    code: US_PALETTE_OKLCH.accent,
+    disabled: US_PALETTE_OKLCH.surfaceDark,
+    marked: US_PALETTE_OKLCH.accent,
+    preformatted: US_PALETTE_OKLCH.surfaceLight,
+    text: US_PALETTE_OKLCH.surfaceLight,
+    textLight: US_PALETTE_OKLCH.mutedDark,
+  });
 });
 
 test("system returns null so prefers-color-scheme CSS owns tokens", () => {

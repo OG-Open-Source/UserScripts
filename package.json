@@ -11,7 +11,8 @@
   "scripts": {
     "check": "ultracite check",
     "fix": "ultracite fix",
-    "new": "bun run tools/new-script.mjs"
+    "new": "bun run tools/new-script.mjs",
+    "sync:tokens": "bun run tools/sync-settings-tokens.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
