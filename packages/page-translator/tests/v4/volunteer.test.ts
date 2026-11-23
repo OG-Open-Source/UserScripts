@@ -3,84 +3,94 @@ import { Window } from "happy-dom";
 import { mergeLocaleTables } from "../../src/dict/store";
 import type { SiteLocaleTable } from "../../src/dict/template";
 import { DEFAULT_CONFIG } from "../../src/platform/config";
+import { createPtrMetrics } from "../../src/platform/metrics";
+import { resolveAdapter } from "../../src/structure/registry";
+import { parseSiteDelta } from "../../src/structure/site-rules";
 import { parseAiTranslationImport } from "../../src/ui/export-ai";
-import { createVolunteerController } from "../../src/ui/studio/volunteer";
 import {
+  buildConflictResolutionPatch,
+  buildDraftPatch,
   buildVolunteerExportJson,
   diffImportConflicts,
+  resolveInitialEntryValue,
   scanVolunteerEntries,
+  suggestEntryScope,
 } from "../../src/ui/studio/volunteer/logic";
+import { createStudioWorkspaceController } from "../../src/ui/studio/workspace";
 
 function getShadowRoot(win: Window): ShadowRoot {
-  const host = win.document.querySelector("#ptr-volunteer-workbench");
+  const host = win.document.querySelector("#ptr-studio-shell");
   if (!host?.shadowRoot) {
-    throw new Error("Expected #ptr-volunteer-workbench shadowRoot");
+    throw new Error("Expected #ptr-studio-shell shadowRoot");
   }
   return host.shadowRoot;
 }
 
-function getStyle(el: Element) {
-  return {
-    display:
-      el.tagName === "DIV" ||
-      el.tagName === "BODY" ||
-      el.tagName === "SECTION" ||
-      el.tagName === "NAV" ||
-      el.tagName === "H2" ||
-      el.tagName === "A"
-        ? "block"
-        : "inline",
-    visibility: "visible",
-  };
+function mountStudioDictTab(
+  win: Window,
+  opts: {
+    getDelta?: () => ReturnType<typeof parseSiteDelta>;
+    getLocalLocaleTable?: () => SiteLocaleTable | null;
+    getSiteLocaleTable?: () => SiteLocaleTable | null;
+    getTargetLang?: () => string;
+    onSiteDictUpdated?: () => void;
+    onSyncLocalTable?: (patch: SiteLocaleTable) => void;
+  } = {}
+) {
+  const doc = win.document as unknown as Document;
+  const metrics = createPtrMetrics();
+  const cfg = { ...DEFAULT_CONFIG, uiTier: "studio" as const };
+  const studio = createStudioWorkspaceController({
+    doc,
+    getAdapter: () => resolveAdapter({ doc, host: "github.com" }),
+    getConfig: () => cfg,
+    getDelta: opts.getDelta ?? (() => parseSiteDelta("")),
+    getHostRawDelta: () => "",
+    getLocalLocaleTable: opts.getLocalLocaleTable ?? (() => null),
+    getMetrics: () => metrics,
+    getSiteLocaleTable: opts.getSiteLocaleTable ?? (() => null),
+    getTargetLang: opts.getTargetLang ?? (() => "zh-Hant-TW"),
+    hostname: "github.com",
+    isTranslated: () => false,
+    onExitStudio: () => undefined,
+    onOpenSettings: () => undefined,
+    onSaveHostDelta: () => undefined,
+    onSiteDictUpdated: opts.onSiteDictUpdated,
+    onSyncLocalTable: opts.onSyncLocalTable ?? (() => undefined),
+    onToggleTranslate: () => undefined,
+  });
+  studio.syncFromConfig();
+  const sr = getShadowRoot(win);
+  (
+    sr.querySelector('[data-studio-right-tab="dict"]') as HTMLButtonElement
+  ).click();
+  return { studio, sr };
 }
 
-test("volunteer panel escapes targetLang safely without HTML injection and has no close button", () => {
-  const win = new Window();
+test("Studio Dict panel escapes targetLang safely without HTML injection", () => {
+  const win = new Window({ url: "https://github.com/" });
   win.document.body.innerHTML =
     '<div>Type <span class="key">/</span> to search</div>';
 
-  const vol = createVolunteerController({
-    doc: win.document as unknown as Document,
-    hostname: "github.com",
-    getConfig: () => ({
-      ...DEFAULT_CONFIG,
-      uiTier: "studio",
-      defaultVolunteer: true,
-    }),
+  const { studio, sr } = mountStudioDictTab(win, {
     getTargetLang: () => 'zh-TW"><img src=x onerror=alert(1)>',
-    getDelta: () => ({ addSelectors: [], removeSelectors: [], modRules: [] }),
-    getSiteLocaleTable: () => null,
-    storage: null,
-    getStyle,
   });
 
-  vol.syncFromConfig();
-  const sr = getShadowRoot(win);
   expect(sr.querySelector("img")).toBeNull();
-  expect(sr.querySelector("#ptr-v-close")).toBeNull();
-  vol.stop();
+  studio.stop();
 });
 
-test("volunteer mode supports scoped CSS selector suggestion, single-item Save & Preview, and scoped-only JSON export", () => {
-  const win = new Window();
+test("Studio Dict tab supports scoped CSS selector suggestion, single-item Save & Preview, and scoped-only JSON export", () => {
+  const win = new Window({ url: "https://github.com/" });
   win.document.body.innerHTML = `<section aria-label="Insights Nav"><div id="i1">Pulse</div></section>`;
 
   let localTable: SiteLocaleTable | null = null;
   const syncedPatches: SiteLocaleTable[] = [];
   let dictUpdatedCalls = 0;
 
-  const vol = createVolunteerController({
-    doc: win.document as unknown as Document,
-    hostname: "github.com",
-    getConfig: () => ({
-      ...DEFAULT_CONFIG,
-      uiTier: "studio",
-      defaultVolunteer: true,
-    }),
-    getTargetLang: () => "zh-Hant-TW",
-    getDelta: () => ({ addSelectors: [], removeSelectors: [], modRules: [] }),
-    getSiteLocaleTable: () => localTable,
+  const { studio, sr } = mountStudioDictTab(win, {
     getLocalLocaleTable: () => localTable,
+    getSiteLocaleTable: () => localTable,
     onSyncLocalTable: (patch) => {
       syncedPatches.push(patch);
       localTable = mergeLocaleTables(localTable, patch);
@@ -88,25 +98,24 @@ test("volunteer mode supports scoped CSS selector suggestion, single-item Save &
     onSiteDictUpdated: () => {
       dictUpdatedCalls += 1;
     },
-    storage: null,
-    getStyle,
   });
 
-  vol.syncFromConfig();
-  const sr = getShadowRoot(win);
-  const suggestBtn = Array.from(sr.querySelectorAll("button")).find(
-    (b) => b.textContent === "Suggest"
+  const suggestBtn = sr.querySelector(
+    '[data-studio-dict="suggest"]'
   ) as HTMLButtonElement;
   suggestBtn.click();
 
-  const inputs = Array.from(sr.querySelectorAll("input"));
-  const scopeInput = inputs[0] as HTMLInputElement;
-  const valInput = inputs[1] as HTMLInputElement;
+  const scopeInput = sr.querySelector(
+    '[data-studio-dict="scope"]'
+  ) as HTMLInputElement;
+  const valInput = sr.querySelector(
+    '[data-studio-dict="trans"]'
+  ) as HTMLInputElement;
   expect(scopeInput.value).toBe('section[aria-label="Insights Nav"]');
 
   valInput.value = "脈動";
-  const saveBtn = Array.from(sr.querySelectorAll("button")).find(
-    (b) => b.textContent === "Save & Preview"
+  const saveBtn = sr.querySelector(
+    '[data-studio-dict="save"]'
   ) as HTMLButtonElement;
   saveBtn.click();
 
@@ -129,27 +138,19 @@ test("volunteer mode supports scoped CSS selector suggestion, single-item Save &
     exported.locales["zh-Hant-TW"].scoped['section[aria-label="Insights Nav"]']
       .static
   ).toEqual({ Pulse: "脈動" });
-  vol.stop();
+  studio.stop();
 });
 
-test("volunteer mode pre-fills dynamic/<x> input and exports ONLY translated drafts", () => {
-  const win = new Window();
+test("Studio Dict tab pre-fills dynamic/{v0} input and exports ONLY translated drafts", () => {
+  const win = new Window({ url: "https://github.com/" });
   win.document.body.innerHTML = `
-    <div id="a">Type <span class="tok">/</span> to search</div>
+    <div id="a">Type <span class="tok" style="display:inline">/</span> to search</div>
     <div id="b">Untranslated static line</div>
   `;
 
   let localTable: SiteLocaleTable | null = null;
-  const vol = createVolunteerController({
-    doc: win.document as unknown as Document,
-    hostname: "github.com",
-    getConfig: () => ({
-      ...DEFAULT_CONFIG,
-      uiTier: "studio",
-      defaultVolunteer: true,
-    }),
-    getTargetLang: () => "zh-Hant-TW",
-    getDelta: () => parseDelta("* .tok : inline-atomic"),
+  const { studio, sr } = mountStudioDictTab(win, {
+    getDelta: () => parseSiteDelta("* .tok : inline-atomic"),
     getSiteLocaleTable: () => ({
       static: { "Old Stale Key": "舊資料" },
       dynamic: {},
@@ -158,14 +159,11 @@ test("volunteer mode pre-fills dynamic/<x> input and exports ONLY translated dra
     onSyncLocalTable: (patch) => {
       localTable = mergeLocaleTables(localTable, patch);
     },
-    storage: null,
-    getStyle,
   });
 
-  vol.syncFromConfig();
-  const sr = getShadowRoot(win);
-  const inputs = Array.from(sr.querySelectorAll("input"));
-  const valInput = inputs[1] as HTMLInputElement;
+  const valInput = sr.querySelector(
+    '[data-studio-dict="trans"]'
+  ) as HTMLInputElement;
   expect(valInput.value).toBe("Type {v0} to search");
 
   // Before saving, local export has no stale remote keys
@@ -175,8 +173,8 @@ test("volunteer mode pre-fills dynamic/<x> input and exports ONLY translated dra
   expect(emptyExport.locales["zh-Hant-TW"]).toEqual({});
 
   valInput.value = "按 {v0} 搜尋";
-  const saveBtn = Array.from(sr.querySelectorAll("button")).find(
-    (b) => b.textContent === "Save & Preview"
+  const saveBtn = sr.querySelector(
+    '[data-studio-dict="save"]'
   ) as HTMLButtonElement;
   saveBtn.click();
 
@@ -187,83 +185,51 @@ test("volunteer mode pre-fills dynamic/<x> input and exports ONLY translated dra
     "Type {v0} to search": "按 {v0} 搜尋",
   });
   expect(savedExport.locales["zh-Hant-TW"].static).toBeUndefined();
-  vol.stop();
+  studio.stop();
 });
 
-function parseDelta(src: string) {
-  const { parseSiteDelta } =
-    require("../../src/structure/site-rules") as typeof import("../../src/structure/site-rules");
-  return parseSiteDelta(src);
-}
-
-test("volunteer click-lock blocks page links while allowing sibling [data-us-ui] controls and resets on toggle off", () => {
+test("volunteer/logic helpers compute scope, initial values, draft patches, and conflict resolution", () => {
   const win = new Window();
-  win.document.body.innerHTML = `
-    <div id="h1dl-btn" data-us-ui="h1dl" translate="no"><button id="dl-now" type="button">Download</button></div>
-    <nav aria-label="Repo"><a id="nav-link" href="/owner/repo/insights">Insights</a></nav>
-  `;
+  win.document.body.innerHTML = `<section aria-label="Repo"><div id="a">Pulse</div><div id="b">Count 5</div></section>`;
+  const scan = scanVolunteerEntries(
+    win.document as unknown as Document,
+    parseSiteDelta(""),
+    null
+  );
+  expect(scan.entries).toHaveLength(2);
+  const [first, second] = scan.entries;
+  if (!(first && second)) {
+    throw new Error("Expected 2 entries");
+  }
 
-  let clickBlocked = false;
-  const vol = createVolunteerController({
-    doc: win.document as unknown as Document,
-    hostname: "github.com",
-    getConfig: () => ({
-      ...DEFAULT_CONFIG,
-      uiTier: "studio",
-      defaultVolunteer: true,
-    }),
-    getTargetLang: () => "zh-Hant-TW",
-    getDelta: () => ({ addSelectors: [], removeSelectors: [], modRules: [] }),
-    getSiteLocaleTable: () => null,
-    isClickBlocked: () => clickBlocked,
-    setClickBlocked: (next) => {
-      clickBlocked = next;
+  expect(suggestEntryScope(first)).toBe('section[aria-label="Repo"]');
+  expect(resolveInitialEntryValue(first, "", null, null)).toBe("");
+  expect(resolveInitialEntryValue(second, "", null, null)).toBe("Count {v0}");
+
+  const patch = buildDraftPatch(first, "脈動", 'section[aria-label="Repo"]');
+  expect(patch).toEqual({
+    scoped: {
+      'section[aria-label="Repo"]': { static: { Pulse: "脈動" } },
     },
-    storage: null,
-    getStyle,
   });
 
-  vol.syncFromConfig();
-  const sr = getShadowRoot(win);
-  const lockBtn = Array.from(sr.querySelectorAll("button")).find(
-    (b) => b.textContent === "Lock: OFF"
-  ) as HTMLButtonElement;
-  expect(lockBtn.getAttribute("aria-pressed")).toBe("false");
-
-  lockBtn.click();
-  expect(clickBlocked).toBe(true);
-  expect(lockBtn.getAttribute("aria-pressed")).toBe("true");
-
-  const link = win.document.querySelector("#nav-link") as HTMLAnchorElement;
-  const evLocked = new win.MouseEvent("click", {
-    bubbles: true,
-    cancelable: true,
+  const resolved = buildConflictResolutionPatch({
+    id: "c1",
+    scope: 'section[aria-label="Repo"]',
+    bucket: "static",
+    key: "Pulse",
+    existing: "舊",
+    imported: "新",
   });
-  link.dispatchEvent(evLocked);
-  expect(evLocked.defaultPrevented).toBe(true);
-
-  const dlBtn = win.document.querySelector("#dl-now") as HTMLButtonElement;
-  const evSibling = new win.MouseEvent("click", {
-    bubbles: true,
-    cancelable: true,
+  expect(resolved).toEqual({
+    scoped: {
+      'section[aria-label="Repo"]': { static: { Pulse: "新" } },
+    },
   });
-  dlBtn.dispatchEvent(evSibling);
-  expect(evSibling.defaultPrevented).toBe(false);
-
-  // Turning OFF Volunteer mode resets click lock and restores normal clicks
-  vol.toggle();
-  expect(clickBlocked).toBe(false);
-  const evAfter = new win.MouseEvent("click", {
-    bubbles: true,
-    cancelable: true,
-  });
-  link.dispatchEvent(evAfter);
-  expect(evAfter.defaultPrevented).toBe(false);
-  vol.stop();
 });
 
-test("importAiJson separates conflicts from new entries and resolves them via inline conflict UI", () => {
-  const win = new Window();
+test("importAiJson separates conflicts from new entries and resolves them via Studio Dict conflict UI", () => {
+  const win = new Window({ url: "https://github.com/" });
   win.document.body.innerHTML = `
     <nav aria-label="Repo"><div id="a">Insights</div></nav>
     <div id="b">Settings</div>
@@ -282,16 +248,7 @@ test("importAiJson separates conflicts from new entries and resolves them via in
   const syncedPatches: SiteLocaleTable[] = [];
   let dictUpdatedCalls = 0;
 
-  const vol = createVolunteerController({
-    doc: win.document as unknown as Document,
-    hostname: "github.com",
-    getConfig: () => ({
-      ...DEFAULT_CONFIG,
-      uiTier: "studio",
-      defaultVolunteer: true,
-    }),
-    getTargetLang: () => "zh-Hant-TW",
-    getDelta: () => ({ addSelectors: [], removeSelectors: [], modRules: [] }),
+  const { studio, sr } = mountStudioDictTab(win, {
     getSiteLocaleTable: () => siteTable,
     getLocalLocaleTable: () => localTable,
     onSyncLocalTable: (patch) => {
@@ -302,18 +259,16 @@ test("importAiJson separates conflicts from new entries and resolves them via in
     onSiteDictUpdated: () => {
       dictUpdatedCalls += 1;
     },
-    storage: null,
-    getStyle,
   });
 
-  vol.syncFromConfig();
-  const sr = getShadowRoot(win);
-  const importToggle = Array.from(sr.querySelectorAll("button")).find(
-    (b) => b.textContent === "Import AI"
+  const importToggle = sr.querySelector(
+    '[data-studio-dict="import-ai"]'
   ) as HTMLButtonElement;
   importToggle.click();
 
-  const textarea = sr.querySelector("textarea") as HTMLTextAreaElement;
+  const textarea = sr.querySelector(
+    '[data-studio-dict="import-text"]'
+  ) as HTMLTextAreaElement;
   const payload = JSON.stringify({
     version: 1,
     host: "github.com",
@@ -340,37 +295,39 @@ test("importAiJson separates conflicts from new entries and resolves them via in
   });
 
   textarea.value = payload;
-  const applyBtn = Array.from(sr.querySelectorAll("button")).find(
-    (b) => b.textContent === "Apply Import"
+  const applyBtn = sr.querySelector(
+    '[data-studio-dict="import-apply"]'
   ) as HTMLButtonElement;
   applyBtn.click();
 
-  const conflictBox = sr.querySelector(".ptr-vol-conflicts") as HTMLElement;
-  expect(conflictBox.hidden).toBe(false);
+  const conflictBox = sr.querySelector(
+    '[data-studio-dict="conflicts"]'
+  ) as HTMLElement;
+  expect(conflictBox.classList.contains("ptr-studio-hidden")).toBe(false);
   expect(conflictBox.textContent).toContain("設定（舊）");
   expect(conflictBox.textContent).toContain("設定（新）");
 
   const firstOverwrite = conflictBox.querySelector(
-    '[data-conflict-action="imported"]'
+    "[data-studio-conflict-overwrite]"
   ) as HTMLButtonElement;
   firstOverwrite.click();
   expect(
-    conflictBox.querySelectorAll('[data-conflict-action="imported"]').length
+    conflictBox.querySelectorAll("[data-studio-conflict-overwrite]").length
   ).toBe(2);
 
   const firstKeep = conflictBox.querySelector(
-    '[data-conflict-action="existing"]'
+    "[data-studio-conflict-keep]"
   ) as HTMLButtonElement;
   firstKeep.click();
   expect(
-    conflictBox.querySelectorAll('[data-conflict-action="imported"]').length
+    conflictBox.querySelectorAll("[data-studio-conflict-overwrite]").length
   ).toBe(1);
 
   const overwriteAll = conflictBox.querySelector(
-    '[data-conflict-bulk="overwrite"]'
+    "[data-studio-conflict-overwrite-all]"
   ) as HTMLButtonElement;
   overwriteAll.click();
-  expect(conflictBox.hidden).toBe(true);
+  expect(conflictBox.classList.contains("ptr-studio-hidden")).toBe(true);
   expect(dictUpdatedCalls).toBeGreaterThanOrEqual(3);
 
   // Second import + Keep All
@@ -378,53 +335,39 @@ test("importAiJson separates conflicts from new entries and resolves them via in
     translations: { Pulls: "提取請求（第三次）" },
   });
   applyBtn.click();
-  expect(conflictBox.hidden).toBe(false);
+  expect(conflictBox.classList.contains("ptr-studio-hidden")).toBe(false);
   const keepAll = conflictBox.querySelector(
-    '[data-conflict-bulk="keep"]'
+    "[data-studio-conflict-keep-all]"
   ) as HTMLButtonElement;
   keepAll.click();
-  expect(conflictBox.hidden).toBe(true);
-  vol.stop();
+  expect(conflictBox.classList.contains("ptr-studio-hidden")).toBe(true);
+  studio.stop();
 });
 
 test("onSaveDraft displays volSavedScoped message when scope is non-empty", () => {
-  const win = new Window();
+  const win = new Window({ url: "https://github.com/" });
   win.document.body.innerHTML = `<section aria-label="Insights Nav"><div id="i1">Pulse</div></section>`;
 
-  const vol = createVolunteerController({
-    doc: win.document as unknown as Document,
-    hostname: "github.com",
-    getConfig: () => ({
-      ...DEFAULT_CONFIG,
-      uiTier: "studio",
-      defaultVolunteer: true,
-    }),
-    getTargetLang: () => "zh-Hant-TW",
-    getDelta: () => ({ addSelectors: [], removeSelectors: [], modRules: [] }),
-    getSiteLocaleTable: () => null,
-    storage: null,
-    getStyle,
-  });
-
-  vol.syncFromConfig();
-  const sr = getShadowRoot(win);
-  const inputs = Array.from(sr.querySelectorAll("input"));
-  const scopeInput = inputs[0] as HTMLInputElement;
-  const valInput = inputs[1] as HTMLInputElement;
+  const { studio, sr } = mountStudioDictTab(win);
+  const scopeInput = sr.querySelector(
+    '[data-studio-dict="scope"]'
+  ) as HTMLInputElement;
+  const valInput = sr.querySelector(
+    '[data-studio-dict="trans"]'
+  ) as HTMLInputElement;
   scopeInput.value = 'section[aria-label="Insights Nav"]';
   valInput.value = "脈動";
 
-  const saveBtn = Array.from(sr.querySelectorAll("button")).find(
-    (b) => b.textContent === "Save & Preview"
+  const saveBtn = sr.querySelector(
+    '[data-studio-dict="save"]'
   ) as HTMLButtonElement;
   saveBtn.click();
 
-  const msgs = Array.from(sr.querySelectorAll(".ptr-vol-msg"));
-  const msgEl = msgs.at(-1) as HTMLElement | undefined;
-  expect(msgEl?.textContent).toContain(
+  const statusEl = sr.querySelector("[data-studio-status]") as HTMLElement;
+  expect(statusEl.textContent).toContain(
     'Saved draft (scoped to section[aria-label="Insights Nav"]). Preview: 脈動'
   );
-  vol.stop();
+  studio.stop();
 });
 
 test("scanVolunteerEntries respects Discourse adapter captureScope and excludes header/footer chrome", () => {
@@ -449,7 +392,7 @@ test("scanVolunteerEntries respects Discourse adapter captureScope and excludes 
 
   const scan = scanVolunteerEntries(
     win.document as unknown as Document,
-    parseDelta(""),
+    parseSiteDelta(""),
     null,
     discourseStyle
   );

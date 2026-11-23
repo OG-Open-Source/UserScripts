@@ -4,10 +4,14 @@ import { collectSegments } from "../../src/capture/segmenter";
 import { DEFAULT_CONFIG } from "../../src/platform/config";
 import { createPtrMetrics } from "../../src/platform/metrics";
 import { renderInspectMarker, restoreAll } from "../../src/render/renderer";
+import { resolveAdapter } from "../../src/structure/registry";
 import { parseSiteDelta } from "../../src/structure/site-rules";
 import { buildAiTranslationExport } from "../../src/ui/export-ai";
-import { createInspectController } from "../../src/ui/studio/inspect";
-import { scanInspectSegments } from "../../src/ui/studio/inspect/logic";
+import {
+  buildInspectDiagnostics,
+  scanInspectSegments,
+} from "../../src/ui/studio/inspect/logic";
+import { createStudioWorkspaceController } from "../../src/ui/studio/workspace";
 
 function getStyle(el: Element) {
   return {
@@ -94,59 +98,79 @@ test("classifies inspect markers into auto-static, auto-dynamic, +, and manual k
   expect(win.document.querySelectorAll("[data-tr-inspect]").length).toBe(0);
 });
 
-test("Inspect HUD displays telemetry, toggles compact/detailed views, and cleans up on stop", () => {
-  const win = new Window();
+test("Studio Workspace and buildInspectDiagnostics report telemetry, toggle bottom dock, and clean up on stop", () => {
+  const win = new Window({ url: "https://example.com/" });
   win.document.body.innerHTML = `<nav aria-label="Repository"><div id="m1">Insights</div></nav><div id="d1">Updated 5 hours ago</div>`;
+  const doc = win.document as unknown as Document;
   const metrics = createPtrMetrics();
-  const controller = createInspectController({
-    doc: win.document as unknown as Document,
-    getConfig: () => ({
-      ...DEFAULT_CONFIG,
-      uiTier: "studio",
-      defaultInspect: true,
-      targetLang: "zh-TW",
-      spacingMode: "both",
-    }),
-    getDelta: () => ({ addSelectors: [], removeSelectors: [], modRules: [] }),
-    getMetrics: () => metrics,
-    getSiteLocaleTable: () => ({
-      scoped: {
-        "nav[aria-label='Repository']": { static: { Insights: "洞察分析" } },
-      },
-    }),
-    storage: null,
+  const delta = parseSiteDelta("");
+  const cfg = {
+    ...DEFAULT_CONFIG,
+    uiTier: "studio" as const,
+    targetLang: "zh-TW",
+    spacingMode: "both" as const,
+  };
+  const siteTable = {
+    scoped: {
+      "nav[aria-label='Repository']": { static: { Insights: "洞察分析" } },
+    },
+  };
+  const scan = scanInspectSegments(doc, delta, cfg, metrics, {
     getStyle,
+    siteTable,
+  });
+  const diag = JSON.parse(
+    buildInspectDiagnostics("fallback", scan, "https://example.com/")
+  ) as {
+    adapterId: string;
+    counts: { manual: number; dynamic: number };
+  };
+  expect(diag.adapterId).toBe("fallback");
+  expect(diag.counts.manual).toBe(1);
+  expect(diag.counts.dynamic).toBe(1);
+
+  const studio = createStudioWorkspaceController({
+    doc,
+    getAdapter: () => resolveAdapter({ doc, host: "example.com" }),
+    getConfig: () => cfg,
+    getDelta: () => delta,
+    getHostRawDelta: () => "",
+    getLocalLocaleTable: () => null,
+    getMetrics: () => metrics,
+    getSiteLocaleTable: () => siteTable,
+    getTargetLang: () => cfg.targetLang,
+    hostname: "example.com",
+    isTranslated: () => false,
+    onExitStudio: () => undefined,
+    onOpenSettings: () => undefined,
+    onSaveHostDelta: () => undefined,
+    onSyncLocalTable: () => undefined,
+    onToggleTranslate: () => undefined,
   });
 
-  controller.syncFromConfig();
-  const hudEl = win.document.querySelector("#ptr-inspect-hud");
-  if (!hudEl?.shadowRoot) {
-    throw new Error("expected #ptr-inspect-hud shadowRoot");
+  studio.syncFromConfig();
+  const shellHost = win.document.querySelector("#ptr-studio-shell");
+  if (!shellHost?.shadowRoot) {
+    throw new Error("expected #ptr-studio-shell shadowRoot");
   }
-  const sr = hudEl.shadowRoot;
-  expect(hudEl.getAttribute("data-us-ui")).toBe("ptr");
-  expect(sr.querySelector("#ptr-h-adapter")?.textContent).toContain("fallback");
-  expect(sr.querySelector("#ptr-h-manual")?.textContent).toBe("1");
-  expect(sr.querySelector("#ptr-h-dynamic")?.textContent).toBe("1");
+  const sr = shellHost.shadowRoot;
+  expect(shellHost.getAttribute("data-us-ui")).toBe("ptr");
+  expect(sr.querySelector("[data-studio-adapter]")?.textContent).toContain(
+    "fallback"
+  );
 
-  const detailsBox = sr.querySelector(".ptr-hud-details") as HTMLElement;
-  const detailsBtn = Array.from(sr.querySelectorAll("button")).find(
-    (b) => b.textContent === "Details"
+  const shellEl = sr.querySelector(".ptr-studio-shell") as HTMLElement;
+  const collapseBtn = sr.querySelector(
+    '[data-studio-action="collapse-bottom"]'
   ) as HTMLButtonElement;
-  expect(detailsBox.hidden).toBe(true);
-  expect(detailsBtn.getAttribute("aria-pressed")).toBe("false");
+  expect(shellEl.getAttribute("data-bottom-collapsed")).toBe("0");
+  collapseBtn.click();
+  expect(shellEl.getAttribute("data-bottom-collapsed")).toBe("1");
+  collapseBtn.click();
+  expect(shellEl.getAttribute("data-bottom-collapsed")).toBe("0");
 
-  detailsBtn.click();
-  expect(detailsBox.hidden).toBe(false);
-  expect(detailsBtn.getAttribute("aria-pressed")).toBe("true");
-  expect(detailsBox.textContent).toContain("Segments");
-
-  detailsBtn.click();
-  expect(detailsBox.hidden).toBe(true);
-  expect(detailsBtn.getAttribute("aria-pressed")).toBe("false");
-
-  controller.stop();
-  expect(win.document.querySelector("#ptr-inspect-hud")).toBeNull();
+  studio.stop();
+  expect(win.document.querySelector("#ptr-studio-shell")).toBeNull();
 });
 
 test("scanInspectSegments and buildAiTranslationExport respect Discourse adapter captureScope and exclude header/footer chrome", () => {

@@ -25,6 +25,7 @@ import { parseBcp47, routePrimary } from "./router";
 import type { GroupedTranslateItem, TranslationProvider } from "./types";
 
 export interface BatchRunnerOptions {
+  beforeApiDispatch?: () => Promise<void>;
   coalesceMs?: number;
   delta: CompiledSiteDelta;
   doc: Document;
@@ -306,6 +307,14 @@ export function createBatchRunner(options: BatchRunnerOptions) {
     }
   }
 
+  async function awaitBeforeDispatch(gen: number): Promise<boolean> {
+    if (!options.beforeApiDispatch) {
+      return true;
+    }
+    await options.beforeApiDispatch();
+    return gen === generation;
+  }
+
   async function runFlushEntries(
     active: PendingFlushEntry[],
     lastActive: PendingFlushEntry,
@@ -331,6 +340,9 @@ export function createBatchRunner(options: BatchRunnerOptions) {
         : undefined;
 
     try {
+      if (options.beforeApiDispatch && !(await awaitBeforeDispatch(gen))) {
+        return;
+      }
       const apiStart = Date.now();
       const translatedByPayloadIdx = await translateUniquePayloads(
         provider,

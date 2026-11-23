@@ -8,27 +8,12 @@ import type { SiteLocaleTable } from "../../src/dict/template";
 import type { TranslatorConfig } from "../../src/platform/config";
 import { DEFAULT_CONFIG } from "../../src/platform/config";
 import { MESSAGES_EN } from "../../src/platform/i18n";
+import { createPtrMetrics } from "../../src/platform/metrics";
+import { resolveAdapter } from "../../src/structure/registry";
 import { parseSiteDelta } from "../../src/structure/site-rules";
 import { createBasicController } from "../../src/ui/basic";
-import { createInspectController } from "../../src/ui/studio/inspect";
-import { createVolunteerController } from "../../src/ui/studio/volunteer";
+import { createStudioWorkspaceController } from "../../src/ui/studio/workspace";
 import { getSharedPanelCss } from "../../src/ui/theme";
-
-class MemoryTabStorage {
-  private readonly values = new Map<string, string>();
-
-  getItem(key: string): string | null {
-    return this.values.get(key) ?? null;
-  }
-
-  setItem(key: string, value: string): void {
-    this.values.set(key, value);
-  }
-
-  removeItem(key: string): void {
-    this.values.delete(key);
-  }
-}
 
 function setup(url = "https://github.com/og-open-source/UserScripts") {
   const win = new Window({ url });
@@ -48,21 +33,25 @@ function config(patch: Partial<TranslatorConfig> = {}): TranslatorConfig {
   return { ...DEFAULT_CONFIG, ...patch };
 }
 
-function commonStudioOptions(
-  doc: Document,
-  getStyle: (el: Element) => {
-    display: string;
-    fontFamily: string;
-    visibility: string;
-  },
-  getConfig: () => TranslatorConfig
-) {
+function commonStudioOptions(doc: Document, getConfig: () => TranslatorConfig) {
+  const metrics = createPtrMetrics();
   return {
     doc,
+    getAdapter: () => resolveAdapter({ doc, host: "github.com" }),
     getConfig,
     getDelta: () => parseSiteDelta(""),
-    getStyle,
-    storage: new MemoryTabStorage(),
+    getHostRawDelta: () => "",
+    getLocalLocaleTable: () => null,
+    getMetrics: () => metrics,
+    getSiteLocaleTable: () => null,
+    getTargetLang: () => getConfig().targetLang,
+    hostname: "github.com",
+    isTranslated: () => false,
+    onExitStudio: () => undefined,
+    onOpenSettings: () => undefined,
+    onSaveHostDelta: () => undefined,
+    onSyncLocalTable: () => undefined,
+    onToggleTranslate: () => undefined,
   };
 }
 
@@ -121,63 +110,51 @@ test("Basic renders only minimalist pill controls and hides when Studio mounts",
   controller.stop();
 });
 
-test("Studio controllers gate Inspect and Volunteer on tier and tab activation", () => {
-  const { doc, getStyle } = setup();
-  let cfg = config({ defaultInspect: true, defaultVolunteer: true });
-  const storage = new MemoryTabStorage();
-  const inspect = createInspectController({
-    ...commonStudioOptions(doc, getStyle, () => cfg),
-    storage,
-  });
-  const volunteer = createVolunteerController({
-    ...commonStudioOptions(doc, getStyle, () => cfg),
-    storage,
-    hostname: "github.com",
-    getSiteLocaleTable: () => null,
-    getTargetLang: () => cfg.targetLang,
-  });
+test("Studio Workspace controller mounts #ptr-studio-shell only when uiTier is studio", () => {
+  const { doc } = setup();
+  let cfg = config();
+  const studio = createStudioWorkspaceController(
+    commonStudioOptions(doc, () => cfg)
+  );
 
-  inspect.syncFromConfig();
-  volunteer.syncFromConfig();
-  expect(doc.querySelector("#ptr-inspect-hud")).toBeNull();
-  expect(doc.querySelector("#ptr-volunteer-workbench")).toBeNull();
+  studio.syncFromConfig();
+  expect(doc.querySelector("#ptr-studio-shell")).toBeNull();
+  expect(studio.isActive()).toBe(false);
 
   cfg = { ...cfg, uiTier: "studio" };
-  inspect.syncFromConfig();
-  volunteer.syncFromConfig();
-  expect(doc.querySelector("#ptr-inspect-hud")).not.toBeNull();
-  expect(doc.querySelector("#ptr-volunteer-workbench")).not.toBeNull();
+  studio.syncFromConfig();
+  expect(doc.querySelector("#ptr-studio-shell")).not.toBeNull();
+  expect(studio.isActive()).toBe(true);
 
-  inspect.toggle();
-  volunteer.toggle();
-  expect(doc.querySelector("#ptr-inspect-hud")).toBeNull();
-  expect(doc.querySelector("#ptr-volunteer-workbench")).toBeNull();
-  inspect.stop();
-  volunteer.stop();
+  cfg = { ...cfg, uiTier: "basic" };
+  studio.syncFromConfig();
+  expect(doc.querySelector("#ptr-studio-shell")).toBeNull();
+  expect(studio.isActive()).toBe(false);
+  studio.stop();
 });
 
-test("Inspect HUD displays the detected adapter and diagnostics include adapterId", () => {
-  const { doc, getStyle } = setup();
-  const cfg = config({ uiTier: "studio", defaultInspect: true });
-  const inspect = createInspectController(
-    commonStudioOptions(doc, getStyle, () => cfg)
+test("Studio Workspace displays the detected adapter and diagnostics include adapterId", () => {
+  const { doc } = setup();
+  const cfg = config({ uiTier: "studio" });
+  const studio = createStudioWorkspaceController(
+    commonStudioOptions(doc, () => cfg)
   );
-  inspect.syncFromConfig();
+  studio.syncFromConfig();
 
-  const host = doc.querySelector("#ptr-inspect-hud") as HTMLElement;
+  const host = doc.querySelector("#ptr-studio-shell") as HTMLElement;
   expect(host.getAttribute("data-us-ui")).toBe("ptr");
   expect(host.getAttribute("translate")).toBe("no");
   expect(
-    host.shadowRoot?.querySelector("#ptr-h-adapter")?.textContent
+    host.shadowRoot?.querySelector("[data-studio-adapter]")?.textContent
   ).toContain("github");
   expect(host.getAttribute("data-theme-mode")).toBe("system");
-  const diagnostics = JSON.parse(inspect.getDiagnostics()) as {
+  const diagnostics = JSON.parse(studio.getDiagnostics()) as {
     adapterId: string;
     detectedFramework: string;
   };
   expect(diagnostics.adapterId).toBe("github");
   expect(diagnostics.detectedFramework).toBe("github");
-  inspect.stop();
+  studio.stop();
 });
 
 const ONE_PIXEL_BORDER_RE = /\bborder(?:-[a-z]+)?:\s*1px\b/iu;
@@ -251,38 +228,40 @@ test("v4 UI modules never import legacy source", async () => {
   }
 });
 
-test("Volunteer workbench resets translation input on Next/Prev and restores saved entries", () => {
-  const { doc, getStyle } = setup();
+test("Studio Workspace Dict tab resets translation input on Next/Prev and restores saved entries", () => {
+  const { doc } = setup();
   doc.body.innerHTML =
     "<main><p>First static line.</p><p>Second item 42 items</p><p>Third static line.</p></main>";
-  const cfg = config({ uiTier: "studio", defaultVolunteer: true });
+  const cfg = config({ uiTier: "studio" });
   let localTable: SiteLocaleTable | null = null;
-  const volunteer = createVolunteerController({
-    ...commonStudioOptions(doc, getStyle, () => cfg),
-    hostname: "github.com",
+  const studio = createStudioWorkspaceController({
+    ...commonStudioOptions(doc, () => cfg),
     getLocalLocaleTable: () => localTable,
     getSiteLocaleTable: () => localTable,
-    getTargetLang: () => cfg.targetLang,
     onSyncLocalTable: (patch) => {
       localTable = mergeLocaleTables(localTable ?? undefined, patch) ?? null;
     },
   });
 
-  volunteer.syncFromConfig();
-  const host = doc.querySelector("#ptr-volunteer-workbench") as HTMLElement;
+  studio.syncFromConfig();
+  const host = doc.querySelector("#ptr-studio-shell") as HTMLElement;
   const shadow = host.shadowRoot as ShadowRoot;
-  const buttons = Array.from(shadow.querySelectorAll("button"));
-  const nextBtn = buttons.find(
-    (btn) => btn.textContent === MESSAGES_EN.volNext
+  const dictTabBtn = shadow.querySelector(
+    '[data-studio-right-tab="dict"]'
   ) as HTMLButtonElement;
-  const prevBtn = buttons.find(
-    (btn) => btn.textContent === MESSAGES_EN.volPrev
+  dictTabBtn.click();
+
+  const nextBtn = shadow.querySelector(
+    '[data-studio-dict="next"]'
   ) as HTMLButtonElement;
-  const saveBtn = buttons.find(
-    (btn) => btn.textContent === MESSAGES_EN.volSave
+  const prevBtn = shadow.querySelector(
+    '[data-studio-dict="prev"]'
+  ) as HTMLButtonElement;
+  const saveBtn = shadow.querySelector(
+    '[data-studio-dict="save"]'
   ) as HTMLButtonElement;
   const valInput = shadow.querySelector(
-    ".ptr-vol-editor > input.ptr-input"
+    '[data-studio-dict="trans"]'
   ) as HTMLInputElement;
 
   expect(valInput.value).toBe("");
@@ -304,7 +283,7 @@ test("Volunteer workbench resets translation input on Next/Prev and restores sav
   prevBtn.click();
   expect(valInput.value).toBe("第一行譯文");
 
-  volunteer.stop();
+  studio.stop();
 });
 
 test("settings pages load external Simple.css before tokens.css, omit createCustomSelect, and have no inline styles", () => {

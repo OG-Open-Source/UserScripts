@@ -11,12 +11,7 @@ export interface BasicControllerOptions {
   onOpenSettings?: () => void;
   onStudioMount?: () => void;
   onStudioUnmount?: () => void;
-  onToggleInspect?: () => void;
   onToggleTranslate?: () => void;
-  onToggleVolunteer?: () => void;
-  setCustomCss?: (css: string) => void;
-  setCustomFont?: (font: string) => void;
-  setTargetLang?: (lang: string) => void;
   setUiTier: (tier: UiTier) => void;
   t?: (key: PtrMessageKey) => string;
 }

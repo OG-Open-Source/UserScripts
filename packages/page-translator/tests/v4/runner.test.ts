@@ -385,3 +385,86 @@ test("zh-subsystem normalizes cross-element bracket and punctuation seams in ren
     "中文，and keep, next"
   );
 });
+
+test("beforeApiDispatch pauses API batch dispatch until resolved", async () => {
+  const win = new Window();
+  win.document.body.innerHTML = `<div id="p1">Hello breakpoint world</div>`;
+  const segs = collectSegments(
+    win.document.body as unknown as Element,
+    parseSiteDelta(""),
+    { getStyle }
+  );
+
+  let releaseGate: (() => void) | null = null;
+  let providerCalls = 0;
+  const gatePromise = new Promise<void>((resolve) => {
+    releaseGate = resolve;
+  });
+
+  const runner = createBatchRunner({
+    doc: win.document as unknown as Document,
+    delta: parseSiteDelta(""),
+    getConfig: () => DEFAULT_CONFIG,
+    getProvider: () => ({
+      id: "translate-pa",
+      translateBatch: (items: string[]) => {
+        providerCalls += 1;
+        return Promise.resolve(items.map((x) => `ZH:${x}`));
+      },
+    }),
+    beforeApiDispatch: () => gatePromise,
+  });
+
+  const pending = runner.translateBatch(segs);
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(providerCalls).toBe(0);
+
+  releaseGate?.();
+  await pending;
+  expect(providerCalls).toBe(1);
+  expect(win.document.querySelector("#p1 [data-tr-dst]")?.textContent).toBe(
+    "ZH:Hello breakpoint world"
+  );
+});
+
+test("cancelAll while paused at beforeApiDispatch prevents provider call after resolution", async () => {
+  const win = new Window();
+  win.document.body.innerHTML = `<div id="p1">Cancelled while paused</div>`;
+  const segs = collectSegments(
+    win.document.body as unknown as Element,
+    parseSiteDelta(""),
+    { getStyle }
+  );
+
+  let releaseGate: (() => void) | null = null;
+  let providerCalls = 0;
+  const gatePromise = new Promise<void>((resolve) => {
+    releaseGate = resolve;
+  });
+
+  const runner = createBatchRunner({
+    doc: win.document as unknown as Document,
+    delta: parseSiteDelta(""),
+    getConfig: () => DEFAULT_CONFIG,
+    getProvider: () => ({
+      id: "translate-pa",
+      translateBatch: (items: string[]) => {
+        providerCalls += 1;
+        return Promise.resolve(items.map((x) => `ZH:${x}`));
+      },
+    }),
+    beforeApiDispatch: () => gatePromise,
+  });
+
+  const pending = runner.translateBatch(segs);
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(providerCalls).toBe(0);
+
+  runner.cancelAll();
+  releaseGate?.();
+  await pending;
+  expect(providerCalls).toBe(0);
+  expect(win.document.querySelector("#p1 [data-tr-dst]")?.textContent).toBe("");
+});

@@ -6,8 +6,10 @@ import locales from "../../locales.json" with { type: "json" };
 import { DEFAULT_CONFIG } from "../../src/platform/config";
 import type { PtrMessageKey } from "../../src/platform/i18n";
 import { MESSAGES_EN } from "../../src/platform/i18n";
-import { createInspectController } from "../../src/ui/studio/inspect";
-import { createVolunteerController } from "../../src/ui/studio/volunteer";
+import { createPtrMetrics } from "../../src/platform/metrics";
+import { resolveAdapter } from "../../src/structure/registry";
+import { parseSiteDelta } from "../../src/structure/site-rules";
+import { createStudioWorkspaceController } from "../../src/ui/studio/workspace";
 
 const zhTw = locales.languages.find((l) => l.code === "zh-Hant-TW")?.messages as
   | Record<string, string>
@@ -16,10 +18,8 @@ const zhCn = locales.languages.find((l) => l.code === "zh-Hans-CN")?.messages as
   | Record<string, string>
   | undefined;
 
-const INSPECT_HARDCODED_RE =
-  /["']Capture Preview["']|["']Copy Diagnostics["']/u;
-const VOLUNTEER_HARDCODED_RE =
-  /["']Rescan["']|["']Save & Preview["']|["']Manual Hits:/u;
+const WORKSPACE_HARDCODED_RE =
+  /["']Exit Studio["']|["']Save & Preview["']|["']Copy Diagnostics["']|["']Apply Delta["']/u;
 
 test("all MESSAGES_EN keys are translated in zh-Hant-TW and zh-Hans-CN locales", () => {
   expect(zhTw).toBeDefined();
@@ -32,74 +32,48 @@ test("all MESSAGES_EN keys are translated in zh-Hant-TW and zh-Hans-CN locales",
   }
 });
 
-test("HUD and Volunteer panels render localized zh-Hant-TW strings when t() is injected", () => {
-  const win = new Window();
+test("Studio Workspace renders localized zh-Hant-TW strings when t() is injected", () => {
+  const win = new Window({ url: "https://example.com/" });
   win.document.body.innerHTML = "<div>Hello world</div>";
-  const t = (key: PtrMessageKey) => zhTw?.[key] ?? MESSAGES_EN[key];
+  const doc = win.document as unknown as Document;
+  const t = (key: string) =>
+    zhTw?.[key] ?? MESSAGES_EN[key as PtrMessageKey] ?? key;
 
-  const inspect = createInspectController({
-    doc: win.document as unknown as Document,
-    getConfig: () => ({
-      ...DEFAULT_CONFIG,
-      uiTier: "studio",
-      defaultInspect: true,
-    }),
-    getDelta: () => ({ addSelectors: [], removeSelectors: [], modRules: [] }),
-    storage: null,
-    t,
-    getStyle: (el) => ({
-      display:
-        el.tagName === "DIV" || el.tagName === "BODY" ? "block" : "inline",
-      visibility: "visible",
-    }),
-  });
-  inspect.syncFromConfig();
-  const hudText =
-    win.document.querySelector("#ptr-inspect-hud")?.shadowRoot?.textContent ??
-    "";
-  expect(hudText).toContain("捕捉預覽模式");
-  expect(hudText).toContain("全文導出 (AI)");
-  expect(hudText).toContain("片段總數");
-  inspect.stop();
-
-  const vol = createVolunteerController({
-    doc: win.document as unknown as Document,
-    hostname: "example.com",
-    getConfig: () => ({
-      ...DEFAULT_CONFIG,
-      uiTier: "studio",
-      defaultVolunteer: true,
-    }),
-    getTargetLang: () => "zh-Hant-TW",
-    getDelta: () => ({ addSelectors: [], removeSelectors: [], modRules: [] }),
+  const studio = createStudioWorkspaceController({
+    doc,
+    getAdapter: () => resolveAdapter({ doc, host: "example.com" }),
+    getConfig: () => ({ ...DEFAULT_CONFIG, uiTier: "studio" }),
+    getDelta: () => parseSiteDelta(""),
+    getHostRawDelta: () => "",
+    getLocalLocaleTable: () => null,
+    getMetrics: () => createPtrMetrics(),
     getSiteLocaleTable: () => null,
-    storage: null,
+    getTargetLang: () => "zh-Hant-TW",
+    hostname: "example.com",
+    isTranslated: () => false,
+    onExitStudio: () => undefined,
+    onOpenSettings: () => undefined,
+    onSaveHostDelta: () => undefined,
+    onSyncLocalTable: () => undefined,
+    onToggleTranslate: () => undefined,
     t,
-    getStyle: (el) => ({
-      display:
-        el.tagName === "DIV" || el.tagName === "BODY" ? "block" : "inline",
-      visibility: "visible",
-    }),
   });
-  vol.syncFromConfig();
-  const volText =
-    win.document.querySelector("#ptr-volunteer-workbench")?.shadowRoot
-      ?.textContent ?? "";
-  expect(volText).toContain("志工協作");
-  expect(volText).toContain("儲存並預覽");
-  expect(volText).toContain("靜態片段");
-  vol.stop();
+
+  studio.syncFromConfig();
+  const studioText =
+    win.document.querySelector("#ptr-studio-shell")?.shadowRoot?.textContent ??
+    "";
+  expect(studioText).toContain(zhTw?.studioTabNode ?? "");
+  expect(studioText).toContain(zhTw?.studioTabDict ?? "");
+  expect(studioText).toContain(zhTw?.studioExit ?? "");
+  expect(studioText).toContain(zhTw?.volSave ?? "");
+  studio.stop();
 });
 
-test("Studio Inspect and Volunteer views contain no hardcoded UI English copy outside i18n keys", () => {
-  const inspectSrc = readFileSync(
-    resolve(import.meta.dir, "../../src/ui/studio/inspect/view.ts"),
+test("Studio Workspace view contains no hardcoded UI English copy outside i18n keys", () => {
+  const viewSrc = readFileSync(
+    resolve(import.meta.dir, "../../src/ui/studio/workspace/view.ts"),
     "utf8"
   );
-  const volSrc = readFileSync(
-    resolve(import.meta.dir, "../../src/ui/studio/volunteer/view.ts"),
-    "utf8"
-  );
-  expect(inspectSrc).not.toMatch(INSPECT_HARDCODED_RE);
-  expect(volSrc).not.toMatch(VOLUNTEER_HARDCODED_RE);
+  expect(viewSrc).not.toMatch(WORKSPACE_HARDCODED_RE);
 });

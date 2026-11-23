@@ -1,9 +1,7 @@
-import type { GMMenuHandle } from "@userscripts/shared";
 import {
   configureGmApi,
   createI18n,
   gmMenuCommand,
-  gmUnregisterMenuCommand,
   isManagerPage,
   isTopFrame,
   MANAGER_URL,
@@ -39,7 +37,8 @@ import {
   EMPTY_REMOTE_DELTAS,
   loadRemoteDeltas,
 } from "./platform/deltas-remote";
-import { formatPtrMsg, MESSAGES_EN } from "./platform/i18n";
+import type { PtrMessageKey } from "./platform/i18n";
+import { MESSAGES_EN } from "./platform/i18n";
 import {
   createSpaRescanController,
   watchSpaNavigation,
@@ -58,8 +57,8 @@ import { resolveAdapter } from "./structure/registry";
 import { resolveSiteDeltaForHost } from "./structure/site-rules";
 import { createOpenCC } from "./text/opencc";
 import { createBasicController } from "./ui/basic";
-import { createInspectController } from "./ui/studio/inspect";
-import { createVolunteerController } from "./ui/studio/volunteer";
+import { createStudioWorkspaceController } from "./ui/studio/workspace";
+import { createStudioBreakpointGate } from "./ui/studio/workspace/logic";
 
 declare const __LOCALE_URL__: string;
 declare const __DELTAS_URL__: string;
@@ -259,6 +258,7 @@ async function boot(): Promise<void> {
   let activeRunner: ReturnType<typeof createBatchRunner> | null = null;
   let activeConfigSnapshot: ActiveConfigSnapshot | null = null;
   let translationActive = false;
+  const breakpointGate = createStudioBreakpointGate();
 
   function resolveCurrentDelta() {
     const cfg = loadConfig();
@@ -276,7 +276,7 @@ async function boot(): Promise<void> {
     if (added.length > 0) {
       syncShadowRootsOnly(
         document,
-        buildStyleOpts(loadConfig(), inspectController.isActive()),
+        buildStyleOpts(loadConfig(), studioController.isActive()),
         added
       );
     }
@@ -293,7 +293,7 @@ async function boot(): Promise<void> {
   function syncAllStyles(cfg = loadConfig()): void {
     syncStylesheet(
       document,
-      buildStyleOpts(cfg, inspectController.isActive()),
+      buildStyleOpts(cfg, studioController.isActive()),
       knownShadowRoots
     );
   }
@@ -312,11 +312,12 @@ async function boot(): Promise<void> {
     };
     const root = document.body ?? document.documentElement;
     activeRunner = createBatchRunner({
+      beforeApiDispatch: () => breakpointGate.waitIfPaused(),
       doc: document,
       delta,
       coalesceMs: 25,
       getConfig: loadConfig,
-      isInspectActive: () => inspectController.isActive(),
+      isInspectActive: () => studioController.isActive(),
       getProvider: (c) => {
         if (c.provider === "inspect") {
           return createInspectProvider();
@@ -347,6 +348,7 @@ async function boot(): Promise<void> {
     activeObserver.scan(root);
     persistTabActive(true);
     basicController.setTranslated(true);
+    studioController.syncFromConfig();
   }
 
   function stopTranslation(clearActiveFlag = true): void {
@@ -355,7 +357,9 @@ async function boot(): Promise<void> {
       activeConfigSnapshot = null;
       persistTabActive(false);
       basicController.setTranslated(false);
+      studioController.syncFromConfig();
     }
+    breakpointGate.releaseAll();
     activeRunner?.cancelAll();
     activeRunner = null;
     activeObserver?.stop();
@@ -366,33 +370,44 @@ async function boot(): Promise<void> {
     }
   }
 
-  let inspectMenuId: GMMenuHandle | undefined;
-  let volunteerMenuId: GMMenuHandle | undefined;
-
-  const inspectController = createInspectController({
+  const studioController = createStudioWorkspaceController({
+    breakpointGate,
     doc: document,
     getAdapter: () => adapter,
     getConfig: loadConfig,
     getDelta: resolveCurrentDelta,
-    getMetrics: () => metrics,
-    getSiteLocaleTable: getActiveLocaleTable,
-    onToggle: () => {
-      syncAllStyles();
-      syncInspectMenuCommand();
-    },
-    t: i18n.t,
-  });
-
-  const volunteerController = createVolunteerController({
-    doc: document,
-    hostname: host,
-    getAdapter: () => adapter,
-    getConfig: loadConfig,
-    getDelta: resolveCurrentDelta,
-    getSiteLocaleTable: getActiveLocaleTable,
+    getHostRawDelta: () => loadConfig().siteDeltas[host] ?? "",
     getLocalLocaleTable: () =>
       pickLocaleTable(localSiteTranslations, loadConfig().targetLang),
+    getMetrics: () => metrics,
+    getSiteLocaleTable: getActiveLocaleTable,
     getTargetLang: () => loadConfig().targetLang,
+    hostname: host,
+    isTranslated: () => translationActive,
+    onExitStudio: () => {
+      saveConfig({ uiTier: "basic" });
+      basicController.syncFromConfig();
+    },
+    onOpenSettings: () => {
+      window.open(`${MANAGER_URL}/settings/translate/`, "_blank", "noopener");
+    },
+    onSaveHostDelta: (rawDelta) => {
+      const nextDeltas = { ...loadConfig().siteDeltas };
+      if (rawDelta.trim() === "") {
+        delete nextDeltas[host];
+      } else {
+        nextDeltas[host] = rawDelta;
+      }
+      saveConfig({ siteDeltas: nextDeltas });
+      if (translationActive) {
+        activeRunner?.clearCache();
+        startTranslation();
+      }
+      studioController.syncFromConfig();
+    },
+    onSiteDictUpdated: () => {
+      onSiteDictUpdated?.();
+    },
     onSyncLocalTable: (patch) => {
       localSiteTranslations = mergeLocalSiteLocaleTable(
         host,
@@ -401,50 +416,15 @@ async function boot(): Promise<void> {
       );
       recomputeSiteTranslations();
     },
-    onSiteDictUpdated: () => {
-      onSiteDictUpdated?.();
+    onToggleTranslate: () => {
+      if (translationActive) {
+        stopTranslation(true);
+      } else {
+        startTranslation();
+      }
     },
-    onToggle: () => {
-      syncVolunteerMenuCommand();
-    },
-    isClickBlocked: () => loadConfig().volunteerBlockClicks,
-    setClickBlocked: (next) => {
-      saveConfig({ volunteerBlockClicks: next });
-    },
-    t: i18n.t,
+    t: (key) => i18n.t(key as PtrMessageKey),
   });
-
-  function syncInspectMenuCommand(): void {
-    if (inspectMenuId !== undefined) {
-      gmUnregisterMenuCommand(inspectMenuId);
-    }
-    inspectMenuId = gmMenuCommand(
-      formatPtrMsg(i18n.t("inspectMode"), {
-        state: i18n.t(inspectController.isActive() ? "on" : "off"),
-      }),
-      () => {
-        if (loadConfig().uiTier === "studio") {
-          inspectController.toggle();
-        }
-      }
-    );
-  }
-
-  function syncVolunteerMenuCommand(): void {
-    if (volunteerMenuId !== undefined) {
-      gmUnregisterMenuCommand(volunteerMenuId);
-    }
-    volunteerMenuId = gmMenuCommand(
-      formatPtrMsg(i18n.t("volunteerMode"), {
-        state: i18n.t(volunteerController.isActive() ? "on" : "off"),
-      }),
-      () => {
-        if (loadConfig().uiTier === "studio") {
-          volunteerController.toggle();
-        }
-      }
-    );
-  }
 
   const basicController = createBasicController({
     doc: document,
@@ -457,39 +437,16 @@ async function boot(): Promise<void> {
         startTranslation();
       }
     },
-    onToggleInspect: () => {
-      inspectController.toggle();
-    },
-    onToggleVolunteer: () => {
-      volunteerController.toggle();
-    },
     onStudioMount: () => {
-      inspectController.syncFromConfig();
-      volunteerController.syncFromConfig();
+      studioController.syncFromConfig();
       syncAllStyles();
     },
     onStudioUnmount: () => {
-      inspectController.syncFromConfig();
-      volunteerController.syncFromConfig();
+      studioController.syncFromConfig();
       syncAllStyles();
     },
     onOpenSettings: () => {
       window.open(`${MANAGER_URL}/settings/translate/`, "_blank", "noopener");
-    },
-    setTargetLang: (lang) => {
-      saveConfig({ targetLang: lang });
-      if (translationActive) {
-        activeRunner?.clearCache();
-        startTranslation();
-      }
-    },
-    setCustomCss: (css) => {
-      saveConfig({ customCss: css });
-      syncAllStyles();
-    },
-    setCustomFont: (font) => {
-      saveConfig({ customFont: font });
-      syncAllStyles();
     },
     setUiTier: (tier) => {
       saveConfig({ uiTier: tier });
@@ -499,8 +456,9 @@ async function boot(): Promise<void> {
 
   onSiteDictUpdated = () => {
     syncDictMetrics();
-    inspectController.syncFromConfig();
-    volunteerController.rescan();
+    if (studioController.isActive()) {
+      studioController.rescan();
+    }
     if (translationActive) {
       activeRunner?.clearCache();
       startTranslation();
@@ -510,10 +468,7 @@ async function boot(): Promise<void> {
   onConfigUpdated = (next) => {
     syncAllStyles(next);
     basicController.syncFromConfig();
-    inspectController.syncFromConfig();
-    volunteerController.syncFromConfig();
-    syncInspectMenuCommand();
-    syncVolunteerMenuCommand();
+    studioController.syncFromConfig();
     if (
       translationActive &&
       didTranslationConfigChange(activeConfigSnapshot, next)
@@ -525,8 +480,7 @@ async function boot(): Promise<void> {
 
   syncAllStyles();
   basicController.syncFromConfig();
-  inspectController.syncFromConfig();
-  volunteerController.syncFromConfig();
+  studioController.syncFromConfig();
 
   const spaRescan = createSpaRescanController({
     getAdapter: () => adapter,
@@ -551,6 +505,7 @@ async function boot(): Promise<void> {
     win: typeof unsafeWindow === "undefined" ? window : unsafeWindow,
     onBeforeLeave() {
       spaRescan.cancel();
+      breakpointGate.releaseAll();
       activeRunner?.cancelAll();
       restorePending(document);
       for (const sr of knownShadowRoots) {
@@ -560,10 +515,7 @@ async function boot(): Promise<void> {
     onSettled() {
       pruneDisconnectedShadowRoots();
       syncAllStyles();
-      inspectController.syncFromConfig();
-      if (volunteerController.isActive()) {
-        volunteerController.rescan();
-      }
+      studioController.syncFromConfig();
       if (translationActive || loadConfig().autoTranslate) {
         void spaRescan.onSpaNavigate(document);
       }
@@ -577,8 +529,6 @@ async function boot(): Promise<void> {
     saveConfig({ uiTier: nextTier });
     basicController.syncFromConfig();
   });
-  syncInspectMenuCommand();
-  syncVolunteerMenuCommand();
   gmMenuCommand(i18n.t("openSettings"), () => {
     window.open(`${MANAGER_URL}/settings/translate/`, "_blank", "noopener");
   });
