@@ -5,6 +5,7 @@ import type {
   TranslationProvider,
   TranslationRequestOptions,
 } from "../core/types";
+import { DEFAULT_TRANSLATE_PA_API_KEY } from "../platform/config";
 
 const TRANSLATE_PA_ENDPOINT =
   "https://translate-pa.googleapis.com/v1/translateHtml";
@@ -83,6 +84,7 @@ export function createTranslatePaProvider(
   options: TranslatePaOptions
 ): TranslationProvider {
   const request = options.request ?? gmRequest;
+  const apiKey = options.apiKey.trim() || DEFAULT_TRANSLATE_PA_API_KEY;
 
   async function translateBatch(
     items: string[],
@@ -102,7 +104,7 @@ export function createTranslatePaProvider(
         url: TRANSLATE_PA_ENDPOINT,
         headers: {
           "Content-Type": "application/json+protobuf",
-          "X-Goog-Api-Key": options.apiKey,
+          "X-Goog-Api-Key": apiKey,
         },
         data: JSON.stringify(payload),
         timeout: 25_000,

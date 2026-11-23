@@ -8,6 +8,7 @@ import {
   renderPending,
   renderTranslated,
   restoreAll,
+  restorePending,
 } from "../../src/render/renderer";
 import {
   buildStylesheet,
@@ -268,4 +269,36 @@ test("inline-atomic slots with no-opencc/no-space modifiers shield subtree from 
   expect(win.document.querySelector("[data-tr-dst]")?.textContent).toBe(
     "使用软件CSS 測試"
   );
+});
+
+test("restorePending unwraps only pending blocks so done translations stay intact and pending nodes can be rescanned", () => {
+  const win = new Window();
+  win.document.body.innerHTML =
+    '<div id="a">First paragraph</div><div id="b">Second paragraph</div>';
+  const doc = win.document as unknown as Document;
+  const delta = parseSiteDelta("");
+  const getStyle = (el: Element) => ({
+    display: el.tagName === "DIV" || el.tagName === "BODY" ? "block" : "inline",
+    visibility: "visible",
+  });
+  const segs = collectSegments(doc.body, delta, { getStyle });
+  expect(segs.length).toBe(2);
+  const [first, second] = segs;
+  if (!(first && second)) {
+    throw new Error("expected 2 segments");
+  }
+  const { slots } = encodeInlineNodes(first.nodes, delta);
+  renderPending(first, doc);
+  renderTranslated(first, "第一段", slots, { spacing: false }, doc);
+  renderPending(second, doc);
+
+  restorePending(doc);
+
+  expect(doc.querySelector('#a [data-tr-state="done"]')).not.toBeNull();
+  expect(doc.querySelector("#b [data-tr-block]")).toBeNull();
+  expect(doc.querySelector("#b")?.textContent).toBe("Second paragraph");
+
+  const rescanned = collectSegments(doc.body, delta, { getStyle });
+  expect(rescanned.length).toBe(1);
+  expect(rescanned[0]?.container.id).toBe("b");
 });

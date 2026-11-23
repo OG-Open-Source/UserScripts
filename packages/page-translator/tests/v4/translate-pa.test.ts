@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { configureGmApi } from "@userscripts/shared";
+import { DEFAULT_CONFIG } from "../../src/platform/config";
 import { createInspectProvider } from "../../src/providers/inspect";
 import { createTranslatePaProvider } from "../../src/providers/translate-pa";
 
@@ -67,4 +68,28 @@ test("translate-pa translateGrouped wraps context groups and extracts per-id inn
   expect(sentBody).toContain('data-ptr-s=\\"u0\\"');
   expect(map.get("u0")).toBe("儲存");
   expect(map.get("u1")).toBe("取消");
+});
+
+test("translate-pa falls back to default API key when given blank or whitespace apiKey", async () => {
+  const sentKeys: string[] = [];
+  const request = (options: { headers?: Record<string, string> }) => {
+    sentKeys.push(options.headers?.["X-Goog-Api-Key"] ?? "");
+    return Promise.resolve({
+      responseText: JSON.stringify([["你好"], "en"]),
+    });
+  };
+
+  await Promise.all(
+    ["", "   ", "  CUSTOM_KEY  "].map((apiKey) =>
+      createTranslatePaProvider({ apiKey, request }).translateBatch(["Hello"], {
+        targetLang: "zh-TW",
+      })
+    )
+  );
+
+  expect(sentKeys).toEqual([
+    DEFAULT_CONFIG.translatePaApiKey,
+    DEFAULT_CONFIG.translatePaApiKey,
+    "CUSTOM_KEY",
+  ]);
 });

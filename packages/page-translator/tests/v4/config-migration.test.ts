@@ -132,3 +132,36 @@ test("invalid provider and storage failures fall back to defaults", () => {
     saveConfig({ uiTier: "studio" }, { storage: throwing })
   ).not.toThrow();
 });
+
+test("blank or whitespace translatePaApiKey falls back to built-in default on load and save", () => {
+  const storage = new MemoryConfigStorage();
+  storage.values.set("ptr:config", { translatePaApiKey: "" });
+  expect(loadConfig({ storage }).translatePaApiKey).toBe(
+    DEFAULT_CONFIG.translatePaApiKey
+  );
+
+  storage.values.set("ptr:config", { translatePaApiKey: "   " });
+  expect(loadConfig({ storage }).translatePaApiKey).toBe(
+    DEFAULT_CONFIG.translatePaApiKey
+  );
+
+  const custom = saveConfig(
+    { translatePaApiKey: "  AIzaCustomKey123  " },
+    { storage }
+  );
+  expect(custom.translatePaApiKey).toBe("AIzaCustomKey123");
+
+  const kept = saveConfig({ targetLang: "ja" }, { storage });
+  expect(kept.translatePaApiKey).toBe("AIzaCustomKey123");
+
+  const cleared = saveConfig({ translatePaApiKey: "" }, { storage });
+  expect(cleared.translatePaApiKey).toBe(DEFAULT_CONFIG.translatePaApiKey);
+
+  const whitespaceCleared = saveConfig(
+    { translatePaApiKey: "  \t  " },
+    { storage }
+  );
+  expect(whitespaceCleared.translatePaApiKey).toBe(
+    DEFAULT_CONFIG.translatePaApiKey
+  );
+});

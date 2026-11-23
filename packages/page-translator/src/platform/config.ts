@@ -48,11 +48,13 @@ export type ConfigPatch = Partial<
 };
 
 export const CONFIG_KEY = "ptr:config";
+export const DEFAULT_TRANSLATE_PA_API_KEY =
+  "AIzaSyATBXajvzQLTDHEQbcpq0Ihe0vWDHmO520";
 
 export const DEFAULT_CONFIG: TranslatorConfig = {
   targetLang: "zh-TW",
   provider: "translate-pa",
-  translatePaApiKey: "AIzaSyATBXajvzQLTDHEQbcpq0Ihe0vWDHmO520",
+  translatePaApiKey: DEFAULT_TRANSLATE_PA_API_KEY,
   customCss: "",
   customFont: "",
   autoSpacing: true,
@@ -113,6 +115,17 @@ function hasOwn(record: Record<string, unknown>, key: string): boolean {
 
 function stringValue(value: unknown, fallback: string): string {
   return typeof value === "string" ? value : fallback;
+}
+
+function resolveApiKeyValue(value: unknown, fallback: string): string {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : DEFAULT_TRANSLATE_PA_API_KEY;
+  }
+  const fallbackTrimmed = fallback.trim();
+  return fallbackTrimmed.length > 0
+    ? fallbackTrimmed
+    : DEFAULT_TRANSLATE_PA_API_KEY;
 }
 
 function booleanValue(value: unknown, fallback: boolean): boolean {
@@ -198,7 +211,7 @@ function normalizeConfig(
   return {
     targetLang: stringValue(source.targetLang, fallback.targetLang),
     provider: enumValue(source.provider, PROVIDERS, fallback.provider),
-    translatePaApiKey: stringValue(
+    translatePaApiKey: resolveApiKeyValue(
       source.translatePaApiKey,
       fallback.translatePaApiKey
     ),

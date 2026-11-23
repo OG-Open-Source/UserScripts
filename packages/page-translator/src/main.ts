@@ -48,7 +48,7 @@ import { createPtrMetrics } from "./platform/metrics";
 import { createHumanOnlyProvider } from "./providers/human-only";
 import { createInspectProvider } from "./providers/inspect";
 import { createTranslatePaProvider } from "./providers/translate-pa";
-import { restoreAll } from "./render/renderer";
+import { restoreAll, restorePending } from "./render/renderer";
 import { syncShadowRootsOnly, syncStylesheet } from "./render/styles";
 import type { SiteStructureAdapter } from "./structure/adapter";
 import { createDiscourseAdapter } from "./structure/discourse";
@@ -115,6 +115,7 @@ interface ActiveConfigSnapshot {
   siteDeltasJson: string;
   spacingMode: TranslatorConfig["spacingMode"];
   targetLang: string;
+  translatePaApiKey: string;
 }
 
 function snapshotTranslationConfig(
@@ -123,6 +124,7 @@ function snapshotTranslationConfig(
   return {
     targetLang: cfg.targetLang,
     provider: cfg.provider,
+    translatePaApiKey: cfg.translatePaApiKey,
     openccMode: cfg.openccMode,
     spacingMode: cfg.spacingMode,
     punctNorm: cfg.punctNorm,
@@ -142,6 +144,7 @@ function didTranslationConfigChange(
   return (
     prev.targetLang !== cur.targetLang ||
     prev.provider !== cur.provider ||
+    prev.translatePaApiKey !== cur.translatePaApiKey ||
     prev.openccMode !== cur.openccMode ||
     prev.spacingMode !== cur.spacingMode ||
     prev.punctNorm !== cur.punctNorm ||
@@ -549,6 +552,10 @@ async function boot(): Promise<void> {
     onBeforeLeave() {
       spaRescan.cancel();
       activeRunner?.cancelAll();
+      restorePending(document);
+      for (const sr of knownShadowRoots) {
+        restorePending(sr);
+      }
     },
     onSettled() {
       pruneDisconnectedShadowRoots();

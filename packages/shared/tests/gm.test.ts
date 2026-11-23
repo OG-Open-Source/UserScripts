@@ -7,6 +7,8 @@ import {
   gmUnregisterMenuCommand,
 } from "../src";
 
+const EXACT_HTTP_403_RE = /^HTTP 403$/u;
+
 test("gmRequest forwards method, headers, body and resolves response", async () => {
   let captured: Record<string, unknown> | null = null;
   configureGmApi({
@@ -33,17 +35,29 @@ test("gmRequest forwards method, headers, body and resolves response", async () 
   ).toBe("application/json");
 });
 
-test("gmRequest rejects on HTTP 4xx/5xx", async () => {
+test("gmRequest rejects on HTTP 4xx/5xx with response snippet when present", async () => {
   configureGmApi({
     GM_xmlhttpRequest(details: Record<string, unknown>) {
       (details.onload as (res: unknown) => void)({
         status: 403,
-        responseText: "Forbidden",
+        responseText: "  Forbidden\nACCESS_DENIED  ",
       });
     },
   });
   await expect(gmRequest({ url: "https://example.com/api" })).rejects.toThrow(
-    "HTTP 403"
+    "HTTP 403: Forbidden ACCESS_DENIED"
+  );
+
+  configureGmApi({
+    GM_xmlhttpRequest(details: Record<string, unknown>) {
+      (details.onload as (res: unknown) => void)({
+        status: 403,
+        responseText: "   ",
+      });
+    },
+  });
+  await expect(gmRequest({ url: "https://example.com/api" })).rejects.toThrow(
+    EXACT_HTTP_403_RE
   );
 });
 
@@ -118,4 +132,5 @@ test("gmAddStyle calls GM_addStyle when configured and returns null when absent"
   });
   expect(gmAddStyle("a{color:red}")).toBe(fakeEl);
   expect(injected).toBe("a{color:red}");
+  configureGmApi(null);
 });

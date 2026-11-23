@@ -19,6 +19,8 @@ import type {
 } from "./gm-types";
 
 let api: GMApi | null = null;
+const WHITESPACE_RE = /\s+/gu;
+const HTTP_ERROR_SNIPPET_LIMIT = 160;
 
 /**
  * Inject the GM API implementation. Called once at userscript entry, e.g.:
@@ -67,7 +69,15 @@ export function gmRequest(options: GMRequestOptions): Promise<GMXHRResponse> {
         if (res.status >= 200 && res.status < 400) {
           resolve(res);
         } else {
-          reject(new Error(`HTTP ${res.status}`));
+          const snippet = (res.responseText ?? "")
+            .replace(WHITESPACE_RE, " ")
+            .trim()
+            .slice(0, HTTP_ERROR_SNIPPET_LIMIT);
+          reject(
+            new Error(
+              snippet ? `HTTP ${res.status}: ${snippet}` : `HTTP ${res.status}`
+            )
+          );
         }
       },
       onerror: () => reject(new Error("network error")),

@@ -168,6 +168,25 @@ export function renderInspectMarker(
   seg.container.setAttribute("data-tr-inspect-label", labelParts.join(" | "));
 }
 
+function unwrapBlock(block: Element): void {
+  const parent = block.parentNode;
+  const orig = block.querySelector("[data-tr-orig]");
+  if (parent && orig) {
+    while (orig.firstChild) {
+      parent.insertBefore(orig.firstChild, block);
+    }
+  }
+  block.remove();
+}
+
+export function restorePending(root: ParentNode): void {
+  for (const block of Array.from(
+    root.querySelectorAll('[data-tr-block][data-tr-state="pending"]')
+  )) {
+    unwrapBlock(block);
+  }
+}
+
 export function restoreAll(root: ParentNode): void {
   for (const inspected of Array.from(
     root.querySelectorAll("[data-tr-inspect]")
@@ -180,13 +199,6 @@ export function restoreAll(root: ParentNode): void {
   }
 
   for (const block of Array.from(root.querySelectorAll("[data-tr-block]"))) {
-    const parent = block.parentNode;
-    const orig = block.querySelector("[data-tr-orig]");
-    if (parent && orig) {
-      while (orig.firstChild) {
-        parent.insertBefore(orig.firstChild, block);
-      }
-    }
-    block.remove();
+    unwrapBlock(block);
   }
 }
