@@ -1,12 +1,6 @@
 import type { TranslatorConfig, UiTier } from "../../platform/config";
 import type { PtrMessageKey } from "../../platform/i18n";
-import type { PresentationPreset } from "./logic";
-import {
-  computeBasicUiState,
-  diffStudioTier,
-  presetToCustomCss,
-  toggleUiTier,
-} from "./logic";
+import { computeBasicUiState, diffStudioTier, toggleUiTier } from "./logic";
 import type { BasicView } from "./view";
 import { mountBasicView } from "./view";
 
@@ -50,28 +44,13 @@ export function createBasicController(
         onToggleTranslate: () => {
           options.onToggleTranslate?.();
         },
-        onTargetLangChange: (lang) => {
-          options.setTargetLang?.(lang);
-        },
-        onPresentationChange: (preset: PresentationPreset) => {
-          options.setCustomCss?.(presetToCustomCss(preset));
-        },
-        onFontChange: (font) => {
-          options.setCustomFont?.(font);
+        onOpenSettings: () => {
+          options.onOpenSettings?.();
         },
         onToggleStudio: () => {
           const next = toggleUiTier(options.getConfig().uiTier);
           options.setUiTier(next);
           syncFromConfig();
-        },
-        onToggleInspect: () => {
-          options.onToggleInspect?.();
-        },
-        onToggleVolunteer: () => {
-          options.onToggleVolunteer?.();
-        },
-        onOpenSettings: () => {
-          options.onOpenSettings?.();
         },
       },
       options.t

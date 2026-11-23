@@ -66,7 +66,7 @@ function commonStudioOptions(
   };
 }
 
-test("Basic renders only basic controls and Studio mounts without reload", () => {
+test("Basic renders only minimalist pill controls and hides when Studio mounts", () => {
   const { doc } = setup();
   let cfg = config();
   let mounts = 0;
@@ -89,21 +89,18 @@ test("Basic renders only basic controls and Studio mounts without reload", () =>
   const host = doc.querySelector("#ptr-basic-ui") as HTMLElement;
   expect(host.getAttribute("data-us-ui")).toBe("ptr");
   expect(host.getAttribute("translate")).toBe("no");
+  expect(host.hidden).toBe(false);
+  expect(host.shadowRoot?.querySelectorAll("button").length).toBe(3);
   expect(
     host.shadowRoot?.querySelector("[data-basic-action='translate']")
   ).not.toBeNull();
   expect(
-    host.shadowRoot?.querySelector("[data-basic-field='targetLang']")
+    host.shadowRoot?.querySelector("[data-basic-action='settings']")
   ).not.toBeNull();
-  expect(
-    host.shadowRoot?.querySelector("[data-basic-field='presentation']")
-  ).not.toBeNull();
-  expect(
-    host.shadowRoot?.querySelector("[data-basic-field='font']")
-  ).not.toBeNull();
-  expect(
-    host.shadowRoot?.querySelector("[data-tier='studio-controls']")?.hidden
-  ).toBe(true);
+  expect(host.shadowRoot?.querySelector("#ptr-basic-studio")).not.toBeNull();
+  expect(host.shadowRoot?.querySelectorAll("[data-basic-field]").length).toBe(
+    0
+  );
   expect(doc.querySelector("#ptr-inspect-hud")).toBeNull();
   expect(doc.querySelector("#ptr-volunteer-workbench")).toBeNull();
   expect(mounts).toBe(0);
@@ -114,17 +111,13 @@ test("Basic renders only basic controls and Studio mounts without reload", () =>
   studioToggle.click();
   expect(cfg.uiTier).toBe("studio");
   expect(mounts).toBe(1);
-  expect(
-    host.shadowRoot?.querySelector("[data-tier='studio-controls']")?.hidden
-  ).toBe(false);
+  expect(host.hidden).toBe(true);
   expect(doc.querySelector("#ptr-basic-ui")).toBe(host);
 
   studioToggle.click();
   expect(cfg.uiTier).toBe("basic");
   expect(unmounts).toBe(1);
-  expect(
-    host.shadowRoot?.querySelector("[data-tier='studio-controls']")?.hidden
-  ).toBe(true);
+  expect(host.hidden).toBe(false);
   controller.stop();
 });
 
