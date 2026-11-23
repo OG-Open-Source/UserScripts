@@ -217,3 +217,27 @@ test("Basic view uses injected t() labels with no hardcoded English strings", ()
 
   controller.stop();
 });
+
+test("Basic UI shadow style applies superellipse(2) squircle shape", () => {
+  const doc = setupDoc();
+  const cfg = makeConfig();
+  const controller = createBasicController({
+    doc,
+    getConfig: () => cfg,
+    setUiTier: () => undefined,
+  });
+
+  controller.syncFromConfig();
+  const shadow = doc.querySelector("#ptr-basic-ui")?.shadowRoot as ShadowRoot;
+  const styleText = Array.from(shadow.querySelectorAll("style"))
+    .map((s) => s.textContent ?? "")
+    .join("\n");
+
+  expect(styleText).toContain("--rho: 0.5;");
+  expect(styleText).toContain(
+    "border-radius: calc(var(--rho) * min(240px, 60px));"
+  );
+  expect(styleText).toContain("corner-shape: superellipse(2);");
+
+  controller.stop();
+});

@@ -288,11 +288,53 @@ ${getSharedPanelCss()}
   display: none !important;
 }
 
-.ptr-studio-select-inline {
+.ptr-studio-top-left {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ptr-studio-top-left .drag-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ptr-studio-top-left .ptr-chip {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.ptr-studio-top-actions {
+  flex: 0 1 auto;
+  min-width: 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ptr-studio-top-actions::-webkit-scrollbar {
+  display: none;
+}
+
+.ptr-studio-top-actions .ptr-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  height: 28px;
+  padding: 0 11px;
+}
+
+select.ptr-input.ptr-studio-select-inline {
   width: auto;
   min-width: 0;
-  padding: 4px 8px;
+  flex: 0 0 auto;
+  height: 28px;
+  padding: 0 10px;
   font-size: 11.5px;
+  background: var(--us-surface-2);
+  --rho: 0.5;
+  border-radius: calc(var(--rho) * min(240px, 60px));
+  corner-shape: superellipse(2);
 }
 `.trim();
 }
@@ -404,7 +446,7 @@ export function mountStudioWorkspaceView(
   topDock.setAttribute("data-studio-dock", "top");
 
   const topLeft = doc.createElement("div");
-  topLeft.className = "ptr-studio-row-nowrap";
+  topLeft.className = "ptr-studio-row-nowrap ptr-studio-top-left";
   const titleEl = doc.createElement("strong");
   titleEl.className = "drag-title";
   titleEl.textContent = formatPtrMsg(t("studioTitle"), { host: hostname });
@@ -417,7 +459,7 @@ export function mountStudioWorkspaceView(
   topLeft.append(titleEl, adapterBadge, summaryChip);
 
   const topActions = doc.createElement("div");
-  topActions.className = "ptr-studio-row-nowrap";
+  topActions.className = "ptr-studio-row-nowrap ptr-studio-top-actions";
   const translateBtn = makeButton(
     doc,
     t("translatePage"),

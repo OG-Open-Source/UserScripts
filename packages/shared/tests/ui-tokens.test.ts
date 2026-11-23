@@ -91,3 +91,10 @@ test("settings/shared/tokens.css matches getSimpleCssThemeVarsCss() without drif
   const diskCss = readFileSync(tokensPath, "utf8");
   expect(diskCss).toBe(`${getSimpleCssThemeVarsCss()}\n`);
 });
+
+test("applies superellipse(2) squircle shape to .us-btn", () => {
+  const css = getUiTokensCss(":host");
+  expect(css).toContain("--rho: 0.5;");
+  expect(css).toContain("border-radius: calc(var(--rho) * min(240px, 60px));");
+  expect(css).toContain("corner-shape: superellipse(2);");
+});

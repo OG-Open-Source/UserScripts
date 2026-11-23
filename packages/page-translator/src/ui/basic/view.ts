@@ -39,7 +39,9 @@ ${getSharedPanelCss()}
   align-items: center;
   gap: 6px;
   padding: 6px 8px;
-  border-radius: 999px;
+  --rho: 0.5;
+  border-radius: calc(var(--rho) * min(240px, 60px));
+  corner-shape: superellipse(2);
   box-shadow: var(--us-shadow);
 }
 `.trim();

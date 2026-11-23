@@ -193,7 +193,9 @@ button.us-btn {
   background: var(--_btn-bg, var(--us-surface-2));
   color: var(--_btn-fg, var(--us-fg));
   border: none;
-  border-radius: var(--us-radius-md);
+  --rho: 0.5;
+  border-radius: calc(var(--rho) * min(240px, 60px));
+  corner-shape: superellipse(2);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -247,7 +249,6 @@ button.us-btn:focus-visible,
 button.us-btn-sm {
   padding: 4px 9px;
   font-size: 11.5px;
-  border-radius: var(--us-radius-sm);
 }
 
 .us-btn-primary,

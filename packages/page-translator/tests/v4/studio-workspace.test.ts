@@ -670,4 +670,26 @@ describe("Industrial Studio Workspace", () => {
 
     controller.stop();
   });
+
+  test("12. top-right toolbar uses inline select specificity, horizontal scroll fallback, and superellipse(2) squircle buttons", () => {
+    const { controller, doc } = createTestEnv("<main><p>Hello</p></main>");
+    controller.syncFromConfig();
+    const sr = getShellShadow(doc);
+    const styleText = Array.from(sr.querySelectorAll("style"))
+      .map((s) => s.textContent ?? "")
+      .join("\n");
+
+    expect(styleText).toContain("select.ptr-input.ptr-studio-select-inline");
+    expect(styleText).toContain("width: auto;");
+    expect(styleText).toContain(".ptr-studio-top-actions");
+    expect(styleText).toContain("overflow-x: auto;");
+    expect(styleText).toContain("white-space: nowrap;");
+    expect(styleText).toContain("--rho: 0.5;");
+    expect(styleText).toContain(
+      "border-radius: calc(var(--rho) * min(240px, 60px));"
+    );
+    expect(styleText).toContain("corner-shape: superellipse(2);");
+
+    controller.stop();
+  });
 });
