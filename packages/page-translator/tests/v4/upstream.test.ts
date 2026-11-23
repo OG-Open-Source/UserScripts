@@ -276,6 +276,24 @@ test("invalid upstream JSON resolves null instead of rejecting", async () => {
   await expect(client.ensureHost("invalid.example")).resolves.toBeNull();
 });
 
+test("upstream rejects a response whose normalized host differs from the request", async () => {
+  const module = await loadUpstreamModule();
+  expect(module).not.toBeNull();
+  if (!module) {
+    return;
+  }
+  const { data, storage } = createMemoryStorage();
+  const client = module.createUpstreamClient({
+    storage,
+    fetchText: () =>
+      Promise.resolve(JSON.stringify(siteFile("other.example", "其他主機"))),
+  });
+
+  expect(await client.ensureHost("requested.example")).toBeNull();
+  expect(data["ptr:site-tr-remote:other.example"]).toBeUndefined();
+  expect(data["ptr:site-tr-remote:requested.example"]).toBeUndefined();
+});
+
 test("remote writes preserve the local layer verbatim", async () => {
   const module = await loadUpstreamModule();
   expect(module).not.toBeNull();
@@ -445,4 +463,44 @@ test("layered store merges local over remote and reads the legacy fallback", asy
     module.deleteCachedSiteTranslations("example.com", storage)
   ).toBeUndefined();
   expect(module.listCachedSiteTranslations(storage)).toHaveLength(1);
+});
+
+test("layered listing merges local overrides with legacy remote entries", async () => {
+  const module = await loadStoreModule();
+  expect(module).not.toBeNull();
+  if (!module) {
+    return;
+  }
+  const host = "legacy-merge.example";
+  const { storage } = createMemoryStorage({
+    "ptr:site-tr-local:legacy-merge.example": {
+      version: 2,
+      host,
+      locales: { "zh-TW": { static: { Hello: "本機覆寫" } } },
+    },
+    "ptr:site-tr:legacy-merge.example": {
+      version: 1,
+      host,
+      locales: {
+        "zh-TW": { static: { Hello: "舊遠端", Issues: "舊議題" } },
+      },
+    },
+    "ptr:site-tr:__index": [host],
+  });
+
+  expect(module.listLayeredSiteTranslations(storage)).toEqual([
+    {
+      file: {
+        version: 2,
+        host,
+        locales: {
+          "zh-TW": {
+            static: { Hello: "本機覆寫", Issues: "舊議題" },
+          },
+        },
+      },
+      hasLocal: true,
+      hasRemote: true,
+    },
+  ]);
 });

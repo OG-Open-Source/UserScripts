@@ -187,6 +187,52 @@ test("configured human-only dictionary miss returns the source untouched without
   expect(conversions).toBe(0);
 });
 
+test("human-only preserves changed string dictionary output as a hit", async () => {
+  let providerCalls = 0;
+  let rendered = "";
+  const result = await runSegmentPipeline(
+    "Hello world",
+    { ...ZH_CONFIG, provider: "human-only" },
+    {
+      dict: () => "GLM 5.3的确…",
+      provider: () => {
+        providerCalls += 1;
+        return "不應翻譯";
+      },
+      render: (html) => {
+        rendered = html;
+      },
+    }
+  );
+
+  expect(result).toEqual({ html: "GLM 5.3 的确…", route: "translate" });
+  expect(rendered).toBe("GLM 5.3 的确…");
+  expect(providerCalls).toBe(0);
+});
+
+test("human-only treats unchanged string dictionary output as a miss", async () => {
+  let providerCalls = 0;
+  let renders = 0;
+  const result = await runSegmentPipeline(
+    "Hello world",
+    { ...ZH_CONFIG, provider: "human-only" },
+    {
+      dict: (html) => html,
+      provider: () => {
+        providerCalls += 1;
+        return "不應翻譯";
+      },
+      render: () => {
+        renders += 1;
+      },
+    }
+  );
+
+  expect(result).toEqual({ html: "Hello world", route: "translate" });
+  expect(providerCalls).toBe(0);
+  expect(renders).toBe(0);
+});
+
 test("human-only provider object also preserves a dictionary miss", async () => {
   const humanModule = await loadHumanOnlyModule();
   expect(humanModule).not.toBeNull();

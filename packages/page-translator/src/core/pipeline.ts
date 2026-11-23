@@ -63,7 +63,7 @@ async function applyDictionary(
   }
   const result = await dict(sourceHtml, targetLang);
   if (typeof result === "string") {
-    return { html: result, hit: false };
+    return { html: result, hit: result !== sourceHtml };
   }
   if (result?.hit === true) {
     const { html } = result;

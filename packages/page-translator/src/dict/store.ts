@@ -312,10 +312,9 @@ export function listLayeredSiteTranslations(
       continue;
     }
     const local = readStoredFile(LOCAL_PREFIX, host, storage);
-    let remote = readStoredFile(REMOTE_PREFIX, host, storage);
-    if (!(local || remote)) {
-      remote = readStoredFile(LEGACY_PREFIX, host, storage);
-    }
+    const remote =
+      readStoredFile(REMOTE_PREFIX, host, storage) ??
+      readStoredFile(LEGACY_PREFIX, host, storage);
     const file = mergeSiteTranslations(remote, local);
     if (file) {
       out.push({

@@ -146,13 +146,17 @@ export function createUpstreamClient(
       if (!(isObject(parsed) && isObject(parsed.locales))) {
         return null;
       }
+      if (
+        typeof parsed.host === "string" &&
+        parsed.host.trim() &&
+        normalizeHost(parsed.host) !== host
+      ) {
+        return null;
+      }
       return saveRemoteSiteTranslations(
         {
           version: Number(parsed.version) || 1,
-          host:
-            typeof parsed.host === "string" && parsed.host.trim()
-              ? parsed.host
-              : host,
+          host,
           locales: parsed.locales as SiteTranslationsFile["locales"],
         },
         storage
