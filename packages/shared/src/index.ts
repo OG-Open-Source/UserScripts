@@ -2,15 +2,21 @@
  * @userscripts/shared — common utilities and types for all userscripts.
  */
 
-export type { Oklab, Oklch } from "./color";
+export type { Oklab, Oklch, ZeroErrorOklchResult } from "./color";
 export {
   formatOklch,
+  formatZeroErrorOklch,
   getAccessibleTextOklch,
   hexToOklab,
+  hexToZeroErrorOklch,
   NOVAKIT,
+  normalizeHex,
   oklabToHex,
   oklabToOklch,
+  oklchToHex,
   oklchToOklab,
+  US_PALETTE_HEX,
+  US_PALETTE_OKLCH,
 } from "./color";
 export { isForeignUi, isUsUiEvent, markUiRoot, US_UI_ATTR } from "./conflict";
 export type { DragControllerOptions } from "./drag";
