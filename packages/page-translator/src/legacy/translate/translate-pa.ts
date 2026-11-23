@@ -17,7 +17,7 @@ function escapeAttr(val: string): string {
 }
 
 const GROUPED_ITEM_RE =
-  /<p\b[^>]*\bdata-ptr-s=["']([^"']+)["'][^>]*>([\s\S]*?)<\/p>/giu;
+  /<p\b[^>]*\bdata-ptr-s=["'](?<id>[^"']+)["'][^>]*>(?<inner>[\s\S]*?)<\/p>/giu;
 
 export function parseGroupedResponseHtml(
   htmlList: readonly string[]
@@ -27,8 +27,8 @@ export function parseGroupedResponseHtml(
     GROUPED_ITEM_RE.lastIndex = 0;
     let match = GROUPED_ITEM_RE.exec(html);
     while (match !== null) {
-      const id = match[1];
-      const inner = match[2];
+      const id = match.groups?.id;
+      const inner = match.groups?.inner;
       if (id !== undefined && inner !== undefined) {
         out.set(id, inner);
       }
@@ -64,10 +64,13 @@ export function createTranslatePaProvider(
     });
 
     const parsed = JSON.parse(res.responseText) as unknown;
-    if (!(Array.isArray(parsed) && Array.isArray(parsed[0]))) {
+    if (!Array.isArray(parsed)) {
       throw new Error("[ptr] Unexpected translate-pa response shape");
     }
-    const translations = parsed[0] as unknown[];
+    const [translations] = parsed as unknown[];
+    if (!Array.isArray(translations)) {
+      throw new Error("[ptr] Unexpected translate-pa response shape");
+    }
     if (translations.length !== items.length) {
       throw new Error(
         `[ptr] translate-pa count mismatch: expected ${items.length}, got ${translations.length}`
@@ -77,7 +80,7 @@ export function createTranslatePaProvider(
   }
 
   async function translateGrouped(
-    groups: ReadonlyArray<ReadonlyArray<GroupedTranslateItem>>,
+    groups: readonly (readonly GroupedTranslateItem[])[],
     opts: TranslationRequestOptions
   ): Promise<Map<string, string>> {
     if (groups.length === 0) {

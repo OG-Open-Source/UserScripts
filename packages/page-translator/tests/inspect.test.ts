@@ -11,7 +11,9 @@ test("auto-marks page on startup when debugInspect is already true across page l
     doc: win.document as unknown as Document,
     getDelta: () => ({ addSelectors: [], removeSelectors: [], modRules: [] }),
     isEnabled: () => true,
-    setEnabled: () => {},
+    setEnabled: () => {
+      // noop
+    },
     getStyle: (el) => ({
       display:
         el.tagName === "DIV" || el.tagName === "BODY" ? "block" : "inline",
@@ -40,7 +42,9 @@ test("toggle flips debugInspect state, updates menu caption via id, and clears/r
       registered.push({ caption, opts });
       return "ptr-inspect";
     },
-    GM_unregisterMenuCommand() {},
+    GM_unregisterMenuCommand() {
+      // noop
+    },
   });
 
   const controller = createInspectController({
@@ -90,7 +94,9 @@ test("classifies inspect markers into auto-static, auto-dynamic, +, and manual k
       modRules: [],
     }),
     isEnabled: () => true,
-    setEnabled: () => {},
+    setEnabled: () => {
+      // noop
+    },
     getSiteLocaleTable: () => ({
       static: { "Pull requests": "拉取請求" },
       dynamic: {},
@@ -105,10 +111,10 @@ test("classifies inspect markers into auto-static, auto-dynamic, +, and manual k
 
   controller.syncFromConfig();
   expect(
-    win.document.getElementById("s1")?.getAttribute("data-tr-inspect-kind")
+    win.document.querySelector("#s1")?.getAttribute("data-tr-inspect-kind")
   ).toBe("auto-static");
   expect(
-    win.document.getElementById("s2")?.getAttribute("data-tr-inspect-kind")
+    win.document.querySelector("#s2")?.getAttribute("data-tr-inspect-kind")
   ).toBe("auto-dynamic");
   expect(
     win.document
@@ -116,10 +122,10 @@ test("classifies inspect markers into auto-static, auto-dynamic, +, and manual k
       ?.getAttribute("data-tr-inspect-kind")
   ).toBe("+");
   expect(
-    win.document.getElementById("s4")?.getAttribute("data-tr-inspect-kind")
+    win.document.querySelector("#s4")?.getAttribute("data-tr-inspect-kind")
   ).toBe("manual");
   expect(
-    win.document.getElementById("s1")?.getAttribute("data-tr-inspect-space")
+    win.document.querySelector("#s1")?.getAttribute("data-tr-inspect-space")
   ).toBe("both");
   controller.stop();
 });
@@ -142,7 +148,9 @@ test("inspect HUD displays capability and performance telemetry and toggles comp
       },
     }),
     isEnabled: () => true,
-    setEnabled: () => {},
+    setEnabled: () => {
+      // noop
+    },
     getSpacingMode: () => "both",
     getStyle: (el) => ({
       display:
@@ -153,24 +161,37 @@ test("inspect HUD displays capability and performance telemetry and toggles comp
     }),
   });
   controller.syncFromConfig();
-  const sr = win.document.getElementById("ptr-inspect-hud")!.shadowRoot!;
-  expect(sr.getElementById("ptr-h-copy")).not.toBeNull();
+  const hudEl = win.document.querySelector("#ptr-inspect-hud");
+  if (!hudEl?.shadowRoot) {
+    throw new Error("expected #ptr-inspect-hud shadowRoot");
+  }
+  const sr = hudEl.shadowRoot;
+  expect(sr.querySelector("#ptr-h-copy")).not.toBeNull();
   expect(metrics.routing).toEqual({ api: 2, opencc: 0, skip: 0 });
   expect(sr.textContent).toContain("manual");
   expect(sr.textContent).toContain("`ms");
   expect(
-    win.document.getElementById("ptr-inspect-hud")?.getAttribute("data-us-ui")
+    win.document.querySelector("#ptr-inspect-hud")?.getAttribute("data-us-ui")
   ).toBe("ptr");
   // Details drawer starts collapsed to avoid DOM writes until expanded
-  expect(sr.getElementById("ptr-h-details")?.dataset.collapsed).toBe("true");
-  (sr.getElementById("ptr-h-toggle") as HTMLElement).click();
-  expect(sr.getElementById("ptr-h-details")?.dataset.collapsed).toBe("false");
-  expect(sr.getElementById("ptr-h-toggle")?.getAttribute("aria-expanded")).toBe(
+  expect(
+    (sr.querySelector("#ptr-h-details") as HTMLElement | null)?.dataset
+      .collapsed
+  ).toBe("true");
+  (sr.querySelector("#ptr-h-toggle") as HTMLElement).click();
+  expect(
+    (sr.querySelector("#ptr-h-details") as HTMLElement | null)?.dataset
+      .collapsed
+  ).toBe("false");
+  expect(sr.querySelector("#ptr-h-toggle")?.getAttribute("aria-expanded")).toBe(
     "true"
   );
   expect(sr.textContent).toContain("75");
-  (sr.getElementById("ptr-h-toggle") as HTMLElement).click();
-  expect(sr.getElementById("ptr-h-details")?.dataset.collapsed).toBe("true");
+  (sr.querySelector("#ptr-h-toggle") as HTMLElement).click();
+  expect(
+    (sr.querySelector("#ptr-h-details") as HTMLElement | null)?.dataset
+      .collapsed
+  ).toBe("true");
   controller.stop();
 });
 
@@ -181,7 +202,9 @@ test("inspect mode renders floating legend/hover HUD and cleans up when toggled 
     doc: win.document as unknown as Document,
     getDelta: () => ({ addSelectors: [], removeSelectors: [], modRules: [] }),
     isEnabled: () => true,
-    setEnabled: () => {},
+    setEnabled: () => {
+      // noop
+    },
     getSpacingMode: () => "both",
     getStyle: (el) => ({
       display:
@@ -191,14 +214,17 @@ test("inspect mode renders floating legend/hover HUD and cleans up when toggled 
   });
 
   controller.syncFromConfig();
-  const hud = win.document.getElementById("ptr-inspect-hud");
+  const hud = win.document.querySelector("#ptr-inspect-hud");
   expect(hud).not.toBeNull();
   expect(hud?.hasAttribute("data-ptr-ui")).toBe(true);
   expect(hud?.shadowRoot?.textContent).toContain("both");
 
-  const d1 = win.document.getElementById("d1")!;
+  const d1 = win.document.querySelector("#d1");
+  if (!d1) {
+    throw new Error("expected #d1");
+  }
   expect(d1.getAttribute("data-tr-inspect-label")).toContain("auto-dynamic");
 
   controller.stop();
-  expect(win.document.getElementById("ptr-inspect-hud")).toBeNull();
+  expect(win.document.querySelector("#ptr-inspect-hud")).toBeNull();
 });

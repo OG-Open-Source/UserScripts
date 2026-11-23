@@ -42,15 +42,17 @@ function linearToSrgb(linear: number): number {
     : 1.055 * clamped ** (1 / 2.4) - 0.055;
 }
 
+const HEX_RE = /^#?(?<r>[a-f\d]{2})(?<g>[a-f\d]{2})(?<b>[a-f\d]{2})$/iu;
+
 /** Parse `#RRGGBB` into Oklab. Returns null on malformed input. */
 export function hexToOklab(hex: string): Oklab | null {
-  const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex.trim());
-  if (!match) {
+  const match = HEX_RE.exec(hex.trim());
+  if (!match?.groups) {
     return null;
   }
-  const r = srgbToLinear(Number.parseInt(match[1], 16) / 255);
-  const g = srgbToLinear(Number.parseInt(match[2], 16) / 255);
-  const b = srgbToLinear(Number.parseInt(match[3], 16) / 255);
+  const r = srgbToLinear(Number.parseInt(match.groups.r, 16) / 255);
+  const g = srgbToLinear(Number.parseInt(match.groups.g, 16) / 255);
+  const b = srgbToLinear(Number.parseInt(match.groups.b, 16) / 255);
   const l = Math.cbrt(
     0.412_221_470_8 * r + 0.536_332_536_3 * g + 0.051_445_992_9 * b
   );

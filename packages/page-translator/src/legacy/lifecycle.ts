@@ -6,7 +6,7 @@ export interface SpaLifecycleOptions {
 }
 
 export interface SpaLifecycleHandle {
-  stop(): void;
+  stop: () => void;
 }
 
 export function watchSpaNavigation(
@@ -175,20 +175,20 @@ export function watchSpaNavigation(
   const nav = (
     win as unknown as {
       navigation?: {
-        addEventListener(
+        addEventListener: (
           type: string,
           cb: (e: {
             destination?: { url?: string };
             navigationType?: string;
           }) => void
-        ): void;
-        removeEventListener(
+        ) => void;
+        removeEventListener: (
           type: string,
           cb: (e: {
             destination?: { url?: string };
             navigationType?: string;
           }) => void
-        ): void;
+        ) => void;
       };
     }
   ).navigation;

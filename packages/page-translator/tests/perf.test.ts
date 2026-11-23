@@ -13,7 +13,7 @@ test("createOpenCC memoizes converter instance per mode/fetcher (no repeated GM/
   let gmGetCalls = 0;
   configureGmApi({
     GM_getValue: (k: string, d?: unknown) => {
-      gmGetCalls++;
+      gmGetCalls += 1;
       return k in store ? store[k] : d;
     },
     GM_setValue: (k: string, v: unknown) => {
@@ -64,9 +64,9 @@ test("syncShadowRootsOnly styles shadow roots without touching document head", (
     { customCss: "", customFont: "", debugInspect: false },
     [shadow as unknown as ShadowRoot]
   );
-  expect(win.document.getElementById("ptr-user-css")).toBeNull();
+  expect(win.document.querySelector("#ptr-user-css")).toBeNull();
   const hasStyle =
-    shadow.getElementById("ptr-user-css") !== null ||
+    shadow.querySelector("#ptr-user-css") !== null ||
     shadow.adoptedStyleSheets.length > 0;
   expect(hasStyle).toBe(true);
 });

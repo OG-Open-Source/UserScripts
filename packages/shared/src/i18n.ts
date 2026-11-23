@@ -63,9 +63,9 @@ export async function loadLocales(
   );
 
   if (cached) {
-    void fresh.then((next) => {
-      if (JSON.stringify(cached) !== JSON.stringify(next)) {
-        gmSet(key, next);
+    void fresh.then((fetched) => {
+      if (JSON.stringify(cached) !== JSON.stringify(fetched)) {
+        gmSet(key, fetched);
         onChange?.();
       }
     });

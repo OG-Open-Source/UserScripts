@@ -75,9 +75,7 @@ function syncShadowRoot(root: ShadowRoot, css: string, doc: Document): void {
       // Fall back to <style> inside shadowRoot
     }
   }
-  let styleEl = root.getElementById(
-    STYLE_ELEMENT_ID
-  ) as HTMLStyleElement | null;
+  let styleEl = root.querySelector<HTMLStyleElement>(`#${STYLE_ELEMENT_ID}`);
   if (!styleEl) {
     styleEl = doc.createElement("style");
     styleEl.id = STYLE_ELEMENT_ID;
@@ -125,7 +123,7 @@ export function syncStylesheet(
     return viaGm;
   }
 
-  let styleEl = doc.getElementById(STYLE_ELEMENT_ID) as HTMLStyleElement | null;
+  let styleEl = doc.querySelector<HTMLStyleElement>(`#${STYLE_ELEMENT_ID}`);
   if (!styleEl) {
     styleEl = doc.createElement("style");
     styleEl.id = STYLE_ELEMENT_ID;

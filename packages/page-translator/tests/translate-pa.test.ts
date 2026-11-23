@@ -52,7 +52,10 @@ test("translate-pa translateGrouped wraps context groups and extracts per-id inn
     },
   });
   const provider = createTranslatePaProvider({ apiKey: "TEST_KEY" });
-  const map = await provider.translateGrouped!(
+  if (!provider.translateGrouped) {
+    throw new Error("expected translateGrouped");
+  }
+  const map = await provider.translateGrouped(
     [
       [
         { id: "u0", html: "Save" },

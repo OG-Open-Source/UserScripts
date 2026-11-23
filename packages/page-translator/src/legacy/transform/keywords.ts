@@ -59,6 +59,10 @@ const STOP_WORDS = new Set([
 
 const TOKEN_RE = /\b[A-Za-z][A-Za-z0-9._+-]{1,31}\b/gu;
 const CAMEL_OR_ACRONYM = /(?:[a-z][A-Z]|[A-Z]{2,}|[A-Za-z]\.[A-Za-z])/u;
+const LEADING_UPPER_RE = /^[A-Z]/u;
+const HTML_TAG_SPLIT_RE = /(?<tag><[^>]+>)/gu;
+const KW_OPEN_RE = /^<span\b[^>]*data-ptr-kw\b/iu;
+const SPAN_CLOSE_RE = /^<\/span\s*>$/iu;
 
 export function extractPageKeywords(texts: readonly string[]): string[] {
   const segCounts = new Map<string, number>();
@@ -86,7 +90,10 @@ export function extractPageKeywords(texts: readonly string[]): string[] {
     if (count < 2) {
       continue;
     }
-    if (CAMEL_OR_ACRONYM.test(token) || (count >= 3 && /^[A-Z]/u.test(token))) {
+    if (
+      CAMEL_OR_ACRONYM.test(token) ||
+      (count >= 3 && LEADING_UPPER_RE.test(token))
+    ) {
       out.push(token);
     }
   }
@@ -109,20 +116,20 @@ export function maskKeywordsInHtml(
   }
 
   const pattern = new RegExp(
-    `\\b(${clean.map(escapeRegex).join("|")})\\b`,
-    "g"
+    `\\b(?<kw>${clean.map(escapeRegex).join("|")})\\b`,
+    "gu"
   );
 
   // Split around HTML tags so attributes and tag names are never altered.
-  const parts = html.split(/(<[^>]+>)/gu);
+  const parts = html.split(HTML_TAG_SPLIT_RE);
   let insideKw = 0;
   return parts
     .map((part) => {
       if (part.startsWith("<") && part.endsWith(">")) {
-        if (/^<span\b[^>]*data-ptr-kw\b/iu.test(part)) {
-          insideKw++;
-        } else if (insideKw > 0 && /^<\/span\s*>$/iu.test(part)) {
-          insideKw--;
+        if (KW_OPEN_RE.test(part)) {
+          insideKw += 1;
+        } else if (insideKw > 0 && SPAN_CLOSE_RE.test(part)) {
+          insideKw -= 1;
         }
         return part;
       }
@@ -131,7 +138,7 @@ export function maskKeywordsInHtml(
       }
       return part.replace(
         pattern,
-        '<span translate="no" data-ptr-kw="1">$1</span>'
+        '<span translate="no" data-ptr-kw="1">$<kw></span>'
       );
     })
     .join("");

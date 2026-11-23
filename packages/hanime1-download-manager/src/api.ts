@@ -10,6 +10,9 @@ import { gmFetch } from "@userscripts/shared";
 
 /** Path to the site's download page (quality list is queried per video). */
 const DL_PATH = "/download?v=";
+const QUALITY_RE = /(?<quality>\d{3,4}p)/u;
+const VIDEO_PARAM_RE = /[?&]v=(?<id>[^&]+)/u;
+const URL_SPLIT_RE = /[?#]/u;
 
 /** videoId -> qualityInfo[] (session only; secure= params are time-limited). */
 const qualityCache = new Map<string, QualityInfo[]>();
@@ -26,23 +29,21 @@ export function queryQualities(videoId: string): Promise<QualityInfo[]> {
   return gmFetch(location.origin + DL_PATH + videoId).then((html: string) => {
     const doc = new DOMParser().parseFromString(html, "text/html");
     const list: QualityInfo[] = [];
-    doc
-      .querySelectorAll("table.download-table tbody tr")
-      .forEach((tr: Element) => {
-        const link = tr.querySelector("a[data-url]");
-        if (!link) {
-          return;
-        }
-        const m = /(\d{3,4}p)/u.exec(tr.textContent ?? "");
-        if (!m) {
-          return;
-        }
-        list.push({
-          quality: m[1],
-          url: (link as HTMLAnchorElement).dataset.url as string,
-          filename: (link as HTMLAnchorElement).getAttribute("download"),
-        });
+    for (const tr of doc.querySelectorAll("table.download-table tbody tr")) {
+      const link = tr.querySelector("a[data-url]");
+      if (!link) {
+        continue;
+      }
+      const m = QUALITY_RE.exec(tr.textContent ?? "");
+      if (!m?.groups?.quality) {
+        continue;
+      }
+      list.push({
+        quality: m.groups.quality,
+        url: (link as HTMLAnchorElement).dataset.url as string,
+        filename: (link as HTMLAnchorElement).getAttribute("download"),
       });
+    }
     qualityCache.set(videoId, list);
     return list;
   });
@@ -59,17 +60,17 @@ export function extractVideoId(
         node?.getAttribute?.("href") ??
         null);
   if (href) {
-    const m = /[?&]v=([^&]+)/u.exec(href);
-    if (m) {
-      return m[1];
+    const m = VIDEO_PARAM_RE.exec(href);
+    if (m?.groups?.id) {
+      return m.groups.id;
     }
   }
   if (node && typeof node === "object" && "querySelector" in node) {
     const link = node.querySelector('a[href*="watch?v="]');
     if (link) {
-      const m = /[?&]v=([^&]+)/u.exec(link.getAttribute("href") ?? "");
-      if (m) {
-        return m[1];
+      const m = VIDEO_PARAM_RE.exec(link.getAttribute("href") ?? "");
+      if (m?.groups?.id) {
+        return m.groups.id;
       }
     }
   }
@@ -112,7 +113,7 @@ export function downloadName(filename: string | null, url: string): string {
 }
 
 function extensionOf(url: string): string | null {
-  const path = url.split(/[?#]/u, 1)[0] ?? "";
+  const path = url.split(URL_SPLIT_RE, 1)[0] ?? "";
   const base = path.slice(path.lastIndexOf("/") + 1);
   const dot = base.lastIndexOf(".");
   if (dot <= 0 || dot === base.length - 1) {
@@ -145,7 +146,7 @@ export async function resolveWithFallback(
   const list = await queryQualities(videoId);
   const idx = qualities.indexOf(quality);
   // Try requested quality, then lower ones.
-  for (let i = idx; i < qualities.length; i++) {
+  for (let i = idx; i < qualities.length; i += 1) {
     const info = list.find((q) => q.quality === qualities[i]);
     if (info) {
       return { info, quality: qualities[i] };

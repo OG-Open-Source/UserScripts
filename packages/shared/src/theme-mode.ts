@@ -63,10 +63,10 @@ const LIGHT_TOKENS: ThemeTokens = {
   accentFg: "oklch(98.00% 0.0060 255.83)",
 };
 
-const HEX_6_RE = /^#([a-f\d]{6})$/iu;
-const HEX_3_RE = /^#([a-f\d])([a-f\d])([a-f\d])$/iu;
+const HEX_6_RE = /^#(?<hex>[a-f\d]{6})$/iu;
+const HEX_3_RE = /^#(?<r>[a-f\d])(?<g>[a-f\d])(?<b>[a-f\d])$/iu;
 const RGB_FUNC_RE =
-  /^rgba?\(\s*(\d+(?:\.\d+)?)\s*[,\s]\s*(\d+(?:\.\d+)?)\s*[,\s]\s*(\d+(?:\.\d+)?)(?:\s*[,/]\s*(\d+(?:\.\d+)?%?))?\s*\)$/iu;
+  /^rgba?\(\s*(?<r>\d+(?:\.\d+)?)\s*[,\s]\s*(?<g>\d+(?:\.\d+)?)\s*[,\s]\s*(?<b>\d+(?:\.\d+)?)(?:\s*[,/]\s*(?<a>\d+(?:\.\d+)?%?))?\s*\)$/iu;
 
 function toHexByte(n: number): string {
   return Math.max(0, Math.min(255, Math.round(n)))
@@ -87,12 +87,13 @@ export function cssColorToHex(raw: string | null | undefined): string | null {
     return s.toUpperCase();
   }
   const m3 = HEX_3_RE.exec(s);
-  if (m3) {
-    return `#${m3[1]}${m3[1]}${m3[2]}${m3[2]}${m3[3]}${m3[3]}`.toUpperCase();
+  if (m3?.groups) {
+    const { r, g, b } = m3.groups;
+    return `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
   }
   const mRgb = RGB_FUNC_RE.exec(s);
-  if (mRgb) {
-    const alphaRaw = mRgb[4];
+  if (mRgb?.groups) {
+    const alphaRaw = mRgb.groups.a;
     if (alphaRaw !== undefined) {
       const alpha = alphaRaw.endsWith("%")
         ? Number.parseFloat(alphaRaw) / 100
@@ -101,9 +102,9 @@ export function cssColorToHex(raw: string | null | undefined): string | null {
         return null;
       }
     }
-    const r = Number.parseFloat(mRgb[1] ?? "0");
-    const g = Number.parseFloat(mRgb[2] ?? "0");
-    const b = Number.parseFloat(mRgb[3] ?? "0");
+    const r = Number.parseFloat(mRgb.groups.r ?? "0");
+    const g = Number.parseFloat(mRgb.groups.g ?? "0");
+    const b = Number.parseFloat(mRgb.groups.b ?? "0");
     return `#${toHexByte(r)}${toHexByte(g)}${toHexByte(b)}`.toUpperCase();
   }
   return null;
@@ -115,12 +116,12 @@ export function cssColorToHex(raw: string | null | undefined): string | null {
  */
 export function probeHostColors(doc: Document = document): ThemeColors | null {
   const view = doc.defaultView;
-  const gcs =
-    view && typeof view.getComputedStyle === "function"
-      ? view.getComputedStyle.bind(view)
-      : typeof getComputedStyle === "function"
-        ? getComputedStyle
-        : null;
+  let gcs: ((el: Element) => CSSStyleDeclaration) | null = null;
+  if (view && typeof view.getComputedStyle === "function") {
+    gcs = view.getComputedStyle.bind(view);
+  } else if (typeof getComputedStyle === "function") {
+    gcs = getComputedStyle;
+  }
   if (!gcs) {
     return null;
   }

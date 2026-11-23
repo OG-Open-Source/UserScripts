@@ -6,8 +6,8 @@ import { recordMutationBatch, recordScanTiming } from "../metrics";
 import type { CompiledSiteDelta } from "../site-rules";
 
 export interface ViewportObserverHandle {
-  scan(target?: Element): void;
-  stop(): void;
+  scan: (target?: Element) => void;
+  stop: () => void;
 }
 
 const OBSERVE_CONFIG: MutationObserverInit = {
@@ -52,7 +52,7 @@ export function createViewportObserver(options: {
   metrics?: PtrMetrics;
   rootMargin?: string;
 }): ViewportObserverHandle {
-  const metrics = options.metrics;
+  const { metrics } = options;
   const seenContainers = new WeakSet<Element>();
   const observedRoots = new WeakSet<Node>();
   const pendingByContainer = new Map<Element, TranslationSegment[]>();
@@ -60,36 +60,85 @@ export function createViewportObserver(options: {
   let flushTimer: ReturnType<typeof setTimeout> | null = null;
   const pendingMutationRoots = new Set<Element>();
 
+  function handleIntersection(entries: IntersectionObserverEntry[]): void {
+    if (stopped) {
+      return;
+    }
+    const ready: TranslationSegment[] = [];
+    for (const entry of entries) {
+      if (!entry.isIntersecting) {
+        continue;
+      }
+      const segs = pendingByContainer.get(entry.target);
+      if (segs) {
+        ready.push(...segs);
+        pendingByContainer.delete(entry.target);
+      }
+      intersectionObserver?.unobserve(entry.target);
+    }
+    if (ready.length > 0) {
+      if (metrics) {
+        metrics.viewportTriggered += ready.length;
+        metrics.viewportPending = pendingByContainer.size;
+      }
+      options.onVisibleSegments(ready);
+    }
+  }
+
   const intersectionObserver =
     typeof IntersectionObserver === "undefined"
       ? null
-      : new IntersectionObserver(
-          (entries) => {
-            if (stopped) {
-              return;
-            }
-            const ready: TranslationSegment[] = [];
-            for (const entry of entries) {
-              if (!entry.isIntersecting) {
-                continue;
-              }
-              const segs = pendingByContainer.get(entry.target);
-              if (segs) {
-                ready.push(...segs);
-                pendingByContainer.delete(entry.target);
-              }
-              intersectionObserver?.unobserve(entry.target);
-            }
-            if (ready.length > 0) {
-              if (metrics) {
-                metrics.viewportTriggered += ready.length;
-                metrics.viewportPending = pendingByContainer.size;
-              }
-              options.onVisibleSegments(ready);
-            }
-          },
-          { rootMargin: options.rootMargin ?? "300px 0px" }
-        );
+      : new IntersectionObserver(handleIntersection, {
+          rootMargin: options.rootMargin ?? "300px 0px",
+        });
+
+  function queueMutationRecord(rec: MutationRecord): void {
+    if (isTranslatorNode(rec.target)) {
+      return;
+    }
+    if (rec.type === "attributes" && rec.target.nodeType === 1) {
+      pendingMutationRoots.add(rec.target as Element);
+      return;
+    }
+    if (rec.type !== "childList") {
+      return;
+    }
+    for (const added of Array.from(rec.addedNodes)) {
+      if (added.nodeType === 1 && !isTranslatorNode(added)) {
+        pendingMutationRoots.add(added as Element);
+      } else if (added.nodeType === 3 && rec.target.nodeType === 1) {
+        pendingMutationRoots.add(rec.target as Element);
+      }
+    }
+  }
+
+  function hasQueuedAncestor(el: Element, rootSet: Set<Element>): boolean {
+    let p = el.parentElement;
+    while (p) {
+      if (rootSet.has(p)) {
+        return true;
+      }
+      p = p.parentElement;
+    }
+    return false;
+  }
+
+  function flushMutationRoots(): void {
+    flushTimer = null;
+    const roots = Array.from(pendingMutationRoots);
+    pendingMutationRoots.clear();
+    // Coalesce: skip nodes whose ancestor is already queued in this batch
+    const rootSet = new Set(roots);
+    const scanStartedAt = nowMs();
+    for (const r of roots) {
+      if (r.isConnected && !hasQueuedAncestor(r, rootSet)) {
+        scan(r);
+      }
+    }
+    if (metrics) {
+      recordMutationBatch(metrics, nowMs() - scanStartedAt);
+    }
+  }
 
   const mutationObserver =
     typeof MutationObserver === "undefined"
@@ -99,52 +148,10 @@ export function createViewportObserver(options: {
             return;
           }
           for (const rec of records) {
-            if (isTranslatorNode(rec.target)) {
-              continue;
-            }
-            if (rec.type === "attributes" && rec.target.nodeType === 1) {
-              pendingMutationRoots.add(rec.target as Element);
-              continue;
-            }
-            if (rec.type === "childList") {
-              for (const added of Array.from(rec.addedNodes)) {
-                if (added.nodeType === 1 && !isTranslatorNode(added)) {
-                  pendingMutationRoots.add(added as Element);
-                } else if (added.nodeType === 3 && rec.target.nodeType === 1) {
-                  pendingMutationRoots.add(rec.target as Element);
-                }
-              }
-            }
+            queueMutationRecord(rec);
           }
           if (pendingMutationRoots.size > 0 && flushTimer === null) {
-            flushTimer = setTimeout(() => {
-              flushTimer = null;
-              const roots = Array.from(pendingMutationRoots);
-              pendingMutationRoots.clear();
-              // Coalesce: skip nodes whose ancestor is already queued in this batch
-              const rootSet = new Set(roots);
-              const scanStartedAt = nowMs();
-              for (const r of roots) {
-                if (!r.isConnected) {
-                  continue;
-                }
-                let hasQueuedAncestor = false;
-                let p = r.parentElement;
-                while (p) {
-                  if (rootSet.has(p)) {
-                    hasQueuedAncestor = true;
-                    break;
-                  }
-                  p = p.parentElement;
-                }
-                if (!hasQueuedAncestor) {
-                  scan(r);
-                }
-              }
-              if (metrics) {
-                recordMutationBatch(metrics, nowMs() - scanStartedAt);
-              }
-            }, 120);
+            flushTimer = setTimeout(flushMutationRoots, 120);
           }
         });
 
@@ -154,6 +161,57 @@ export function createViewportObserver(options: {
     }
     observedRoots.add(node);
     mutationObserver.observe(node, OBSERVE_CONFIG);
+  }
+
+  function isAlreadyRendered(seg: TranslationSegment): boolean {
+    if (!seenContainers.has(seg.container)) {
+      return false;
+    }
+    return seg.nodes.every(
+      (n) =>
+        n.parentNode &&
+        (n.parentNode as Element).closest?.("[data-tr-block]") !== null
+    );
+  }
+
+  function queueSegment(
+    seg: TranslationSegment,
+    immediate: TranslationSegment[]
+  ): void {
+    if (isAlreadyRendered(seg)) {
+      return;
+    }
+    seenContainers.add(seg.container);
+
+    const isContents =
+      seg.displayContents ??
+      (typeof getComputedStyle === "function" &&
+        getComputedStyle(seg.container).display === "contents");
+
+    if (!intersectionObserver || isContents) {
+      immediate.push(seg);
+      return;
+    }
+    const list = pendingByContainer.get(seg.container);
+    if (list) {
+      list.push(seg);
+    } else {
+      pendingByContainer.set(seg.container, [seg]);
+      intersectionObserver.observe(seg.container);
+    }
+  }
+
+  function handleShadowRoots(shadowRoots: Set<ShadowRoot>): void {
+    if (shadowRoots.size === 0) {
+      return;
+    }
+    if (metrics) {
+      metrics.shadowRootCount += shadowRoots.size;
+    }
+    for (const sr of shadowRoots) {
+      ensureObserved(sr);
+    }
+    options.onShadowRoots?.(shadowRoots);
   }
 
   function scan(target: Element = options.root): void {
@@ -178,15 +236,7 @@ export function createViewportObserver(options: {
       );
     }
 
-    if (shadowRoots.size > 0) {
-      if (metrics) {
-        metrics.shadowRootCount += shadowRoots.size;
-      }
-      for (const sr of shadowRoots) {
-        ensureObserved(sr);
-      }
-      options.onShadowRoots?.(shadowRoots);
-    }
+    handleShadowRoots(shadowRoots);
 
     if (segs.length === 0) {
       if (metrics) {
@@ -197,34 +247,7 @@ export function createViewportObserver(options: {
 
     const immediate: TranslationSegment[] = [];
     for (const seg of segs) {
-      if (
-        seenContainers.has(seg.container) &&
-        seg.nodes.every(
-          (n) =>
-            n.parentNode &&
-            (n.parentNode as Element).closest?.("[data-tr-block]") !== null
-        )
-      ) {
-        continue;
-      }
-      seenContainers.add(seg.container);
-
-      const isContents =
-        seg.displayContents ??
-        (typeof getComputedStyle === "function" &&
-          getComputedStyle(seg.container).display === "contents");
-
-      if (intersectionObserver && !isContents) {
-        const list = pendingByContainer.get(seg.container);
-        if (list) {
-          list.push(seg);
-        } else {
-          pendingByContainer.set(seg.container, [seg]);
-          intersectionObserver.observe(seg.container);
-        }
-      } else {
-        immediate.push(seg);
-      }
+      queueSegment(seg, immediate);
     }
 
     if (metrics) {

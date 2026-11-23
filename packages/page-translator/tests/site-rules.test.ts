@@ -39,12 +39,18 @@ test("resolveSiteDeltaForHost merges wildcard and exact host deltas", () => {
 test("matchModifiers returns combined modifiers and ignores invalid CSS selectors safely", () => {
   const win = new Window();
   win.document.body.innerHTML = `<div class="a b"></div>`;
-  const el = win.document.querySelector("div")!;
+  const el = win.document.querySelector("div");
+  if (!el) {
+    throw new Error("expected div");
+  }
   const delta = parseSiteDelta(`
     * .a : block
     * .b : keep-orig
     * [invalid=== : no-spacing
   `);
   const mods = matchModifiers(el as unknown as Element, delta);
-  expect([...mods].sort()).toEqual(["block", "keep-orig"]);
+  expect([...mods].sort((a, b) => a.localeCompare(b))).toEqual([
+    "block",
+    "keep-orig",
+  ]);
 });

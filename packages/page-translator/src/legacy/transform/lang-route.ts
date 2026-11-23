@@ -15,6 +15,9 @@ const KANA_RE = /[\p{Script=Hiragana}\p{Script=Katakana}]/u;
 const HANGUL_RE = /\p{Script=Hangul}/u;
 const HAN_RE = /\p{Script=Han}/u;
 const LATIN_RE = /[A-Za-z]/u;
+const BCP47_SPLIT_RE = /[-_]/u;
+const SCRIPT_PART_RE = /^[A-Za-z]{4}$/u;
+const REGION_PART_RE = /^[A-Za-z]{2}$/u;
 
 const CYRILLIC_RE = /\p{Script=Cyrillic}/u;
 const ARABIC_RE = /\p{Script=Arabic}/u;
@@ -43,20 +46,20 @@ const SIMP_FINGERPRINT = new Set(
 );
 
 export function parseBcp47(tag: string): Bcp47Parts {
-  const parts = tag.trim().split(/[-_]/u).filter(Boolean);
-  if (parts.length === 0) {
+  const parts = tag.trim().split(BCP47_SPLIT_RE).filter(Boolean);
+  const [first, ...rest] = parts;
+  if (!first) {
     return { lang: "und" };
   }
 
-  const lang = parts[0]!.toLowerCase();
+  const lang = first.toLowerCase();
   let script: string | undefined;
   let region: string | undefined;
 
-  for (let i = 1; i < parts.length; i++) {
-    const p = parts[i]!;
-    if (p.length === 4 && /^[A-Za-z]{4}$/u.test(p)) {
-      script = p[0]!.toUpperCase() + p.slice(1).toLowerCase();
-    } else if (p.length === 2 && /^[A-Za-z]{2}$/u.test(p)) {
+  for (const p of rest) {
+    if (p.length === 4 && SCRIPT_PART_RE.test(p)) {
+      script = p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
+    } else if (p.length === 2 && REGION_PART_RE.test(p)) {
       region = p.toUpperCase();
     }
   }
@@ -72,6 +75,34 @@ export function parseBcp47(tag: string): Bcp47Parts {
   return { lang, ...(script ? { script } : {}), ...(region ? { region } : {}) };
 }
 
+function detectHanBcp47(text: string, elementLang?: string): Bcp47Parts {
+  const parsedEl = elementLang ? parseBcp47(elementLang) : null;
+  if (parsedEl && (parsedEl.lang === "ja" || parsedEl.lang === "ko")) {
+    return parsedEl;
+  }
+
+  let tradCount = 0;
+  let simpCount = 0;
+  for (const ch of text) {
+    if (TRAD_FINGERPRINT.has(ch)) {
+      tradCount += 1;
+    } else if (SIMP_FINGERPRINT.has(ch)) {
+      simpCount += 1;
+    }
+  }
+  if (simpCount > tradCount) {
+    return { lang: "zh", script: "Hans" };
+  }
+  if (tradCount > simpCount) {
+    return { lang: "zh", script: "Hant" };
+  }
+
+  if (parsedEl && parsedEl.lang === "zh") {
+    return parsedEl;
+  }
+  return { lang: "zh" };
+}
+
 export function detectSegmentBcp47(
   text: string,
   elementLang?: string
@@ -82,33 +113,8 @@ export function detectSegmentBcp47(
   if (HANGUL_RE.test(text)) {
     return { lang: "ko" };
   }
-
   if (HAN_RE.test(text)) {
-    const parsedEl = elementLang ? parseBcp47(elementLang) : null;
-    if (parsedEl && (parsedEl.lang === "ja" || parsedEl.lang === "ko")) {
-      return parsedEl;
-    }
-
-    let tradCount = 0;
-    let simpCount = 0;
-    for (const ch of text) {
-      if (TRAD_FINGERPRINT.has(ch)) {
-        tradCount++;
-      } else if (SIMP_FINGERPRINT.has(ch)) {
-        simpCount++;
-      }
-    }
-    if (simpCount > tradCount) {
-      return { lang: "zh", script: "Hans" };
-    }
-    if (tradCount > simpCount) {
-      return { lang: "zh", script: "Hant" };
-    }
-
-    if (parsedEl && parsedEl.lang === "zh") {
-      return parsedEl;
-    }
-    return { lang: "zh" };
+    return detectHanBcp47(text, elementLang);
   }
 
   for (const [scriptRe, lang] of NON_LATIN_SCRIPT_TAGS) {
@@ -131,6 +137,24 @@ export function detectSegmentBcp47(
   return { lang: LATIN_RE.test(text) ? "en" : "und" };
 }
 
+function routeZhSegment(source: Bcp47Parts, target: Bcp47Parts): SegmentRoute {
+  if (source.script && target.script && source.script !== target.script) {
+    if (source.script === "Hans" && target.script === "Hant") {
+      return {
+        action: "opencc",
+        mode: target.region === "TW" ? "s2twp" : "s2t",
+      };
+    }
+    if (source.script === "Hant" && target.script === "Hans") {
+      return {
+        action: "opencc",
+        mode: target.region === "CN" ? "tw2sp" : "t2s",
+      };
+    }
+  }
+  return { action: "skip" };
+}
+
 export function routeSegment(
   text: string,
   targetLang: string,
@@ -140,21 +164,7 @@ export function routeSegment(
   const source = detectSegmentBcp47(text, elementLang);
 
   if (source.lang === "zh" && target.lang === "zh") {
-    if (source.script && target.script && source.script !== target.script) {
-      if (source.script === "Hans" && target.script === "Hant") {
-        return {
-          action: "opencc",
-          mode: target.region === "TW" ? "s2twp" : "s2t",
-        };
-      }
-      if (source.script === "Hant" && target.script === "Hans") {
-        return {
-          action: "opencc",
-          mode: target.region === "CN" ? "tw2sp" : "t2s",
-        };
-      }
-    }
-    return { action: "skip" };
+    return routeZhSegment(source, target);
   }
 
   if (source.lang !== "und" && source.lang === target.lang) {

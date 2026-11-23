@@ -12,21 +12,23 @@ const URL_RE =
 // Full-width punctuation (【】〖〗「」『』（）［］｛｝！？。，＂’：；、) is NOT in CJK_RE
 // and therefore never receives extra spaces on either side.
 const CJK_HYPHEN_NUM =
-  /([\u4E00-\u9FFF\u3400-\u4DBF\u3105-\u312F\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF])-(\d)/gu;
+  /(?<cjk>[\u4E00-\u9FFF\u3400-\u4DBF\u3105-\u312F\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF])-(?<num>\d)/gu;
 const CJK_TO_HW =
-  /([\u4E00-\u9FFF\u3400-\u4DBF\u3105-\u312F\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF])([A-Za-z0-9([])/gu;
+  /(?<cjk>[\u4E00-\u9FFF\u3400-\u4DBF\u3105-\u312F\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF])(?<hw>[A-Za-z0-9([])/gu;
 const HW_TO_CJK =
-  /([A-Za-z0-9%!)\]])([\u4E00-\u9FFF\u3400-\u4DBF\u3105-\u312F\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF])/gu;
-const PCT_TO_PAREN = /%([([])/gu;
+  /(?<hw>[A-Za-z0-9%!)\]])(?<cjk>[\u4E00-\u9FFF\u3400-\u4DBF\u3105-\u312F\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF])/gu;
+const PCT_TO_PAREN = /%(?<paren>[([])/gu;
 
 const FW_ALNUM_RE = /[\uFF10-\uFF19\uFF21-\uFF3A\uFF41-\uFF5A]/gu;
 const CJK_PARENS_RE =
-  /[ \t]*\(([^()]*?[\u4E00-\u9FFF\u3400-\u4DBF\u3105-\u312F\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF][^()]*?)\)[ \t]*/gu;
+  /[ \t]*\((?<inner>[^()]*?[\u4E00-\u9FFF\u3400-\u4DBF\u3105-\u312F\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF][^()]*?)\)[ \t]*/gu;
 const CJK_ADJ_PUNCT_RE =
-  /([\u4E00-\u9FFF\u3400-\u4DBF\u3105-\u312F\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF）])([,.!?:;])[ \t]*/gu;
-const FW_PUNCT_TRAIL_SPACE_RE = /([，。！？：；（）])[ \t]+/gu;
-const LATIN_COMMA_SPACE_RE = /([A-Za-z]),([A-Za-z])/gu;
-const LATIN_PERIOD_SPACE_RE = /([a-z])\.([A-Z][a-z])/gu;
+  /(?<cjk>[\u4E00-\u9FFF\u3400-\u4DBF\u3105-\u312F\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF）])(?<punct>[,.!?:;])[ \t]*/gu;
+const FW_PUNCT_TRAIL_SPACE_RE = /(?<punct>[，。！？：；（）])[ \t]+/gu;
+const LATIN_COMMA_SPACE_RE = /(?<left>[A-Za-z]),(?<right>[A-Za-z])/gu;
+const LATIN_PERIOD_SPACE_RE = /(?<left>[a-z])\.(?<right>[A-Z][a-z])/gu;
+const URL_MASK_RE = /\uE000U(?<idx>\d+)\uE001/gu;
+const ASCII_PRINTABLE_RE = /^[\x21-\x7E]$/u;
 
 const HALF_TO_FULL_PUNCT: Record<string, string> = {
   ",": "，",
@@ -62,14 +64,14 @@ export function normalizePunctuation(
       CJK_ADJ_PUNCT_RE,
       (_, cjk: string, p: string) => `${cjk}${HALF_TO_FULL_PUNCT[p] ?? p}`
     )
-    .replace(FW_PUNCT_TRAIL_SPACE_RE, "$1")
-    .replace(LATIN_COMMA_SPACE_RE, "$1, $2")
-    .replace(LATIN_PERIOD_SPACE_RE, "$1. $2");
+    .replace(FW_PUNCT_TRAIL_SPACE_RE, "$<punct>")
+    .replace(LATIN_COMMA_SPACE_RE, "$<left>, $<right>")
+    .replace(LATIN_PERIOD_SPACE_RE, "$<left>. $<right>");
 
   if (urls.length === 0) {
     return norm;
   }
-  return norm.replace(/\uE000U(\d+)\uE001/gu, (_, n) => urls[Number(n)] ?? "");
+  return norm.replace(URL_MASK_RE, (_, n) => urls[Number(n)] ?? "");
 }
 
 export function needsSpaceBetween(left: string, right: string): boolean {
@@ -106,18 +108,15 @@ export function spaceCjkText(text: string): string {
   });
 
   const spaced = masked
-    .replace(CJK_HYPHEN_NUM, "$1 - $2")
-    .replace(PCT_TO_PAREN, "% $1")
-    .replace(CJK_TO_HW, "$1 $2")
-    .replace(HW_TO_CJK, "$1 $2");
+    .replace(CJK_HYPHEN_NUM, "$<cjk> - $<num>")
+    .replace(PCT_TO_PAREN, "% $<paren>")
+    .replace(CJK_TO_HW, "$<cjk> $<hw>")
+    .replace(HW_TO_CJK, "$<hw> $<cjk>");
 
   if (urls.length === 0) {
     return spaced;
   }
-  return spaced.replace(
-    /\uE000U(\d+)\uE001/gu,
-    (_, n) => urls[Number(n)] ?? ""
-  );
+  return spaced.replace(URL_MASK_RE, (_, n) => urls[Number(n)] ?? "");
 }
 
 export interface SpacingPreviewResult {
@@ -142,22 +141,25 @@ export function formatDebugSpacingMarks(before: string, after: string): string {
   let i = 0;
   let j = 0;
   while (j < after.length) {
-    const ca = after[j]!;
+    const ca = after[j];
+    if (ca === undefined) {
+      break;
+    }
     const cb = before[i];
     if (ca === " ") {
       if (cb === " ") {
         out += "_";
-        i++;
+        i += 1;
       } else {
         out += "^";
       }
-      j++;
+      j += 1;
     } else {
       out += ca;
       if (cb === ca) {
-        i++;
+        i += 1;
       }
-      j++;
+      j += 1;
     }
   }
   return out;
@@ -197,12 +199,72 @@ export function applyPunctNormToFragment(
   walk(root, false);
 }
 
+function shouldInsertSeamSpace(
+  curSkip: boolean,
+  nextSkip: boolean,
+  leftChar: string,
+  rightChar: string
+): boolean {
+  if (needsSpaceBetween(leftChar, rightChar)) {
+    return true;
+  }
+  if (!(curSkip || nextSkip)) {
+    return false;
+  }
+  if (!curSkip && nextSkip) {
+    return CJK_RE.test(leftChar) && ASCII_PRINTABLE_RE.test(rightChar);
+  }
+  if (curSkip && !nextSkip) {
+    return ASCII_PRINTABLE_RE.test(leftChar) && CJK_RE.test(rightChar);
+  }
+  return false;
+}
+
+function applySeamBetween(
+  cur: { node: Text; skip: boolean },
+  next: { node: Text; skip: boolean },
+  debugMarks: boolean
+): void {
+  if (cur.skip && next.skip) {
+    return;
+  }
+  const leftVal = cur.node.nodeValue ?? "";
+  const rightVal = next.node.nodeValue ?? "";
+  const leftChar = leftVal.at(-1);
+  const [rightChar] = rightVal;
+  if (!(leftChar && rightChar)) {
+    return;
+  }
+  if (!shouldInsertSeamSpace(cur.skip, next.skip, leftChar, rightChar)) {
+    return;
+  }
+  const sep = debugMarks ? "^" : " ";
+  if (!cur.skip) {
+    cur.node.nodeValue = `${leftVal}${sep}`;
+  } else if (!next.skip) {
+    next.node.nodeValue = `${sep}${rightVal}`;
+  }
+}
+
+function applySeamSpacing(
+  textNodes: readonly { node: Text; skip: boolean }[],
+  debugMarks: boolean
+): void {
+  for (let i = 0; i < textNodes.length - 1; i += 1) {
+    const cur = textNodes[i];
+    const next = textNodes[i + 1];
+    if (cur && next) {
+      applySeamBetween(cur, next, debugMarks);
+    }
+  }
+}
+
 export function applySpacingToFragment(
   root: Node,
   options?: { skipPredicate?: (el: Element) => boolean; debugMarks?: boolean }
 ): void {
   const skipPredicate = options?.skipPredicate;
-  const textNodes: Array<{ node: Text; skip: boolean }> = [];
+  const textNodes: { node: Text; skip: boolean }[] = [];
 
   function walk(node: Node, inheritedSkip: boolean): void {
     if (node.nodeType === 3) {
@@ -238,47 +300,5 @@ export function applySpacingToFragment(
   }
 
   // Handle inline element seams without inserting extra DOM nodes
-  for (let i = 0; i < textNodes.length - 1; i++) {
-    const cur = textNodes[i]!;
-    const next = textNodes[i + 1]!;
-    if (cur.skip && next.skip) {
-      continue;
-    }
-    const leftVal = cur.node.nodeValue ?? "";
-    const rightVal = next.node.nodeValue ?? "";
-    if (!(leftVal && rightVal)) {
-      continue;
-    }
-    const leftChar = leftVal[leftVal.length - 1]!;
-    const rightChar = rightVal[0]!;
-
-    let shouldSpace = needsSpaceBetween(leftChar, rightChar);
-    if (!shouldSpace && (cur.skip || next.skip)) {
-      const ASCII_PRINTABLE = /^[\x21-\x7E]$/u;
-      if (
-        !cur.skip &&
-        next.skip &&
-        CJK_RE.test(leftChar) &&
-        ASCII_PRINTABLE.test(rightChar)
-      ) {
-        shouldSpace = true;
-      } else if (
-        cur.skip &&
-        !next.skip &&
-        ASCII_PRINTABLE.test(leftChar) &&
-        CJK_RE.test(rightChar)
-      ) {
-        shouldSpace = true;
-      }
-    }
-
-    if (shouldSpace) {
-      const sep = options?.debugMarks ? "^" : " ";
-      if (!cur.skip) {
-        cur.node.nodeValue = `${leftVal}${sep}`;
-      } else if (!next.skip) {
-        next.node.nodeValue = `${sep}${rightVal}`;
-      }
-    }
-  }
+  applySeamSpacing(textNodes, Boolean(options?.debugMarks));
 }

@@ -4,7 +4,7 @@ import { ConverterFactory } from "opencc-js/core";
 import type { OpenCCMode } from "../config";
 
 export interface OpenCCConverter {
-  convert(text: string): string;
+  convert: (text: string) => string;
 }
 
 const OPENCC_CDN_BASE =

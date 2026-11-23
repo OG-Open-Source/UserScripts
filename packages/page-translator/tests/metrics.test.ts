@@ -8,6 +8,8 @@ import {
 } from "../src/legacy/metrics";
 import { getSharedPanelCss } from "../src/legacy/ui-theme";
 
+const BORDER_1PX_RE = /border:\s*1px/u;
+
 test("getSharedPanelCss exposes borderless NovaKit light/dark CSS tokens", () => {
   const css = getSharedPanelCss();
   expect(css).toContain("color-scheme: light dark");
@@ -18,7 +20,7 @@ test("getSharedPanelCss exposes borderless NovaKit light/dark CSS tokens", () =>
   expect(css).toContain("--us-mono:");
   expect(css).toContain("prefers-color-scheme: dark");
   expect(css).toContain("--us-radius-lg: 12px");
-  expect(css).not.toMatch(/border:\s*1px/u);
+  expect(css).not.toMatch(BORDER_1PX_RE);
 });
 
 test("metrics store tracks scan/mutation timings and cache hit rate accurately", () => {

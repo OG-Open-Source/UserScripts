@@ -51,10 +51,7 @@ export const DEFAULT_CONFIG: TranslatorConfig = {
 export function resolveSpacingMode(
   cfg: Pick<TranslatorConfig, "autoSpacing" | "spacingMode">
 ): SpacingMode {
-  if (cfg.spacingMode) {
-    return cfg.spacingMode;
-  }
-  return cfg.autoSpacing ? "both" : "off";
+  return cfg.spacingMode;
 }
 
 export function loadConfig(): TranslatorConfig {
@@ -85,13 +82,12 @@ export function loadConfig(): TranslatorConfig {
 
 export function saveConfig(patch: Partial<TranslatorConfig>): TranslatorConfig {
   const current = loadConfig();
-  const nextSpacingMode =
-    patch.spacingMode ??
-    (patch.autoSpacing === undefined
-      ? current.spacingMode
-      : patch.autoSpacing
-        ? "both"
-        : "off");
+  let nextSpacingMode = current.spacingMode;
+  if (patch.spacingMode !== undefined) {
+    nextSpacingMode = patch.spacingMode;
+  } else if (patch.autoSpacing !== undefined) {
+    nextSpacingMode = patch.autoSpacing ? "both" : "off";
+  }
   const next: TranslatorConfig = {
     ...current,
     ...patch,

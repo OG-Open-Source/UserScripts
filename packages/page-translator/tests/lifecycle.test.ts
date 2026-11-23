@@ -36,7 +36,7 @@ test("async navigation.navigate waits for pushState/navigatesuccess without drop
       if (!navListeners.has(type)) {
         navListeners.set(type, new Set());
       }
-      navListeners.get(type)!.add(cb);
+      navListeners.get(type)?.add(cb);
     },
     removeEventListener(type: string, cb: (e: unknown) => void) {
       navListeners.get(type)?.delete(cb);
@@ -100,7 +100,9 @@ test("A -> B -> A SPA navigation with turbo:before-cache and turbo:load always t
 test("turbo:frame-load triggers onSettled without breaking non-writable history methods", async () => {
   const win = new Window({ url: "https://github.com/owner/repo/insights" });
   Object.defineProperty(win.history, "pushState", {
-    value: () => {},
+    value: () => {
+      // noop
+    },
     writable: false,
     configurable: true,
   });
@@ -118,7 +120,9 @@ test("turbo:frame-load triggers onSettled without breaking non-writable history 
 });
 
 test("observer ignores [data-ptr-ui] mutations and records scan metrics", async () => {
-  const { createViewportObserver } = await import("../src/legacy/capture/observer");
+  const { createViewportObserver } = await import(
+    "../src/legacy/capture/observer"
+  );
   const { createPtrMetrics } = await import("../src/legacy/metrics");
   const { parseSiteDelta } = await import("../src/legacy/site-rules");
   const win = new Window();
@@ -132,7 +136,11 @@ test("observer ignores [data-ptr-ui] mutations and records scan metrics", async 
     onVisibleSegments: (segs) => seen.push(...segs.map((s) => s.container.id)),
   });
   obs.scan();
-  win.document.getElementById("hud")!.textContent = "Updated HUD 12ms";
+  const hudEl = win.document.querySelector("#hud");
+  if (!hudEl) {
+    throw new Error("expected #hud");
+  }
+  hudEl.textContent = "Updated HUD 12ms";
   await new Promise((r) => setTimeout(r, 150));
   expect(seen).toEqual(["main"]);
   expect(metrics.lastScanMs).toBeGreaterThanOrEqual(0);

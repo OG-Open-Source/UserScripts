@@ -54,14 +54,20 @@ test("gmMenuCommand forwards options and returns id; gmUnregisterMenuCommand inv
       calls.push(["reg", caption, opts]);
       return "menu-1";
     },
-    GM_unregisterMenuCommand(id: string) {
-      calls.push(["unreg", id]);
+    GM_unregisterMenuCommand(menuId: string) {
+      calls.push(["unreg", menuId]);
     },
   });
-  const id = gmMenuCommand("Preview: OFF", () => {}, {
-    id: "menu-1",
-    autoClose: false,
-  });
+  const id = gmMenuCommand(
+    "Preview: OFF",
+    () => {
+      // noop
+    },
+    {
+      id: "menu-1",
+      autoClose: false,
+    }
+  );
   expect(id).toBe("menu-1");
   gmUnregisterMenuCommand("menu-1");
   expect(calls).toEqual([
@@ -80,9 +86,14 @@ test("gmMenuCommand forwards options and returns id; gmUnregisterMenuCommand inv
       numCalls.push(["unreg", handle]);
     },
   });
-  const numId = gmMenuCommand("Volunteer Mode: OFF", () => {});
+  const numId = gmMenuCommand("Volunteer Mode: OFF", () => {
+    // noop
+  });
   expect(numId).toBe(42);
-  gmUnregisterMenuCommand(numId!);
+  if (numId === undefined) {
+    throw new Error("expected numeric menu id");
+  }
+  gmUnregisterMenuCommand(numId);
   expect(numCalls).toEqual([
     ["reg", "Volunteer Mode: OFF"],
     ["unreg", 42],
@@ -93,7 +104,11 @@ test("gmAddStyle calls GM_addStyle when configured and returns null when absent"
   configureGmApi({});
   expect(gmAddStyle("body{}")).toBeNull();
 
-  const fakeEl = { remove() {} } as unknown as HTMLStyleElement;
+  const fakeEl = {
+    remove() {
+      // noop
+    },
+  } as unknown as HTMLStyleElement;
   let injected = "";
   configureGmApi({
     GM_addStyle(css: string) {

@@ -33,9 +33,9 @@ export function createMenu(
   function closeMenu(): void {
     if (openMenu) {
       // Release the pinned trigger button.
-      document.querySelectorAll(".h1dl-pinned").forEach((el) => {
+      for (const el of document.querySelectorAll(".h1dl-pinned")) {
         el.classList.remove("h1dl-pinned");
-      });
+      }
       openMenu.remove();
       openMenu = null;
     }
@@ -45,12 +45,10 @@ export function createMenu(
   // report / more_horiz panels). Bootstrap tracks open state via .open on
   // the .dropdown wrapper; removing it hides the panel and its backdrop.
   function closeSiteDropdowns(): void {
-    document
-      .querySelectorAll(".dropdown.open, .open")
-      .forEach((el: Element) => {
-        el.classList.remove("open");
-        el.setAttribute("aria-expanded", "false");
-      });
+    for (const el of document.querySelectorAll(".dropdown.open, .open")) {
+      el.classList.remove("open");
+      el.setAttribute("aria-expanded", "false");
+    }
   }
 
   function placeMenu(menu: HTMLDivElement, btn: HTMLElement): void {
@@ -72,8 +70,8 @@ export function createMenu(
     if (vRect.left + menuW > window.innerWidth - 8) {
       left = window.innerWidth + sx - menuW - 8;
     }
-    menu.style.left = Math.max(8, left) + "px";
-    menu.style.top = top + "px";
+    menu.style.left = `${Math.max(8, left)}px`;
+    menu.style.top = `${top}px`;
   }
 
   function openQualityMenu(btn: HTMLElement, videoId: string): void {
@@ -95,7 +93,7 @@ export function createMenu(
     // Tag the menu with its trigger so a repeat click toggles it closed.
     // Random id: only needs to be unique per trigger, not cryptographically
     // secure — it just namespaces open menus against repeat clicks.
-    const triggerId = "t" + Math.random().toString(36).slice(2, 9);
+    const triggerId = `t${Math.random().toString(36).slice(2, 9)}`;
     btn.dataset.h1dlTrigger = triggerId;
     menu.dataset.trigger = triggerId;
 
@@ -125,7 +123,7 @@ export function createMenu(
         menu.appendChild(header);
         return;
       }
-      list.forEach((info) => {
+      for (const info of list) {
         const item = document.createElement("div");
         item.className = NATIVE_ITEM_CLASS;
         // Icon priority: site-native first. hanime1 loads Material
@@ -144,7 +142,7 @@ export function createMenu(
           startDownload(btn, videoId, info.quality);
         });
         menu.appendChild(item);
-      });
+      }
       placeMenu(menu, btn);
     });
 
@@ -168,7 +166,7 @@ export function createMenu(
       header.style.cssText = "cursor:default;color:#aaa;font-size:12px";
       header.textContent = t("chooseBatchQuality");
       menu.appendChild(header);
-      qualities.forEach((q) => {
+      for (const q of qualities) {
         const item = document.createElement("div");
         item.className = NATIVE_ITEM_CLASS;
         // Site-native Material Icons (see the quality menu above).
@@ -184,7 +182,7 @@ export function createMenu(
           resolve(q);
         });
         menu.appendChild(item);
-      });
+      }
       document.body.appendChild(menu);
       openMenu = menu;
       // Clicking outside cancels the batch.

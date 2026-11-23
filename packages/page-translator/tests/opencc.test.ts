@@ -18,9 +18,11 @@ test("converts via OpenCC dictionaries fetched and cached in GM storage", async 
     "../node_modules/opencc-js/dist/esm-lib/dict"
   );
   let fetchCount = 0;
-  const localFetcher = async (dictName: string) => {
-    fetchCount++;
-    return readFileSync(resolve(dictDir, `${dictName}.js`), "utf8");
+  const localFetcher = (dictName: string) => {
+    fetchCount += 1;
+    return Promise.resolve(
+      readFileSync(resolve(dictDir, `${dictName}.js`), "utf8")
+    );
   };
 
   const conv = await createOpenCC("s2twp", localFetcher);
@@ -42,9 +44,7 @@ test("falls back gracefully without throwing when offline dictionary fetch fails
       store[k] = v;
     },
   });
-  const failingFetch = async () => {
-    throw new Error("offline");
-  };
+  const failingFetch = () => Promise.reject(new Error("offline"));
   const conv = await createOpenCC("s2t", failingFetch);
   const out = conv.convert("软件");
   expect(out).toBe("軟件");

@@ -52,7 +52,7 @@ export function renderPending(
     return existing;
   }
 
-  const firstNode = seg.nodes[0];
+  const [firstNode] = seg.nodes;
   const parent = firstNode?.parentNode ?? seg.container;
 
   const blockEl = doc.createElement("span");

@@ -55,6 +55,14 @@ export interface BatchOptions {
 const DOCK_ID = "h1dl-dock";
 const DOCK_STYLE_ID = "h1dl-dock-style";
 
+function requireEl<T extends Element>(root: ParentNode, selector: string): T {
+  const el = root.querySelector<T>(selector);
+  if (!el) {
+    throw new Error(`[h1dl] missing element: ${selector}`);
+  }
+  return el;
+}
+
 export function createBatch(
   t: (key: string) => string,
   menuAskQuality: (qualities: string[]) => Promise<string | null>,
@@ -90,9 +98,9 @@ export function createBatch(
     const hostTokens =
       mode === "host" ? resolveThemeTokens("host", hostColors) : null;
     applyThemeModeToElement(dockHost, mode, hostColors);
-    const styleEl = dockShadow.getElementById(
-      DOCK_STYLE_ID
-    ) as HTMLStyleElement | null;
+    const styleEl = dockShadow.querySelector<HTMLStyleElement>(
+      `#${DOCK_STYLE_ID}`
+    );
     if (styleEl) {
       styleEl.textContent = getBatchDockCss(hostTokens);
     }
@@ -125,7 +133,14 @@ export function createBatch(
       for (const bp of Object.keys(BP_MIN)) {
         if (cls.contains(`hidden-${bp}`)) {
           const w = vw();
-          if (w >= BP_MIN[bp]! && w < BP_MAX[bp]!) {
+          const minW = BP_MIN[bp];
+          const maxW = BP_MAX[bp];
+          if (
+            minW !== undefined &&
+            maxW !== undefined &&
+            w >= minW &&
+            w < maxW
+          ) {
             return false;
           }
         }
@@ -227,30 +242,34 @@ export function createBatch(
 </aside>`;
     sr.appendChild(tpl.content.cloneNode(true));
 
-    const flyout = sr.getElementById("h1dl-dock-flyout")!;
-    const tabQueue = sr.getElementById("h1dl-tab-queue")!;
-    const tabPrefs = sr.getElementById("h1dl-tab-prefs")!;
+    const flyout = requireEl<HTMLElement>(sr, "#h1dl-dock-flyout");
+    const tabQueue = requireEl<HTMLElement>(sr, "#h1dl-tab-queue");
+    const tabPrefs = requireEl<HTMLElement>(sr, "#h1dl-tab-prefs");
+
+    const handleTabClick = (next: "queue" | "prefs"): void => {
+      openTab = openTab === next ? null : next;
+      flyout.dataset.open = String(openTab !== null);
+      flyout.setAttribute("aria-hidden", String(openTab === null));
+      for (const b of sr.querySelectorAll("[data-co-tab]")) {
+        b.setAttribute(
+          "aria-expanded",
+          String((b as HTMLElement).dataset.coTab === openTab)
+        );
+      }
+      if (openTab) {
+        tabQueue.hidden = openTab !== "queue";
+        tabPrefs.hidden = openTab !== "prefs";
+      }
+    };
 
     for (const btn of sr.querySelectorAll("[data-co-tab]")) {
       btn.addEventListener("click", () => {
         const next = (btn as HTMLElement).dataset.coTab as "queue" | "prefs";
-        openTab = openTab === next ? null : next;
-        flyout.dataset.open = String(openTab !== null);
-        flyout.setAttribute("aria-hidden", String(openTab === null));
-        for (const b of sr.querySelectorAll("[data-co-tab]")) {
-          b.setAttribute(
-            "aria-expanded",
-            String((b as HTMLElement).dataset.coTab === openTab)
-          );
-        }
-        if (openTab) {
-          tabQueue.hidden = openTab !== "queue";
-          tabPrefs.hidden = openTab !== "prefs";
-        }
+        handleTabClick(next);
       });
     }
 
-    sr.getElementById("h1dl-select-all")!.addEventListener("click", () => {
+    requireEl(sr, "#h1dl-select-all").addEventListener("click", () => {
       for (const entry of batchState) {
         if (
           isCardVisible(entry.card) &&
@@ -262,7 +281,7 @@ export function createBatch(
       }
     });
 
-    sr.getElementById("h1dl-select-none")!.addEventListener("click", () => {
+    requireEl(sr, "#h1dl-select-none").addEventListener("click", () => {
       for (const entry of batchState) {
         if (entry.state !== "downloading") {
           setChecked(entry, false);
@@ -270,22 +289,24 @@ export function createBatch(
       }
     });
 
-    sr.getElementById("h1dl-dl-btn")!.addEventListener("click", () => {
+    requireEl(sr, "#h1dl-dl-btn").addEventListener("click", () => {
       void startBatchDownload();
     });
+
+    const selectPreferredQuality = (q: string | null): void => {
+      preferredQuality = q;
+      for (const b of sr.querySelectorAll("[data-qual]")) {
+        b.setAttribute(
+          "aria-pressed",
+          String(((b as HTMLElement).dataset.qual || null) === preferredQuality)
+        );
+      }
+    };
 
     for (const qBtn of sr.querySelectorAll("[data-qual]")) {
       qBtn.addEventListener("click", () => {
         const q = (qBtn as HTMLElement).dataset.qual || null;
-        preferredQuality = q;
-        for (const b of sr.querySelectorAll("[data-qual]")) {
-          b.setAttribute(
-            "aria-pressed",
-            String(
-              ((b as HTMLElement).dataset.qual || null) === preferredQuality
-            )
-          );
-        }
+        selectPreferredQuality(q);
       });
     }
 
@@ -342,47 +363,57 @@ export function createBatch(
     }
   }
 
+  function createEntryTick(
+    entry: BatchEntry,
+    miniWrap: Element,
+    queueList: Element
+  ): void {
+    const titleEl = entry.card.querySelector(".title, .video-title");
+    const name = titleEl
+      ? ((titleEl as HTMLElement).textContent?.trim() ?? entry.videoId)
+      : entry.videoId;
+
+    const mini = document.createElement("div");
+    mini.className = "dl-track h1dl-batch-tick";
+    mini.title = name;
+    mini.innerHTML = '<div class="h1dl-batch-fill"></div>';
+    miniWrap.appendChild(mini);
+
+    const row = document.createElement("div");
+    row.className = "dl-item";
+    row.innerHTML = `<div class="dl-item-row"><span class="dl-item-name"></span><span class="us-mono us-muted h1dl-pct"></span></div><div class="dl-track"><div class="h1dl-batch-fill"></div></div>`;
+    requireEl(row, ".dl-item-name").textContent = name;
+    const pctEl = row.querySelector(".h1dl-pct") as HTMLElement;
+    queueList.appendChild(row);
+
+    entry.tick = mini;
+    entryRowMap.set(entry, { mini, row, pctEl });
+    updateTick(entry, entry.state);
+  }
+
   function syncTicks(): void {
     if (!dockShadow) {
       return;
     }
-    const miniWrap = dockShadow.getElementById("h1dl-mini-ticks")!;
-    const queueList = dockShadow.getElementById("h1dl-queue-list")!;
+    const miniWrap = requireEl(dockShadow, "#h1dl-mini-ticks");
+    const queueList = requireEl(dockShadow, "#h1dl-queue-list");
     const checked = Array.from(batchState).filter((e) => e.checked);
 
     for (const entry of checked) {
       if (!entryRowMap.has(entry)) {
-        const titleEl = entry.card.querySelector(".title, .video-title");
-        const name = titleEl
-          ? ((titleEl as HTMLElement).textContent?.trim() ?? entry.videoId)
-          : entry.videoId;
-
-        const mini = document.createElement("div");
-        mini.className = "dl-track h1dl-batch-tick";
-        mini.title = name;
-        mini.innerHTML = '<div class="h1dl-batch-fill"></div>';
-        miniWrap.appendChild(mini);
-
-        const row = document.createElement("div");
-        row.className = "dl-item";
-        row.innerHTML = `<div class="dl-item-row"><span class="dl-item-name"></span><span class="us-mono us-muted h1dl-pct"></span></div><div class="dl-track"><div class="h1dl-batch-fill"></div></div>`;
-        row.querySelector(".dl-item-name")!.textContent = name;
-        const pctEl = row.querySelector(".h1dl-pct") as HTMLElement;
-        queueList.appendChild(row);
-
-        entry.tick = mini;
-        entryRowMap.set(entry, { mini, row, pctEl });
-        updateTick(entry, entry.state);
+        createEntryTick(entry, miniWrap, queueList);
       }
     }
 
     for (const entry of Array.from(batchState)) {
-      if (!entry.checked && entryRowMap.has(entry)) {
-        const refs = entryRowMap.get(entry)!;
-        refs.mini.remove();
-        refs.row.remove();
-        entryRowMap.delete(entry);
-        entry.tick = null;
+      if (!entry.checked) {
+        const refs = entryRowMap.get(entry);
+        if (refs) {
+          refs.mini.remove();
+          refs.row.remove();
+          entryRowMap.delete(entry);
+          entry.tick = null;
+        }
       }
     }
   }
@@ -395,13 +426,11 @@ export function createBatch(
       (e) => e.checked && e.state !== "done"
     );
     const checkedTotal = Array.from(batchState).filter((e) => e.checked).length;
-    dockShadow.getElementById("h1dl-count")!.textContent = String(
-      pending.length
-    );
-    dockShadow.getElementById("h1dl-queue-count")!.textContent =
+    requireEl(dockShadow, "#h1dl-count").textContent = String(pending.length);
+    requireEl(dockShadow, "#h1dl-queue-count").textContent =
       String(checkedTotal);
 
-    const dlBtn = dockShadow.getElementById("h1dl-dl-btn") as HTMLButtonElement;
+    const dlBtn = requireEl<HTMLButtonElement>(dockShadow, "#h1dl-dl-btn");
     dlBtn.disabled =
       pending.length === 0 || pending.some((e) => e.state === "downloading");
 
@@ -424,11 +453,78 @@ export function createBatch(
     batchOn = on;
     document.body.classList.toggle("h1dl-batch-on", on);
     if (on) {
-      buildBatchBar();
-      dockHost!.style.display = "block";
+      const host = buildBatchBar();
+      host.style.display = "block";
       updateBatchBar();
     } else if (dockHost) {
       dockHost.style.display = "none";
+    }
+  }
+
+  async function downloadOneEntry(
+    entry: BatchEntry,
+    targetQuality: string,
+    downgraded: { entry: BatchEntry; from: string; to: string }[]
+  ): Promise<void> {
+    entry.state = "downloading";
+    updateTick(entry, "downloading", 0);
+    onActiveChange(1);
+    const { videoId } = entry;
+    try {
+      const resolved = await resolveWithFallback(
+        videoId,
+        targetQuality,
+        QUALITIES
+      );
+      if (!resolved) {
+        throw new Error("no download link found");
+      }
+      if (resolved.quality !== targetQuality) {
+        downgraded.push({
+          entry,
+          from: targetQuality,
+          to: resolved.quality,
+        });
+      }
+      await gmDownload({
+        url: resolved.info.url,
+        name: downloadName(resolved.info.filename, resolved.info.url),
+        onload: () => {
+          onActiveChange(-1);
+          entry.state = "done";
+          updateTick(entry, "done");
+          entry.check.classList.add("completed");
+        },
+        onerror: () => {
+          onActiveChange(-1);
+          entry.state = "error";
+          updateTick(entry, "error");
+        },
+        ontimeout: () => {
+          onActiveChange(-1);
+          entry.state = "error";
+          updateTick(entry, "error");
+        },
+        onprogress: (e: {
+          lengthComputable: boolean;
+          loaded: number;
+          total: number;
+        }) => {
+          if (e.lengthComputable) {
+            updateTick(
+              entry,
+              "downloading",
+              Math.round((e.loaded / e.total) * 100)
+            );
+          }
+        },
+      }).catch(() => {
+        // Handled via onerror/ontimeout callbacks above
+      });
+    } catch {
+      onActiveChange(-1);
+      entry.state = "error";
+      updateTick(entry, "error");
     }
   }
 
@@ -456,66 +552,8 @@ export function createBatch(
         continue;
       }
       seenIds.add(entry.videoId);
-      entry.state = "downloading";
-      updateTick(entry, "downloading", 0);
-      onActiveChange(1);
-      const videoId = entry.videoId;
-      try {
-        const resolved = await resolveWithFallback(
-          videoId,
-          batchQuality,
-          QUALITIES
-        );
-        if (!resolved) {
-          throw new Error("no download link found");
-        }
-        if (resolved.quality !== batchQuality) {
-          downgraded.push({
-            entry,
-            from: batchQuality,
-            to: resolved.quality,
-          });
-        }
-        await gmDownload({
-          url: resolved.info.url,
-          name: downloadName(resolved.info.filename, resolved.info.url),
-          onload: () => {
-            onActiveChange(-1);
-            entry.state = "done";
-            updateTick(entry, "done");
-            entry.check.classList.add("completed");
-          },
-          onerror: () => {
-            onActiveChange(-1);
-            entry.state = "error";
-            updateTick(entry, "error");
-          },
-          ontimeout: () => {
-            onActiveChange(-1);
-            entry.state = "error";
-            updateTick(entry, "error");
-          },
-          onprogress: (e: {
-            lengthComputable: boolean;
-            loaded: number;
-            total: number;
-          }) => {
-            if (e?.lengthComputable) {
-              updateTick(
-                entry,
-                "downloading",
-                Math.round((e.loaded / e.total) * 100)
-              );
-            }
-          },
-        }).catch(() => {
-          // Handled via onerror/ontimeout callbacks above
-        });
-      } catch {
-        onActiveChange(-1);
-        entry.state = "error";
-        updateTick(entry, "error");
-      }
+      // biome-ignore lint/performance/noAwaitInLoops: sequential download order is intentional to avoid saturating connections and to preserve queue state
+      await downloadOneEntry(entry, batchQuality, downgraded);
     }
     if (downgraded.length) {
       const names = downgraded

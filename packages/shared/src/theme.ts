@@ -36,7 +36,7 @@ export function probeTheme(options: ProbeOptions): NativeTheme {
   probe.style.cssText =
     "position:fixed;left:-9999px;top:-9999px;visibility:hidden;z-index:-1;display:block!important;opacity:1";
   document.body.appendChild(probe);
-  probe.offsetLeft; // force reflow
+  void probe.offsetLeft; // force reflow
   const cs = getComputedStyle(probe);
   const theme: NativeTheme = {
     panelBg: cs.backgroundColor,
@@ -52,7 +52,7 @@ export function probeTheme(options: ProbeOptions): NativeTheme {
     probe2.style.cssText =
       "position:fixed;left:-9999px;top:-9999px;visibility:hidden;z-index:-1;display:inline-block";
     document.body.appendChild(probe2);
-    probe2.offsetLeft; // force reflow
+    void probe2.offsetLeft; // force reflow
     theme.actionBg = getComputedStyle(probe2).backgroundColor;
     probe2.remove();
   } else {

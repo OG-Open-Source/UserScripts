@@ -25,7 +25,9 @@ function pointerEvent(
     setPointerCapture?: () => void;
   };
   Object.defineProperty(event, "target", { value: target, configurable: true });
-  target.setPointerCapture = () => {};
+  target.setPointerCapture = () => {
+    // noop
+  };
   return event;
 }
 
@@ -33,9 +35,9 @@ function setup() {
   const win = new Window();
   const doc = win.document;
   doc.body.innerHTML = `<div id="stage" style="position:relative;width:600px;height:400px"><div id="panel" style="position:absolute;width:100px;height:50px"><div id="handle">Header</div></div></div>`;
-  const stage = doc.getElementById("stage") as HTMLElement;
-  const panel = doc.getElementById("panel") as HTMLElement;
-  const handle = doc.getElementById("handle") as HTMLElement;
+  const stage = doc.querySelector("#stage") as HTMLElement;
+  const panel = doc.querySelector("#panel") as HTMLElement;
+  const handle = doc.querySelector("#handle") as HTMLElement;
   defaultTarget.current = handle;
   // happy-dom has no layout: pin geometry used by the controller.
   Object.defineProperty(stage, "clientWidth", { value: 600 });

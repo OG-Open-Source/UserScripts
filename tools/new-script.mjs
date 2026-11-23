@@ -32,7 +32,7 @@ if (args.length === 0) {
   exit(1);
 }
 
-const name = args[0];
+const [name] = args;
 const frameworkIdx = args.indexOf("--framework");
 const framework = frameworkIdx === -1 ? "vanilla" : args[frameworkIdx + 1];
 if (!["vanilla", "solid", "svelte"].includes(framework)) {
@@ -62,9 +62,30 @@ const titleName = name
 // No version field: the tag is the source of truth. No userscript.id field:
 // vite.config.ts's USERSCRIPT_ID export is the single source the release
 // workflow reads.
+const FRAMEWORK_DEPS = {
+  vanilla: {},
+  solid: { "solid-js": "^1.9.0" },
+  svelte: { svelte: "^5.0.0" },
+};
+const FRAMEWORK_DEV_DEPS = {
+  vanilla: {},
+  solid: { "vite-plugin-solid": "^2.11.0" },
+  svelte: { "@sveltejs/vite-plugin-svelte": "^5.0.0" },
+};
+const FRAMEWORK_ENTRY = {
+  vanilla: "src/main.ts",
+  solid: "src/main.tsx",
+  svelte: "src/main.ts",
+};
+const FRAMEWORK_IMPORT = {
+  vanilla: "",
+  solid: "\nimport solid from 'vite-plugin-solid';",
+  svelte: "\nimport { svelte } from '@sveltejs/vite-plugin-svelte';",
+};
+
 writeFileSync(
   resolve(pkgDir, "package.json"),
-  JSON.stringify(
+  `${JSON.stringify(
     {
       name: packageName,
       private: true,
@@ -73,48 +94,29 @@ writeFileSync(
       scripts: { dev: "vite", build: "vite build", typecheck: "tsc --noEmit" },
       dependencies: {
         "@userscripts/shared": "*",
-        ...(framework === "solid"
-          ? { "solid-js": "^1.9.0" }
-          : framework === "svelte"
-            ? { svelte: "^5.0.0" }
-            : {}),
+        ...FRAMEWORK_DEPS[framework],
       },
       devDependencies: {
         typescript: "^5.9.0",
         vite: "^7.1.0",
         "vite-plugin-monkey": "^5.0.0",
         "@types/node": "^22.0.0",
-        ...(framework === "solid"
-          ? { "vite-plugin-solid": "^2.11.0" }
-          : framework === "svelte"
-            ? { "@sveltejs/vite-plugin-svelte": "^5.0.0" }
-            : {}),
+        ...FRAMEWORK_DEV_DEPS[framework],
       },
     },
     null,
     2
-  ) + "\n"
+  )}\n`
 );
 
-const entry =
-  framework === "svelte"
-    ? "src/main.ts"
-    : framework === "solid"
-      ? "src/main.tsx"
-      : "src/main.ts";
+const entry = FRAMEWORK_ENTRY[framework];
 
 writeFileSync(
   resolve(pkgDir, "vite.config.ts"),
   `import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vite';${
-    framework === "solid"
-      ? "\nimport solid from 'vite-plugin-solid';"
-      : framework === "svelte"
-        ? "\nimport { svelte } from '@sveltejs/vite-plugin-svelte';"
-        : ""
-  }
+import { defineConfig } from 'vite';${FRAMEWORK_IMPORT[framework]}
 import monkey from 'vite-plugin-monkey';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -189,7 +191,7 @@ export default defineConfig({
 
 writeFileSync(
   resolve(pkgDir, "tsconfig.json"),
-  JSON.stringify(
+  `${JSON.stringify(
     {
       extends: "../../tsconfig.base.json",
       compilerOptions: {
@@ -200,7 +202,7 @@ writeFileSync(
     },
     null,
     2
-  ) + "\n"
+  )}\n`
 );
 
 writeFileSync(

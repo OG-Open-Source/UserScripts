@@ -15,6 +15,7 @@ export interface EncodedInlineSegment {
 }
 
 const HAS_LETTER = /\p{L}/u;
+const SELF_CLOSING_X_RE = /(?<open><x(?:\b[^>]*)?)\/>/giu;
 
 function escapeHtml(text: string): string {
   return text
@@ -78,11 +79,43 @@ export function decodeTranslatedHtml(
   const tpl = doc.createElement("template");
   // HTML5 parser ignores `/>` self-closing on non-void tags; expand `<x .../>`
   // before parsing so trailing text is never swallowed as a child of `<x>`.
-  tpl.innerHTML = translatedHtml.replace(/<x(\b[^>]*)?\/>/giu, "<x$1></x>");
+  tpl.innerHTML = translatedHtml.replace(SELF_CLOSING_X_RE, "$<open>></x>");
 
   const slotMap = new Map<number, InlineSlot>();
   for (const s of slots) {
     slotMap.set(s.id, s);
+  }
+
+  function rebuildSlot(el: Element, slot: InlineSlot): Element {
+    if (slot.atomic) {
+      const clone = slot.element.cloneNode(true) as Element;
+      clone.setAttribute("data-tr-no-space", "1");
+      clone.setAttribute("data-tr-no-opencc", "1");
+      return clone;
+    }
+    const clone = slot.element.cloneNode(false) as Element;
+    if (slot.modifiers.has("no-spacing")) {
+      clone.setAttribute("data-tr-no-space", "1");
+    }
+    if (slot.modifiers.has("no-opencc")) {
+      clone.setAttribute("data-tr-no-opencc", "1");
+    }
+    clone.appendChild(rebuild(el));
+    return clone;
+  }
+
+  function rebuildElement(el: Element): Node {
+    const tag = el.tagName.toUpperCase();
+    if (tag === "SPAN" && el.hasAttribute("data-ptr-kw")) {
+      return rebuild(el);
+    }
+    if (tag !== "X") {
+      return doc.createTextNode(el.textContent ?? "");
+    }
+    const rawId = el.getAttribute("id");
+    const id = rawId === null ? Number.NaN : Number(rawId);
+    const slot = slotMap.get(id);
+    return slot ? rebuildSlot(el, slot) : rebuild(el);
   }
 
   function rebuild(sourceParent: ParentNode): DocumentFragment {
@@ -90,46 +123,8 @@ export function decodeTranslatedHtml(
     for (const child of Array.from(sourceParent.childNodes)) {
       if (child.nodeType === 3) {
         out.appendChild(doc.createTextNode(child.nodeValue ?? ""));
-        continue;
-      }
-      if (child.nodeType !== 1) {
-        continue;
-      }
-
-      const el = child as Element;
-      if (
-        el.tagName.toUpperCase() === "SPAN" &&
-        el.hasAttribute("data-ptr-kw")
-      ) {
-        out.appendChild(rebuild(el));
-        continue;
-      }
-      if (el.tagName.toUpperCase() === "X") {
-        const rawId = el.getAttribute("id");
-        const id = rawId === null ? Number.NaN : Number(rawId);
-        const slot = slotMap.get(id);
-        if (!slot) {
-          out.appendChild(rebuild(el));
-          continue;
-        }
-        if (slot.atomic) {
-          const clone = slot.element.cloneNode(true) as Element;
-          clone.setAttribute("data-tr-no-space", "1");
-          clone.setAttribute("data-tr-no-opencc", "1");
-          out.appendChild(clone);
-        } else {
-          const clone = slot.element.cloneNode(false) as Element;
-          if (slot.modifiers.has("no-spacing")) {
-            clone.setAttribute("data-tr-no-space", "1");
-          }
-          if (slot.modifiers.has("no-opencc")) {
-            clone.setAttribute("data-tr-no-opencc", "1");
-          }
-          clone.appendChild(rebuild(el));
-          out.appendChild(clone);
-        }
-      } else {
-        out.appendChild(doc.createTextNode(el.textContent ?? ""));
+      } else if (child.nodeType === 1) {
+        out.appendChild(rebuildElement(child as Element));
       }
     }
     return out;

@@ -52,14 +52,14 @@ export interface GMMenuCommandOptions {
 
 /** The subset of the GM_* API consumed by shared helpers. */
 export interface GMApi {
-  GM_addStyle?: (css: string) => HTMLStyleElement | void;
+  GM_addStyle?: (css: string) => HTMLStyleElement | undefined;
   GM_download: (details: GMDownloadDetails) => void;
   GM_getValue: <T = unknown>(key: string, defaultValue?: T) => T;
   GM_registerMenuCommand: (
     caption: string,
     onClick: () => void,
     options?: GMMenuCommandOptions
-  ) => GMMenuHandle | void;
+  ) => GMMenuHandle | undefined;
   GM_setValue: (key: string, value: unknown) => void;
   GM_unregisterMenuCommand?: (menuId: GMMenuHandle) => void;
   GM_xmlhttpRequest: (details: GMXHRDetails) => void;

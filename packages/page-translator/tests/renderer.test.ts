@@ -37,15 +37,19 @@ test("buildStylesheet defaults to replacing original and applies --ptr-font plus
     customCss: "",
     debugInspect: false,
   });
-  expect(win.document.getElementById(STYLE_ELEMENT_ID)).not.toBeNull();
+  expect(win.document.querySelector(`#${STYLE_ELEMENT_ID}`)).not.toBeNull();
 });
 
 test("renderTranslated wraps original nodes preserving event listeners and renders [data-tr-dst]", () => {
   const win = new Window();
   win.document.body.innerHTML = `<div class="box">Click <button type="button" id="btn">here</button> now.</div>`;
   let clicks = 0;
-  win.document.getElementById("btn")!.addEventListener("click", () => {
-    clicks++;
+  const btn = win.document.querySelector("#btn");
+  if (!btn) {
+    throw new Error("expected #btn");
+  }
+  btn.addEventListener("click", () => {
+    clicks += 1;
   });
 
   const delta = parseSiteDelta("");
@@ -57,7 +61,10 @@ test("renderTranslated wraps original nodes preserving event listeners and rende
     }),
   });
   expect(segs.length).toBe(1);
-  const seg = segs[0]!;
+  const [seg] = segs;
+  if (!seg) {
+    throw new Error("expected seg");
+  }
   const { slots } = encodeInlineNodes(seg.nodes, delta);
   const host = renderPending(seg, win.document as unknown as Document);
   renderTranslated(
@@ -94,29 +101,37 @@ test("preserves exact DOM order in mixed inline+block container and restores cle
   for (const s of segs) {
     renderPending(s, win.document as unknown as Document);
   }
+  const [s0, s1, s2] = segs;
+  const [sl0, sl1, sl2] = slotsBySeg;
+  if (!(s0 && s1 && s2 && sl0 && sl1 && sl2)) {
+    throw new Error("expected 3 segments");
+  }
   renderTranslated(
-    segs[0]!,
+    s0,
     "前言 ",
-    slotsBySeg[0]!,
+    sl0,
     { spacing: false },
     win.document as unknown as Document
   );
   renderTranslated(
-    segs[1]!,
+    s1,
     "中間",
-    slotsBySeg[1]!,
+    sl1,
     { spacing: false },
     win.document as unknown as Document
   );
   renderTranslated(
-    segs[2]!,
+    s2,
     " 結尾",
-    slotsBySeg[2]!,
+    sl2,
     { spacing: false },
     win.document as unknown as Document
   );
 
-  const post = win.document.querySelector(".post")!;
+  const post = win.document.querySelector(".post");
+  if (!post) {
+    throw new Error("expected .post");
+  }
   const dstTexts = Array.from(post.querySelectorAll("[data-tr-dst]")).map(
     (el) => el.textContent
   );
@@ -141,8 +156,15 @@ test("renderInspectMarker marks block without altering original text nodes", () 
       }),
     }
   );
-  renderInspectMarker(segs[0]!, win.document as unknown as Document);
-  const item = win.document.querySelector(".item")!;
+  const [seg] = segs;
+  if (!seg) {
+    throw new Error("expected seg");
+  }
+  renderInspectMarker(seg, win.document as unknown as Document);
+  const item = win.document.querySelector(".item");
+  if (!item) {
+    throw new Error("expected .item");
+  }
   expect(item.getAttribute("data-tr-inspect")).toBe("auto");
   expect(item.textContent).toBe("Sample paragraph");
 });
@@ -169,9 +191,13 @@ test("pending and error states keep [data-tr-orig] visible so text never blanks 
       }),
     }
   );
-  const host = renderPending(segs[0]!, win.document as unknown as Document);
+  const [seg] = segs;
+  if (!seg) {
+    throw new Error("expected seg");
+  }
+  const host = renderPending(seg, win.document as unknown as Document);
   expect(host.getAttribute("data-tr-state")).toBe("pending");
-  renderError(segs[0]!, win.document as unknown as Document);
+  renderError(seg, win.document as unknown as Document);
   expect(host.getAttribute("data-tr-state")).toBe("error");
 });
 
@@ -186,15 +212,22 @@ test("inline-atomic slots are shielded from OpenCC and CJK auto-spacing", () => 
       visibility: "visible",
     }),
   });
-  const { slots } = encodeInlineNodes(segs[0]!.nodes, delta);
-  renderPending(segs[0]!, win.document as unknown as Document);
+  const [seg] = segs;
+  if (!seg) {
+    throw new Error("expected seg");
+  }
+  const { slots } = encodeInlineNodes(seg.nodes, delta);
+  renderPending(seg, win.document as unknown as Document);
   renderTranslated(
-    segs[0]!,
+    seg,
     '使用<x id="0"/>測試',
     slots,
     { spacing: true, opencc: (s) => s.replace("软", "軟") },
     win.document as unknown as Document
   );
-  const dst = win.document.querySelector("[data-tr-dst]")!;
+  const dst = win.document.querySelector("[data-tr-dst]");
+  if (!dst) {
+    throw new Error("expected [data-tr-dst]");
+  }
   expect(dst.querySelector("code.tok")?.textContent).toBe("软件CSS");
 });

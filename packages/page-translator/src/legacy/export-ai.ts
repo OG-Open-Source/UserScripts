@@ -139,6 +139,73 @@ export interface ParsedAiImport {
   translationsMap: Record<string, string>;
 }
 
+const DYNAMIC_PLACEHOLDER_RE = /\{v\d+\}/u;
+
+function parseTranslationsMap(
+  translations: Record<string, unknown>,
+  out: ParsedAiImport
+): void {
+  for (const [k, v] of Object.entries(translations)) {
+    if (typeof v === "string" && v.trim()) {
+      out.translationsMap[k] = v;
+      if (DYNAMIC_PLACEHOLDER_RE.test(k)) {
+        out.dynamic[k] = v;
+      } else {
+        out.static[k] = v;
+      }
+    }
+  }
+}
+
+function copyLocaleEntries(
+  src: Record<string, string> | undefined,
+  dest: Record<string, string>,
+  all: Record<string, string>
+): void {
+  for (const [k, v] of Object.entries(src ?? {})) {
+    if (typeof v === "string" && v.trim()) {
+      dest[k] = v;
+      all[k] = v;
+    }
+  }
+}
+
+function parseLocaleTable(
+  locales: Record<string, unknown>,
+  targetLang: string,
+  out: ParsedAiImport
+): void {
+  const table = (locales[targetLang] ?? Object.values(locales)[0]) as
+    | {
+        dynamic?: Record<string, string>;
+        scoped?: Record<
+          string,
+          {
+            dynamic?: Record<string, string>;
+            static?: Record<string, string>;
+          }
+        >;
+        static?: Record<string, string>;
+      }
+    | undefined;
+  if (!table || typeof table !== "object") {
+    throw new Error("Missing locale table.");
+  }
+  copyLocaleEntries(table.static, out.static, out.translationsMap);
+  copyLocaleEntries(table.dynamic, out.dynamic, out.translationsMap);
+  if (table.scoped && typeof table.scoped === "object") {
+    for (const [sel, sc] of Object.entries(table.scoped)) {
+      if (!sc || typeof sc !== "object") {
+        continue;
+      }
+      out.scoped[sel] = {
+        ...(sc.static ? { static: { ...sc.static } } : {}),
+        ...(sc.dynamic ? { dynamic: { ...sc.dynamic } } : {}),
+      };
+    }
+  }
+}
+
 /**
  * Parse AI-generated JSON back into template -> translation drafts.
  * Accepts `{ translations: { template: translation } }` or a `SiteTranslationsFile`.
@@ -164,18 +231,7 @@ export function parseAiTranslationImport(
     parsed.translations &&
     typeof parsed.translations === "object"
   ) {
-    for (const [k, v] of Object.entries(
-      parsed.translations as Record<string, unknown>
-    )) {
-      if (typeof v === "string" && v.trim()) {
-        out.translationsMap[k] = v;
-        if (/\{v\d+\}/u.test(k)) {
-          out.dynamic[k] = v;
-        } else {
-          out.static[k] = v;
-        }
-      }
-    }
+    parseTranslationsMap(parsed.translations as Record<string, unknown>, out);
     return out;
   }
 
@@ -184,46 +240,11 @@ export function parseAiTranslationImport(
     parsed.locales &&
     typeof parsed.locales === "object"
   ) {
-    const locales = parsed.locales as Record<string, unknown>;
-    const table = (locales[targetLang] ?? Object.values(locales)[0]) as
-      | {
-          dynamic?: Record<string, string>;
-          scoped?: Record<
-            string,
-            {
-              dynamic?: Record<string, string>;
-              static?: Record<string, string>;
-            }
-          >;
-          static?: Record<string, string>;
-        }
-      | undefined;
-    if (!table || typeof table !== "object") {
-      throw new Error("Missing locale table.");
-    }
-    for (const [k, v] of Object.entries(table.static ?? {})) {
-      if (typeof v === "string" && v.trim()) {
-        out.static[k] = v;
-        out.translationsMap[k] = v;
-      }
-    }
-    for (const [k, v] of Object.entries(table.dynamic ?? {})) {
-      if (typeof v === "string" && v.trim()) {
-        out.dynamic[k] = v;
-        out.translationsMap[k] = v;
-      }
-    }
-    if (table.scoped && typeof table.scoped === "object") {
-      for (const [sel, sc] of Object.entries(table.scoped)) {
-        if (!sc || typeof sc !== "object") {
-          continue;
-        }
-        out.scoped[sel] = {
-          ...(sc.static ? { static: { ...sc.static } } : {}),
-          ...(sc.dynamic ? { dynamic: { ...sc.dynamic } } : {}),
-        };
-      }
-    }
+    parseLocaleTable(
+      parsed.locales as Record<string, unknown>,
+      targetLang,
+      out
+    );
     return out;
   }
 

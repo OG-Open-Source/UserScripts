@@ -153,12 +153,7 @@ export function collectSegments(
     return trigger;
   }
 
-  function flushRun(
-    container: Element,
-    run: Node[],
-    sourceRule: "auto" | "+",
-    inheritedMods: Set<SiteModifier>
-  ): void {
+  function trimWhitespaceRun(run: Node[]): Node[] {
     let start = 0;
     let end = run.length;
     while (
@@ -166,16 +161,35 @@ export function collectSegments(
       run[start]?.nodeType === 3 &&
       !(run[start]?.nodeValue ?? "").trim()
     ) {
-      start++;
+      start += 1;
     }
     while (
       end > start &&
       run[end - 1]?.nodeType === 3 &&
       !(run[end - 1]?.nodeValue ?? "").trim()
     ) {
-      end--;
+      end -= 1;
     }
-    const trimmed = run.slice(start, end);
+    return run.slice(start, end);
+  }
+
+  function getContainerDisplay(container: Element): string {
+    if (options?.getStyle) {
+      return options.getStyle(container).display;
+    }
+    if (typeof getComputedStyle === "function") {
+      return getComputedStyle(container).display;
+    }
+    return "";
+  }
+
+  function flushRun(
+    container: Element,
+    run: Node[],
+    sourceRule: "auto" | "+",
+    inheritedMods: Set<SiteModifier>
+  ): void {
+    const trimmed = trimWhitespaceRun(run);
     if (trimmed.length === 0) {
       return;
     }
@@ -183,20 +197,67 @@ export function collectSegments(
       return;
     }
 
-    const displayVal = options?.getStyle
-      ? options.getStyle(container).display
-      : typeof getComputedStyle === "function"
-        ? getComputedStyle(container).display
-        : "";
-
+    const seq = nextSegmentSeq;
+    nextSegmentSeq += 1;
     segments.push({
-      id: `seg-${nextSegmentSeq++}`,
+      id: `seg-${seq}`,
       container,
       nodes: trimmed,
       sourceRule,
       modifiers: new Set(inheritedMods),
-      displayContents: displayVal === "contents",
+      displayContents: getContainerDisplay(container) === "contents",
     });
+  }
+
+  function isBlockBoundaryElement(
+    el: Element,
+    isPlus: boolean,
+    mods: Set<SiteModifier>
+  ): boolean {
+    return (
+      Boolean(el.shadowRoot) ||
+      isPlus ||
+      mods.has("block") ||
+      classifier.getRole(el) === "block" ||
+      containsSplitTrigger(el)
+    );
+  }
+
+  function visitChildNode(
+    child: ChildNode,
+    hostContainer: Element,
+    run: Node[],
+    forcedRule: "auto" | "+",
+    inheritedMods: Set<SiteModifier>
+  ): Node[] {
+    if (child.nodeType === 3) {
+      run.push(child);
+      return run;
+    }
+    if (child.nodeType !== 1) {
+      return run;
+    }
+
+    const el = child as Element;
+    if (isExcludedSubtree(el)) {
+      flushRun(hostContainer, run, forcedRule, inheritedMods);
+      return [];
+    }
+
+    if (classifier.isNonProsePrimitive(el)) {
+      run.push(el);
+      return run;
+    }
+
+    const isPlus = matchesAny(el, delta.addSelectors);
+    const mods = matchModifiers(el, delta);
+    if (isBlockBoundaryElement(el, isPlus, mods)) {
+      flushRun(hostContainer, run, forcedRule, inheritedMods);
+      walkBlock(el, isPlus ? "+" : forcedRule, inheritedMods, mods);
+      return [];
+    }
+    run.push(el);
+    return run;
   }
 
   function walkChildList(
@@ -207,42 +268,13 @@ export function collectSegments(
   ): void {
     let run: Node[] = [];
     for (const child of Array.from(childNodes)) {
-      if (child.nodeType === 3) {
-        run.push(child);
-        continue;
-      }
-      if (child.nodeType !== 1) {
-        continue;
-      }
-
-      const el = child as Element;
-      if (isExcludedSubtree(el)) {
-        flushRun(hostContainer, run, forcedRule, inheritedMods);
-        run = [];
-        continue;
-      }
-
-      if (classifier.isNonProsePrimitive(el)) {
-        run.push(el);
-        continue;
-      }
-
-      const isPlus = matchesAny(el, delta.addSelectors);
-      const mods = matchModifiers(el, delta);
-      const isBlockBoundary =
-        Boolean(el.shadowRoot) ||
-        isPlus ||
-        mods.has("block") ||
-        classifier.getRole(el) === "block" ||
-        containsSplitTrigger(el);
-
-      if (isBlockBoundary) {
-        flushRun(hostContainer, run, forcedRule, inheritedMods);
-        run = [];
-        walkBlock(el, isPlus ? "+" : forcedRule, inheritedMods, mods);
-      } else {
-        run.push(el);
-      }
+      run = visitChildNode(
+        child,
+        hostContainer,
+        run,
+        forcedRule,
+        inheritedMods
+      );
     }
     flushRun(hostContainer, run, forcedRule, inheritedMods);
   }

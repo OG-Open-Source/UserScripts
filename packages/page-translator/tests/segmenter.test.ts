@@ -109,7 +109,10 @@ test("applies '*' modifiers (block boundary & inline-atomic placeholder)", () =>
   expect(segs.length).toBe(4);
   expect(segs[1]?.modifiers.has("block")).toBe(true);
 
-  const codeSeg = segs[3]!;
+  const [, , , codeSeg] = segs;
+  if (!codeSeg) {
+    throw new Error("expected segs[3]");
+  }
   const encoded = encodeInlineNodes(codeSeg.nodes, delta);
   expect(encoded.payloadHtml).toBe('Use <x id="0"/> here.');
   const frag = decodeTranslatedHtml(
@@ -144,7 +147,11 @@ test("inline-codec preserves <a> href and class across encode -> translate -> de
   const delta = parseSiteDelta("");
   const segs = collectSegments(body, delta, { getStyle });
   expect(segs.length).toBe(1);
-  const encoded = encodeInlineNodes(segs[0]!.nodes, delta);
+  const [firstSeg] = segs;
+  if (!firstSeg) {
+    throw new Error("expected first segment");
+  }
+  const encoded = encodeInlineNodes(firstSeg.nodes, delta);
   expect(encoded.payloadHtml).toBe('Hello <x id="0">world</x>!');
 
   const frag = decodeTranslatedHtml(
@@ -167,10 +174,8 @@ test("collectSegments skips subtree when an ancestor is excluded or hidden (muta
   const delta = parseSiteDelta("- .sidebar");
   const dyn = win.document.querySelector(
     ".dynamic-child"
-  )! as unknown as Element;
-  const hid = win.document.querySelector(
-    ".hidden-child"
-  )! as unknown as Element;
+  ) as unknown as Element;
+  const hid = win.document.querySelector(".hidden-child") as unknown as Element;
   expect(collectSegments(dyn, delta, { getStyle }).length).toBe(0);
   expect(collectSegments(hid, delta, { getStyle }).length).toBe(0);
 });
@@ -182,7 +187,11 @@ test("inline <svg> inside <a> does not fragment the surrounding sentence", () =>
   const delta = parseSiteDelta("");
   const segs = collectSegments(body, delta, { getStyle });
   expect(segs.length).toBe(1);
-  const encoded = encodeInlineNodes(segs[0]!.nodes, delta);
+  const [firstSeg] = segs;
+  if (!firstSeg) {
+    throw new Error("expected first segment");
+  }
+  const encoded = encodeInlineNodes(firstSeg.nodes, delta);
   expect(encoded.payloadHtml).toBe(
     'Click <x id="0"><x id="1"/> Download</x> now.'
   );
@@ -199,7 +208,10 @@ test("captures text inside open Shadow DOM and slotted light DOM (e.g. mdn-color
   const { win, body, getStyle } = setupDoc(
     `<mdn-color-theme id="host"></mdn-color-theme>`
   );
-  const host = win.document.getElementById("host")!;
+  const host = win.document.querySelector("#host");
+  if (!host) {
+    throw new Error("expected #host");
+  }
   const outerShadow = host.attachShadow({ mode: "open" });
   outerShadow.innerHTML = `
     <div class="color-theme">
@@ -209,7 +221,10 @@ test("captures text inside open Shadow DOM and slotted light DOM (e.g. mdn-color
       </mdn-dropdown>
     </div>
   `;
-  const dd = outerShadow.getElementById("dd")!;
+  const dd = outerShadow.querySelector("#dd");
+  if (!dd) {
+    throw new Error("expected #dd");
+  }
   const innerShadow = dd.attachShadow({ mode: "open" });
   innerShadow.innerHTML = `<slot name="button"></slot><slot name="dropdown"></slot>`;
 

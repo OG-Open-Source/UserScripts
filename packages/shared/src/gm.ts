@@ -67,7 +67,7 @@ export function gmRequest(options: GMRequestOptions): Promise<GMXHRResponse> {
         if (res.status >= 200 && res.status < 400) {
           resolve(res);
         } else {
-          reject(new Error("HTTP " + res.status));
+          reject(new Error(`HTTP ${res.status}`));
         }
       },
       onerror: () => reject(new Error("network error")),
