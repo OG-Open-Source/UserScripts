@@ -18,6 +18,7 @@ export interface VolunteerViewHandlers {
   onNext: () => void;
   onPrev: () => void;
   onRescan: () => void;
+  onResolveAllConflicts?: (choice: "keep" | "overwrite") => void;
   onResolveConflict: (id: string, choice: "keep" | "overwrite") => void;
   onSaveDraft: (translation: string, scope: string) => void;
   onSuggestScope: () => string;
@@ -342,17 +343,46 @@ export function mountVolunteerView(
     renderConflicts(conflicts: readonly VolunteerConflict[]): void {
       conflictsEl.innerHTML = "";
       conflictsEl.hidden = conflicts.length === 0;
+      if (conflicts.length === 0) {
+        return;
+      }
+      if (handlers.onResolveAllConflicts) {
+        const bulkRow = doc.createElement("div");
+        bulkRow.className = "ptr-vol-row";
+        const keepAllBtn = doc.createElement("button");
+        keepAllBtn.type = "button";
+        keepAllBtn.className = "ptr-btn";
+        keepAllBtn.dataset.conflictBulk = "keep";
+        keepAllBtn.textContent = t("volConflictKeepAll");
+        keepAllBtn.addEventListener("click", () => {
+          handlers.onResolveAllConflicts?.("keep");
+        });
+        const overwriteAllBtn = doc.createElement("button");
+        overwriteAllBtn.type = "button";
+        overwriteAllBtn.className = "ptr-btn ptr-btn-primary";
+        overwriteAllBtn.dataset.conflictBulk = "overwrite";
+        overwriteAllBtn.textContent = t("volConflictOverwriteAll");
+        overwriteAllBtn.addEventListener("click", () => {
+          handlers.onResolveAllConflicts?.("overwrite");
+        });
+        bulkRow.append(keepAllBtn, overwriteAllBtn);
+        conflictsEl.append(bulkRow);
+      }
       for (const conflict of conflicts) {
         const card = doc.createElement("div");
         card.className = "ptr-vol-conflict-card";
         const keyLine = doc.createElement("div");
         keyLine.className = "code-inline";
         keyLine.textContent = conflict.key;
+        const diffLine = doc.createElement("div");
+        diffLine.className = "ptr-vol-msg";
+        diffLine.textContent = `${t("volConflictExisting")}: ${conflict.existing} | ${t("volConflictImported")}: ${conflict.imported}`;
         const row = doc.createElement("div");
         row.className = "ptr-vol-row";
         const keepBtn = doc.createElement("button");
         keepBtn.type = "button";
         keepBtn.className = "ptr-btn";
+        keepBtn.dataset.conflictAction = "existing";
         keepBtn.textContent = t("volConflictKeep");
         keepBtn.addEventListener("click", () => {
           handlers.onResolveConflict(conflict.id, "keep");
@@ -360,12 +390,13 @@ export function mountVolunteerView(
         const useBtn = doc.createElement("button");
         useBtn.type = "button";
         useBtn.className = "ptr-btn ptr-btn-primary";
+        useBtn.dataset.conflictAction = "imported";
         useBtn.textContent = t("volConflictOverwrite");
         useBtn.addEventListener("click", () => {
           handlers.onResolveConflict(conflict.id, "overwrite");
         });
         row.append(keepBtn, useBtn);
-        card.append(keyLine, row);
+        card.append(keyLine, diffLine, row);
         conflictsEl.append(card);
       }
     },

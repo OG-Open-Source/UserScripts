@@ -427,7 +427,7 @@ async function boot(): Promise<void> {
   volunteerController.syncFromConfig();
 
   const spaRescan = createSpaRescanController({
-    adapter,
+    getAdapter: () => adapter,
     rescan(regions, ctx) {
       if (!ctx.isCurrent()) {
         return;

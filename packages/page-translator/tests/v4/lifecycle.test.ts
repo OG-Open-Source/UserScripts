@@ -107,3 +107,43 @@ test("watchSpaNavigation handles history and Turbo SPA events", async () => {
   expect(events).toEqual(["before", "settled", "before", "settled"]);
   handle.stop();
 });
+
+test("createSpaRescanController resolves live adapter via getAdapter() after async swap", async () => {
+  const win = new Window({ url: "https://example.test/start" });
+  win.document.body.innerHTML =
+    '<main id="v1">Old</main><section id="v2">New</section>';
+  const doc = win.document as unknown as Document;
+
+  let activeAdapter: SiteStructureAdapter = {
+    id: "v1",
+    detect: () => true,
+    regions: (d) => ({ content: [requireElement(d, "#v1")] }),
+    captureScope: (d) => [requireElement(d, "#v1")],
+    onSpaNavigate: (d) => [requireElement(d, "#v1")],
+    elementPolicy: () => "prose",
+  };
+
+  const scannedIds: string[][] = [];
+  const controller = createSpaRescanController({
+    getAdapter: () => activeAdapter,
+    rescan: (regions) => {
+      scannedIds.push(regions.map((r) => r.id));
+    },
+  });
+
+  await controller.onSpaNavigate(doc);
+  expect(scannedIds).toEqual([["v1"]]);
+
+  // Simulate async fingerprint SWR update swapping the adapter
+  activeAdapter = {
+    id: "v2",
+    detect: () => true,
+    regions: (d) => ({ content: [requireElement(d, "#v2")] }),
+    captureScope: (d) => [requireElement(d, "#v2")],
+    onSpaNavigate: (d) => [requireElement(d, "#v2")],
+    elementPolicy: () => "prose",
+  };
+
+  await controller.onSpaNavigate(doc);
+  expect(scannedIds).toEqual([["v1"], ["v2"]]);
+});

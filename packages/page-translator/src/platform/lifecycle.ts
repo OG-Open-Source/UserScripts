@@ -1,4 +1,5 @@
 import type { SiteStructureAdapter } from "../structure/adapter";
+import { fallbackAdapter } from "../structure/fallback";
 
 export interface SpaLifecycleOptions {
   onBeforeLeave: () => void;
@@ -18,7 +19,8 @@ export interface SpaRescanContext {
 }
 
 export interface SpaRescanControllerOptions<T = void> {
-  adapter: SiteStructureAdapter;
+  adapter?: SiteStructureAdapter;
+  getAdapter?: () => SiteStructureAdapter;
   onApplied?: (
     result: T,
     regions: Element[],
@@ -62,7 +64,9 @@ export function createSpaRescanController<T = void>(
       };
 
       try {
-        const regions = options.adapter.onSpaNavigate(doc);
+        const adapter =
+          options.getAdapter?.() ?? options.adapter ?? fallbackAdapter;
+        const regions = adapter.onSpaNavigate(doc);
         const result = await options.rescan(regions, context);
         if (!context.isCurrent()) {
           return false;

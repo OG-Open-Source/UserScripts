@@ -236,6 +236,26 @@ export function createVolunteerController(
             view?.renderConflicts(conflicts);
             view?.setMessage(t("volConflictResolved"));
           },
+          onResolveAllConflicts: (choice) => {
+            if (conflicts.length === 0) {
+              return;
+            }
+            let mergedPatch: SiteLocaleTable | undefined;
+            for (const conflict of conflicts) {
+              const patch = buildConflictResolutionPatch(conflict, choice);
+              if (patch) {
+                mergedPatch =
+                  mergeLocaleTables(mergedPatch, patch) ?? undefined;
+              }
+            }
+            if (mergedPatch) {
+              options.onSyncLocalTable?.(mergedPatch);
+              options.onSiteDictUpdated?.();
+            }
+            conflicts = [];
+            view?.renderConflicts(conflicts);
+            view?.setMessage(t("volConflictResolved"));
+          },
           onCopyJson: () => {
             const json = buildVolunteerExportJson(
               options.hostname,
@@ -269,6 +289,9 @@ export function createVolunteerController(
     toggle(): void {
       const next = !activation.isActive("volunteer");
       activation.setActive("volunteer", next);
+      if (!next) {
+        options.setClickBlocked?.(false);
+      }
       syncFromConfig();
       options.onToggle?.(isVolunteerEnabled());
     },
