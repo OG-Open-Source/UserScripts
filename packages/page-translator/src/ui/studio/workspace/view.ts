@@ -969,7 +969,9 @@ export function mountStudioWorkspaceView(
           })
         );
       }
+      const prevScrollTop = nodeList.scrollTop;
       nodeList.replaceChildren(frag);
+      nodeList.scrollTop = prevScrollTop;
     },
     renderSelectedNode: (entry, suggestedSelector) => {
       if (!entry) {

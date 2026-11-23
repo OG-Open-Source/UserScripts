@@ -185,7 +185,7 @@ async function boot(): Promise<void> {
     remoteSiteTranslations,
     localSiteTranslations
   );
-  let onSiteDictUpdated: (() => void) | null = null;
+  let onSiteDictUpdated: ((skipStudioRescan?: boolean) => void) | null = null;
 
   function recomputeSiteTranslations(): void {
     siteTranslations = mergeSiteTranslations(
@@ -403,10 +403,9 @@ async function boot(): Promise<void> {
         activeRunner?.clearCache();
         startTranslation();
       }
-      studioController.syncFromConfig();
     },
     onSiteDictUpdated: () => {
-      onSiteDictUpdated?.();
+      onSiteDictUpdated?.(true);
     },
     onSyncLocalTable: (patch) => {
       localSiteTranslations = mergeLocalSiteLocaleTable(
@@ -454,9 +453,9 @@ async function boot(): Promise<void> {
     t: i18n.t,
   });
 
-  onSiteDictUpdated = () => {
+  onSiteDictUpdated = (skipStudioRescan = false) => {
     syncDictMetrics();
-    if (studioController.isActive()) {
+    if (!skipStudioRescan && studioController.isActive()) {
       studioController.rescan();
     }
     if (translationActive) {

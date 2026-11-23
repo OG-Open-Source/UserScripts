@@ -169,6 +169,26 @@ export function createStudioWorkspaceController(
       tab: filterTab,
     });
 
+  const renderToolbarNow = (): void => {
+    if (!view) {
+      return;
+    }
+    view.renderToolbar({
+      adapterId: options.getAdapter().id,
+      boxMode,
+      selectMode,
+      themeMode: options.getConfig().themeMode,
+      translated: options.isTranslated(),
+      zoom,
+    });
+  };
+
+  const syncDictPatch = (patch: SiteLocaleTable): void => {
+    draftPatch = mergeLocaleTables(draftPatch ?? undefined, patch) ?? null;
+    options.onSyncLocalTable(patch);
+    options.onSiteDictUpdated?.();
+  };
+
   const renderOverlayNow = (): void => {
     if (!(view && stage)) {
       return;
@@ -290,14 +310,7 @@ export function createStudioWorkspaceController(
     }
 
     if (view) {
-      view.renderToolbar({
-        adapterId: adapter.id,
-        boxMode,
-        selectMode,
-        themeMode: cfg.themeMode,
-        translated: options.isTranslated(),
-        zoom,
-      });
+      renderToolbarNow();
       view.setDeltaText(options.getHostRawDelta());
       view.renderDiagnostics(lastInspectScan);
       renderNodesAndSelection();
@@ -367,28 +380,12 @@ export function createStudioWorkspaceController(
         {
           onToggleTranslate: () => {
             options.onToggleTranslate();
-            const cfg = options.getConfig();
-            view?.renderToolbar({
-              adapterId: options.getAdapter().id,
-              boxMode,
-              selectMode,
-              themeMode: cfg.themeMode,
-              translated: options.isTranslated(),
-              zoom,
-            });
+            renderToolbarNow();
           },
           onRescan: rescan,
           onToggleSelectMode: () => {
             selectMode = !selectMode;
-            const cfg = options.getConfig();
-            view?.renderToolbar({
-              adapterId: options.getAdapter().id,
-              boxMode,
-              selectMode,
-              themeMode: cfg.themeMode,
-              translated: options.isTranslated(),
-              zoom,
-            });
+            renderToolbarNow();
           },
           onBoxModeChange: (nextMode) => {
             boxMode = nextMode;
@@ -498,10 +495,7 @@ export function createStudioWorkspaceController(
               return;
             }
             const patch = buildDraftPatch(entry, trimmed, scope);
-            draftPatch =
-              mergeLocaleTables(draftPatch ?? undefined, patch) ?? null;
-            options.onSyncLocalTable(patch);
-            options.onSiteDictUpdated?.();
+            syncDictPatch(patch);
             const trimmedScope = scope.trim();
             view?.setStatusMessage(
               trimmedScope
@@ -560,8 +554,7 @@ export function createStudioWorkspaceController(
                 options.getLocalLocaleTable() ?? options.getSiteLocaleTable()
               );
               if (Object.keys(result.patch).length > 0) {
-                options.onSyncLocalTable(result.patch);
-                options.onSiteDictUpdated?.();
+                syncDictPatch(result.patch);
               }
               ({ conflicts } = result);
               view?.renderConflicts(conflicts);
@@ -578,8 +571,7 @@ export function createStudioWorkspaceController(
             }
             const patch = buildConflictResolutionPatch(target, choice);
             if (patch) {
-              options.onSyncLocalTable(patch);
-              options.onSiteDictUpdated?.();
+              syncDictPatch(patch);
             }
             conflicts = conflicts.filter((c) => c.id !== id);
             view?.renderConflicts(conflicts);
@@ -599,8 +591,7 @@ export function createStudioWorkspaceController(
               }
             }
             if (mergedPatch) {
-              options.onSyncLocalTable(mergedPatch);
-              options.onSiteDictUpdated?.();
+              syncDictPatch(mergedPatch);
             }
             conflicts = [];
             view?.renderConflicts(conflicts);

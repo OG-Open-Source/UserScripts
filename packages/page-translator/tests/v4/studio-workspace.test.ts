@@ -573,4 +573,101 @@ describe("Industrial Studio Workspace", () => {
 
     controller.stop();
   });
+
+  test("10. resolving an import conflict with Use overwrites stale draftPatch in both Site Dict input and exported JSON", () => {
+    const { controller, doc } = createTestEnv(
+      '<main><div id="item-1">Settings</div></main>'
+    );
+    controller.syncFromConfig();
+    const sr = getShellShadow(doc);
+
+    const dictTab = sr.querySelector(
+      '[data-studio-right-tab="dict"]'
+    ) as HTMLButtonElement;
+    dictTab.click();
+
+    const transInput = sr.querySelector(
+      '[data-studio-dict="trans"]'
+    ) as HTMLInputElement;
+    transInput.value = "設定-草稿";
+
+    const saveBtn = sr.querySelector(
+      '[data-studio-dict="save"]'
+    ) as HTMLButtonElement;
+    saveBtn.click();
+
+    const importToggleBtn = sr.querySelector(
+      '[data-studio-dict="import-ai"]'
+    ) as HTMLButtonElement;
+    importToggleBtn.click();
+
+    const importTextarea = sr.querySelector(
+      '[data-studio-dict="import-text"]'
+    ) as HTMLTextAreaElement;
+    importTextarea.value = JSON.stringify({
+      translations: {
+        Settings: "設定-覆寫",
+      },
+    });
+
+    const applyImportBtn = sr.querySelector(
+      '[data-studio-dict="import-apply"]'
+    ) as HTMLButtonElement;
+    applyImportBtn.click();
+
+    const overwriteBtn = sr.querySelector(
+      "[data-studio-conflict-overwrite]"
+    ) as HTMLButtonElement;
+    overwriteBtn.click();
+
+    expect(transInput.value).toBe("設定-覆寫");
+
+    let copiedJson = "";
+    const origClipboard = navigator.clipboard;
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: (text: string) => {
+          copiedJson = text;
+          return Promise.resolve();
+        },
+      },
+    });
+
+    try {
+      const copyJsonBtn = sr.querySelector(
+        '[data-studio-dict="copy-json"]'
+      ) as HTMLButtonElement;
+      copyJsonBtn.click();
+    } finally {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: origClipboard,
+      });
+    }
+
+    expect(copiedJson).toContain("設定-覆寫");
+    expect(copiedJson).not.toContain("設定-草稿");
+
+    controller.stop();
+  });
+
+  test("11. nodeList.scrollTop is preserved across clicking/selecting a node", () => {
+    const { controller, doc } = createTestEnv(
+      "<main><p>First node</p><p>Second node</p><p>Third node</p></main>"
+    );
+    controller.syncFromConfig();
+    const sr = getShellShadow(doc);
+
+    const nodeList = sr.querySelector("[data-studio-node-list]") as HTMLElement;
+    nodeList.scrollTop = 120;
+
+    const rows = sr.querySelectorAll("[data-studio-node-index]");
+    expect(rows.length).toBeGreaterThan(1);
+    (rows[1] as HTMLElement).click();
+
+    expect(nodeList.scrollTop).toBe(120);
+
+    controller.stop();
+  });
 });

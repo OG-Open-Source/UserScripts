@@ -63,8 +63,12 @@ test("Studio Workspace renders localized zh-Hant-TW strings when t() is injected
   const studioText =
     win.document.querySelector("#ptr-studio-shell")?.shadowRoot?.textContent ??
     "";
-  expect(studioText).toContain(zhTw?.studioTabNode ?? "");
-  expect(studioText).toContain(zhTw?.studioTabDict ?? "");
+  expect(typeof zhTw?.studioInspectorNode).toBe("string");
+  expect(zhTw?.studioInspectorNode.length).toBeGreaterThan(0);
+  expect(typeof zhTw?.studioInspectorDict).toBe("string");
+  expect(zhTw?.studioInspectorDict.length).toBeGreaterThan(0);
+  expect(studioText).toContain(zhTw?.studioInspectorNode as string);
+  expect(studioText).toContain(zhTw?.studioInspectorDict as string);
   expect(studioText).toContain(zhTw?.studioExit ?? "");
   expect(studioText).toContain(zhTw?.volSave ?? "");
   studio.stop();
