@@ -34,6 +34,7 @@ export interface BatchRunnerOptions {
   getProvider: (cfg: TranslatorConfig) => TranslationProvider;
   getSiteLocaleTable?: () => SiteLocaleTable | null;
   host?: string;
+  isInspectActive?: () => boolean;
   metrics?: PtrMetrics;
   upstream?: UpstreamClient;
 }
@@ -728,7 +729,10 @@ export function createBatchRunner(options: BatchRunnerOptions) {
     const openccSchedule = scheduleOpenCC(cfg);
     const isZhTarget = parseBcp47(cfg.targetLang).lang === "zh";
 
-    if (cfg.defaultInspect && cfg.provider === "inspect") {
+    if (
+      (options.isInspectActive?.() ?? cfg.defaultInspect) &&
+      cfg.provider === "inspect"
+    ) {
       renderInspectOnly(segments, siteTable, cfg);
       return;
     }

@@ -135,7 +135,7 @@ export function mountBasicView(
   langWrap.className = "ptr-basic-field";
   const langLabel = doc.createElement("span");
   langLabel.className = "ptr-basic-label";
-  langLabel.textContent = "Target";
+  langLabel.textContent = t("basicTarget");
   const langSelect = doc.createElement("select");
   langSelect.className = "ptr-input";
   langSelect.setAttribute("data-basic-field", "targetLang");
@@ -154,7 +154,7 @@ export function mountBasicView(
   presetWrap.className = "ptr-basic-field";
   const presetLabel = doc.createElement("span");
   presetLabel.className = "ptr-basic-label";
-  presetLabel.textContent = "Style";
+  presetLabel.textContent = t("basicStyle");
   const presetSelect = doc.createElement("select");
   presetSelect.className = "ptr-input";
   presetSelect.setAttribute("data-basic-field", "presentation");
@@ -173,7 +173,7 @@ export function mountBasicView(
   fontWrap.className = "ptr-basic-field";
   const fontLabel = doc.createElement("span");
   fontLabel.className = "ptr-basic-label";
-  fontLabel.textContent = "Font";
+  fontLabel.textContent = t("basicFont");
   const fontInput = doc.createElement("input");
   fontInput.type = "text";
   fontInput.className = "ptr-input";
@@ -204,7 +204,7 @@ export function mountBasicView(
   volunteerBtn.type = "button";
   volunteerBtn.className = "ptr-btn";
   volunteerBtn.setAttribute("data-studio-action", "volunteer");
-  volunteerBtn.textContent = t("tierStudio");
+  volunteerBtn.textContent = t("basicVolunteer");
   volunteerBtn.addEventListener("click", () => {
     handlers.onToggleVolunteer?.();
   });

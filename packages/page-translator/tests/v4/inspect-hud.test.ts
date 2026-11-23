@@ -5,6 +5,7 @@ import { DEFAULT_CONFIG } from "../../src/platform/config";
 import { createPtrMetrics } from "../../src/platform/metrics";
 import { renderInspectMarker, restoreAll } from "../../src/render/renderer";
 import { parseSiteDelta } from "../../src/structure/site-rules";
+import { buildAiTranslationExport } from "../../src/ui/export-ai";
 import { createInspectController } from "../../src/ui/studio/inspect";
 import { scanInspectSegments } from "../../src/ui/studio/inspect/logic";
 
@@ -146,4 +147,60 @@ test("Inspect HUD displays telemetry, toggles compact/detailed views, and cleans
 
   controller.stop();
   expect(win.document.querySelector("#ptr-inspect-hud")).toBeNull();
+});
+
+test("scanInspectSegments and buildAiTranslationExport respect Discourse adapter captureScope and exclude header/footer chrome", () => {
+  const win = new Window();
+  win.document.body.innerHTML = `
+    <header class="d-header"><div id="hdr">Header Nav</div></header>
+    <main id="main-outlet"><div id="topic">Topic Body</div></main>
+    <footer><div id="ftr">Footer Link</div></footer>
+  `;
+
+  const discourseStyle = (el: Element) => ({
+    display:
+      el.tagName === "DIV" ||
+      el.tagName === "BODY" ||
+      el.tagName === "MAIN" ||
+      el.tagName === "HEADER" ||
+      el.tagName === "FOOTER"
+        ? "block"
+        : "inline",
+    visibility: "visible",
+  });
+
+  const delta = parseSiteDelta("");
+  const metrics = createPtrMetrics();
+  const scan = scanInspectSegments(
+    win.document as unknown as Document,
+    delta,
+    DEFAULT_CONFIG,
+    metrics,
+    { getStyle: discourseStyle }
+  );
+  expect(scan.adapterId).toBe("discourse");
+  expect(scan.counts.total).toBe(1);
+  expect(
+    scan.hoverMap.has(win.document.querySelector("#topic") as Element)
+  ).toBe(true);
+  expect(scan.hoverMap.has(win.document.querySelector("#hdr") as Element)).toBe(
+    false
+  );
+  expect(scan.hoverMap.has(win.document.querySelector("#ftr") as Element)).toBe(
+    false
+  );
+
+  const exported = buildAiTranslationExport(
+    win.document as unknown as Document,
+    delta,
+    {
+      getStyle: discourseStyle,
+      hostname: "meta.discourse.org",
+      targetLang: "zh-TW",
+    }
+  );
+  expect(exported.count).toBe(1);
+  expect(exported.markdown).toContain("Topic Body");
+  expect(exported.markdown).not.toContain("Header Nav");
+  expect(exported.markdown).not.toContain("Footer Link");
 });

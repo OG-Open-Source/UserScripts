@@ -284,3 +284,104 @@ test("human-only provider renders dictionary hits and leaves misses untouched wi
     "Untranslated prose"
   );
 });
+
+test("isInspectActive gates inspect-only rendering per tab regardless of defaultInspect", async () => {
+  const win1 = new Window();
+  win1.document.body.innerHTML = `<div id="p1">Inspect only block</div>`;
+  const segs1 = collectSegments(
+    win1.document.body as unknown as Element,
+    parseSiteDelta(""),
+    { getStyle }
+  );
+
+  const runner1 = createBatchRunner({
+    doc: win1.document as unknown as Document,
+    delta: parseSiteDelta(""),
+    getConfig: () => ({
+      ...DEFAULT_CONFIG,
+      defaultInspect: false,
+      provider: "inspect",
+    }),
+    getProvider: () => ({
+      id: "inspect",
+      translateBatch: (items: string[]) => Promise.resolve(items),
+    }),
+    isInspectActive: () => true,
+  });
+
+  await runner1.translateBatch(segs1);
+  expect(
+    win1.document.querySelector("#p1")?.getAttribute("data-tr-inspect")
+  ).toBe("auto");
+  expect(win1.document.querySelector("#p1 [data-tr-block]")).toBeNull();
+
+  const win2 = new Window();
+  win2.document.body.innerHTML = `<div id="p2">Normal translate block</div>`;
+  const segs2 = collectSegments(
+    win2.document.body as unknown as Element,
+    parseSiteDelta(""),
+    { getStyle }
+  );
+
+  const runner2 = createBatchRunner({
+    doc: win2.document as unknown as Document,
+    delta: parseSiteDelta(""),
+    getConfig: () => ({
+      ...DEFAULT_CONFIG,
+      defaultInspect: true,
+      provider: "inspect",
+    }),
+    getProvider: () => ({
+      id: "inspect",
+      translateBatch: (items: string[]) => Promise.resolve(items.map((x) => x)),
+    }),
+    isInspectActive: () => false,
+  });
+
+  await runner2.translateBatch(segs2);
+  expect(win2.document.querySelector("#p2 [data-tr-block]")).not.toBeNull();
+  expect(
+    win2.document.querySelector("#p2")?.getAttribute("data-tr-inspect")
+  ).toBeNull();
+});
+
+test("zh-subsystem normalizes cross-element bracket and punctuation seams in rendered DOM with openccMode off", async () => {
+  const win = new Window();
+  win.document.body.innerHTML = `
+    <div id="b1"><span>文字</span>[English]</div>
+    <div id="p1"><span>中文</span>, next</div>
+    <div id="s1"><span>中文</span>, and <span data-tr-no-space>keep</span>, next</div>
+  `;
+  const segs = collectSegments(
+    win.document.body as unknown as Element,
+    parseSiteDelta(""),
+    { getStyle }
+  );
+
+  const runner = createBatchRunner({
+    doc: win.document as unknown as Document,
+    delta: parseSiteDelta(""),
+    getConfig: () => ({
+      ...DEFAULT_CONFIG,
+      targetLang: "zh-TW",
+      openccMode: "off",
+      punctNorm: "zh-norm",
+      spacingMode: "off",
+    }),
+    getProvider: () => ({
+      id: "translate-pa",
+      translateBatch: () => Promise.resolve([]),
+    }),
+  });
+
+  await runner.translateBatch(segs);
+  expect(win.document.querySelector("#b1 [data-tr-dst]")?.textContent).toBe(
+    "文字【English】"
+  );
+  expect(win.document.querySelector("#p1 [data-tr-dst]")?.textContent).toBe(
+    "中文，next"
+  );
+  expect(win.document.querySelector("#s1 [data-tr-dst]")?.textContent).toBe(
+    "中文，and keep, next"
+  );
+});

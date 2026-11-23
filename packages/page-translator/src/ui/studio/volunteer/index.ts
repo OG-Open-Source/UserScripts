@@ -7,6 +7,7 @@ import { createTabActivationManager } from "../../../platform/activation";
 import type { TranslatorConfig } from "../../../platform/config";
 import type { PtrMessageKey } from "../../../platform/i18n";
 import { formatPtrMsg, MESSAGES_EN } from "../../../platform/i18n";
+import type { SiteStructureAdapter } from "../../../structure/adapter";
 import type { CompiledSiteDelta } from "../../../structure/site-rules";
 import {
   buildAiTranslationExport,
@@ -27,6 +28,7 @@ import { mountVolunteerView } from "./view";
 
 export interface VolunteerControllerOptions {
   doc: Document;
+  getAdapter?: () => SiteStructureAdapter;
   getConfig: () => TranslatorConfig;
   getDelta: () => CompiledSiteDelta;
   getLocalLocaleTable?: () => SiteLocaleTable | null;
@@ -105,7 +107,10 @@ export function createVolunteerController(
       options.doc,
       options.getDelta(),
       options.getSiteLocaleTable(),
-      options.getStyle
+      {
+        getAdapter: options.getAdapter,
+        getStyle: options.getStyle,
+      }
     );
     view?.renderScan(lastScan, cfg.themeMode);
     renderCurrentEntry();
@@ -184,8 +189,15 @@ export function createVolunteerController(
               mergeLocaleTables(draftPatch ?? undefined, patch) ?? null;
             options.onSyncLocalTable?.(patch);
             options.onSiteDictUpdated?.();
+            const preview = translation.trim();
+            const trimmedScope = scope.trim();
             view?.setMessage(
-              formatPtrMsg(t("volSaved"), { preview: translation.trim() })
+              trimmedScope
+                ? formatPtrMsg(t("volSavedScoped"), {
+                    scope: trimmedScope,
+                    preview,
+                  })
+                : formatPtrMsg(t("volSaved"), { preview })
             );
           },
           onExportAi: () => {
@@ -193,6 +205,7 @@ export function createVolunteerController(
               options.doc,
               options.getDelta(),
               {
+                getAdapter: options.getAdapter,
                 getStyle: options.getStyle,
                 hostname: options.hostname,
                 siteTable: options.getSiteLocaleTable(),

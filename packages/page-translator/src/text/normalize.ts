@@ -474,11 +474,11 @@ export function applyPunctNormToFragment(
     return;
   }
 
+  const textNodes: { node: Text; skip: boolean }[] = [];
+
   function walk(node: Node, skip: boolean): void {
     if (node.nodeType === 3) {
-      if (!skip && node.nodeValue) {
-        node.nodeValue = normalizePunctuation(node.nodeValue, mode);
-      }
+      textNodes.push({ node: node as Text, skip });
       return;
     }
     if (node.nodeType !== 1 && node.nodeType !== 11) {
@@ -489,6 +489,7 @@ export function applyPunctNormToFragment(
       const element = node as Element;
       if (
         element.hasAttribute("data-tr-no-opencc") ||
+        element.hasAttribute("data-tr-no-space") ||
         skipPredicate?.(element)
       ) {
         nextSkip = true;
@@ -500,6 +501,39 @@ export function applyPunctNormToFragment(
   }
 
   walk(root, false);
+
+  for (const entry of textNodes) {
+    if (!entry.skip && entry.node.nodeValue) {
+      entry.node.nodeValue = normalizePunctuation(entry.node.nodeValue, mode);
+    }
+  }
+
+  let run: { node: Text; token: TextToken }[] = [];
+  const flushRun = (): void => {
+    if (run.length > 1) {
+      const tokens = run.map((item) => item.token);
+      normalizeCjkBracketSeams(tokens);
+      normalizePunctuationSeams(tokens);
+      for (const item of run) {
+        if (item.node.nodeValue !== item.token.value) {
+          item.node.nodeValue = item.token.value;
+        }
+      }
+    }
+    run = [];
+  };
+
+  for (const entry of textNodes) {
+    if (entry.skip) {
+      flushRun();
+      continue;
+    }
+    run.push({
+      node: entry.node,
+      token: { kind: "text", value: entry.node.nodeValue ?? "" },
+    });
+  }
+  flushRun();
 }
 
 export function applySpacingToFragment(

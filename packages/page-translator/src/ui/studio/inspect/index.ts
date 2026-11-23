@@ -6,6 +6,7 @@ import type { TranslatorConfig } from "../../../platform/config";
 import type { PtrMessageKey } from "../../../platform/i18n";
 import type { PtrMetrics } from "../../../platform/metrics";
 import { createPtrMetrics } from "../../../platform/metrics";
+import type { SiteStructureAdapter } from "../../../structure/adapter";
 import type { CompiledSiteDelta } from "../../../structure/site-rules";
 import { buildAiTranslationExport } from "../../export-ai";
 import type { InspectScanResult } from "./logic";
@@ -15,6 +16,7 @@ import { mountInspectView } from "./view";
 
 export interface InspectControllerOptions {
   doc: Document;
+  getAdapter?: () => SiteStructureAdapter;
   getConfig: () => TranslatorConfig;
   getDelta: () => CompiledSiteDelta;
   getMetrics?: () => PtrMetrics;
@@ -59,6 +61,7 @@ export function createInspectController(
       cfg,
       metrics,
       {
+        getAdapter: options.getAdapter,
         getStyle: options.getStyle,
         siteTable: options.getSiteLocaleTable?.(),
       }
@@ -90,6 +93,7 @@ export function createInspectController(
               options.doc,
               options.getDelta(),
               {
+                getAdapter: options.getAdapter,
                 getStyle: options.getStyle,
                 hostname: options.doc.location?.hostname ?? "",
                 siteTable: options.getSiteLocaleTable?.(),

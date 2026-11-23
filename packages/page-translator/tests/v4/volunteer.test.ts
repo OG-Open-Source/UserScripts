@@ -8,6 +8,7 @@ import { createVolunteerController } from "../../src/ui/studio/volunteer";
 import {
   buildVolunteerExportJson,
   diffImportConflicts,
+  scanVolunteerEntries,
 } from "../../src/ui/studio/volunteer/logic";
 
 function getShadowRoot(win: Window): ShadowRoot {
@@ -384,4 +385,73 @@ test("importAiJson separates conflicts from new entries and resolves them via in
   keepAll.click();
   expect(conflictBox.hidden).toBe(true);
   vol.stop();
+});
+
+test("onSaveDraft displays volSavedScoped message when scope is non-empty", () => {
+  const win = new Window();
+  win.document.body.innerHTML = `<section aria-label="Insights Nav"><div id="i1">Pulse</div></section>`;
+
+  const vol = createVolunteerController({
+    doc: win.document as unknown as Document,
+    hostname: "github.com",
+    getConfig: () => ({
+      ...DEFAULT_CONFIG,
+      uiTier: "studio",
+      defaultVolunteer: true,
+    }),
+    getTargetLang: () => "zh-Hant-TW",
+    getDelta: () => ({ addSelectors: [], removeSelectors: [], modRules: [] }),
+    getSiteLocaleTable: () => null,
+    storage: null,
+    getStyle,
+  });
+
+  vol.syncFromConfig();
+  const sr = getShadowRoot(win);
+  const inputs = Array.from(sr.querySelectorAll("input"));
+  const scopeInput = inputs[0] as HTMLInputElement;
+  const valInput = inputs[1] as HTMLInputElement;
+  scopeInput.value = 'section[aria-label="Insights Nav"]';
+  valInput.value = "脈動";
+
+  const saveBtn = Array.from(sr.querySelectorAll("button")).find(
+    (b) => b.textContent === "Save & Preview"
+  ) as HTMLButtonElement;
+  saveBtn.click();
+
+  const msgs = Array.from(sr.querySelectorAll(".ptr-vol-msg"));
+  const msgEl = msgs.at(-1) as HTMLElement | undefined;
+  expect(msgEl?.textContent).toContain(
+    'Saved draft (scoped to section[aria-label="Insights Nav"]). Preview: 脈動'
+  );
+  vol.stop();
+});
+
+test("scanVolunteerEntries respects Discourse adapter captureScope and excludes header/footer chrome", () => {
+  const win = new Window();
+  win.document.body.innerHTML = `
+    <header class="d-header"><div id="hdr">Header Nav</div></header>
+    <main id="main-outlet"><div id="topic">Topic Body</div></main>
+    <footer><div id="ftr">Footer Link</div></footer>
+  `;
+
+  const discourseStyle = (el: Element) => ({
+    display:
+      el.tagName === "DIV" ||
+      el.tagName === "BODY" ||
+      el.tagName === "MAIN" ||
+      el.tagName === "HEADER" ||
+      el.tagName === "FOOTER"
+        ? "block"
+        : "inline",
+    visibility: "visible",
+  });
+
+  const scan = scanVolunteerEntries(
+    win.document as unknown as Document,
+    parseDelta(""),
+    null,
+    discourseStyle
+  );
+  expect(scan.entries.map((e) => e.key)).toEqual(["Topic Body"]);
 });

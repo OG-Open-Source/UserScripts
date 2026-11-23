@@ -9,6 +9,8 @@ import {
   matchSiteTranslation,
   suggestScopeSelector,
 } from "../../../dict/template";
+import type { SiteStructureAdapter } from "../../../structure/adapter";
+import { resolveAdapter } from "../../../structure/registry";
 import type { CompiledSiteDelta } from "../../../structure/site-rules";
 import type { ParsedAiImport } from "../../export-ai";
 
@@ -39,16 +41,39 @@ export interface VolunteerScanResult {
   staticCount: number;
 }
 
+export interface VolunteerScanOptions {
+  adapter?: SiteStructureAdapter;
+  getAdapter?: () => SiteStructureAdapter;
+  getStyle?: StyleReader;
+}
+
 export function scanVolunteerEntries(
   doc: Document,
   delta: CompiledSiteDelta,
   siteTable: SiteLocaleTable | null,
-  getStyle?: StyleReader
+  styleOrOptions?: StyleReader | VolunteerScanOptions
 ): VolunteerScanResult {
-  const root = doc.body ?? doc.documentElement;
-  const segs = root
-    ? collectSegments(root, delta, getStyle ? { getStyle } : undefined)
-    : [];
+  const opts: VolunteerScanOptions =
+    typeof styleOrOptions === "function"
+      ? { getStyle: styleOrOptions }
+      : (styleOrOptions ?? {});
+  const adapter =
+    opts.adapter ??
+    opts.getAdapter?.() ??
+    resolveAdapter({ host: doc.location?.hostname ?? "", doc });
+  const scopeRoots = adapter.captureScope(doc);
+  const fallbackRoot = doc.body ?? doc.documentElement;
+  let roots: Element[] = [];
+  if (scopeRoots.length > 0) {
+    roots = scopeRoots;
+  } else if (fallbackRoot) {
+    roots = [fallbackRoot];
+  }
+  const segOpts = {
+    adapter,
+    ...(opts.getStyle ? { getStyle: opts.getStyle } : {}),
+  };
+  const segs = roots.flatMap((root) => collectSegments(root, delta, segOpts));
 
   const entries: CapturedVolunteerEntry[] = [];
   let staticCount = 0;

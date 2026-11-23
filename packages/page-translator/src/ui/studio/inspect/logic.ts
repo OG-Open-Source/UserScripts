@@ -10,6 +10,7 @@ import {
   getMetricsSnapshot,
   recordScanTiming,
 } from "../../../platform/metrics";
+import type { SiteStructureAdapter } from "../../../structure/adapter";
 import { resolveAdapter } from "../../../structure/registry";
 import type { CompiledSiteDelta } from "../../../structure/site-rules";
 import {
@@ -51,7 +52,13 @@ function nowMs(): number {
   return typeof performance === "undefined" ? Date.now() : performance.now();
 }
 
-export function resolveInspectAdapterId(doc: Document): string {
+export function resolveInspectAdapterId(
+  doc: Document,
+  adapter?: SiteStructureAdapter
+): string {
+  if (adapter) {
+    return adapter.id;
+  }
   const host = doc.location?.hostname ?? "";
   return resolveAdapter({ host, doc }).id;
 }
@@ -69,20 +76,33 @@ export function scanInspectSegments(
   >,
   metrics: PtrMetrics,
   options: {
+    adapter?: SiteStructureAdapter;
+    getAdapter?: () => SiteStructureAdapter;
     getStyle?: StyleReader;
     siteTable?: SiteLocaleTable | null;
   } = {}
 ): InspectScanResult {
-  const adapterId = resolveInspectAdapterId(doc);
-  const root = doc.body ?? doc.documentElement;
+  const adapter =
+    options.adapter ??
+    options.getAdapter?.() ??
+    resolveAdapter({ host: doc.location?.hostname ?? "", doc });
+  const adapterId = adapter.id;
+  const scopeRoots = adapter.captureScope(doc);
+  const fallbackRoot = doc.body ?? doc.documentElement;
+  let roots: Element[] = [];
+  if (scopeRoots.length > 0) {
+    roots = scopeRoots;
+  } else if (fallbackRoot) {
+    roots = [fallbackRoot];
+  }
+  const segOpts = {
+    adapter,
+    ...(options.getStyle ? { getStyle: options.getStyle } : {}),
+  };
   const t0 = nowMs();
-  const segments = root
-    ? collectSegments(
-        root,
-        delta,
-        options.getStyle ? { getStyle: options.getStyle } : undefined
-      )
-    : [];
+  const segments = roots.flatMap((root) =>
+    collectSegments(root, delta, segOpts)
+  );
   const elapsed = Math.max(0, Math.round(nowMs() - t0));
   recordScanTiming(metrics, elapsed, segments.length);
 

@@ -1,7 +1,9 @@
+import type { GMMenuHandle } from "@userscripts/shared";
 import {
   configureGmApi,
   createI18n,
   gmMenuCommand,
+  gmUnregisterMenuCommand,
   isManagerPage,
   isTopFrame,
   MANAGER_URL,
@@ -37,7 +39,7 @@ import {
   EMPTY_REMOTE_DELTAS,
   loadRemoteDeltas,
 } from "./platform/deltas-remote";
-import { MESSAGES_EN } from "./platform/i18n";
+import { formatPtrMsg, MESSAGES_EN } from "./platform/i18n";
 import {
   createSpaRescanController,
   watchSpaNavigation,
@@ -103,6 +105,49 @@ function buildStyleOpts(cfg = loadConfig(), debugInspect = false) {
     debugInspect,
     spacingMode: cfg.spacingMode,
   };
+}
+
+interface ActiveConfigSnapshot {
+  debugSpacingMarks: boolean;
+  openccMode: TranslatorConfig["openccMode"];
+  provider: TranslatorConfig["provider"];
+  punctNorm: TranslatorConfig["punctNorm"];
+  siteDeltasJson: string;
+  spacingMode: TranslatorConfig["spacingMode"];
+  targetLang: string;
+}
+
+function snapshotTranslationConfig(
+  cfg: TranslatorConfig
+): ActiveConfigSnapshot {
+  return {
+    targetLang: cfg.targetLang,
+    provider: cfg.provider,
+    openccMode: cfg.openccMode,
+    spacingMode: cfg.spacingMode,
+    punctNorm: cfg.punctNorm,
+    debugSpacingMarks: cfg.debugSpacingMarks,
+    siteDeltasJson: JSON.stringify(cfg.siteDeltas),
+  };
+}
+
+function didTranslationConfigChange(
+  prev: ActiveConfigSnapshot | null,
+  next: TranslatorConfig
+): boolean {
+  if (!prev) {
+    return false;
+  }
+  const cur = snapshotTranslationConfig(next);
+  return (
+    prev.targetLang !== cur.targetLang ||
+    prev.provider !== cur.provider ||
+    prev.openccMode !== cur.openccMode ||
+    prev.spacingMode !== cur.spacingMode ||
+    prev.punctNorm !== cur.punctNorm ||
+    prev.debugSpacingMarks !== cur.debugSpacingMarks ||
+    prev.siteDeltasJson !== cur.siteDeltasJson
+  );
 }
 
 let onConfigUpdated: ((next: TranslatorConfig) => void) | null = null;
@@ -209,6 +254,7 @@ async function boot(): Promise<void> {
 
   let activeObserver: ViewportObserverHandle | null = null;
   let activeRunner: ReturnType<typeof createBatchRunner> | null = null;
+  let activeConfigSnapshot: ActiveConfigSnapshot | null = null;
   let translationActive = false;
 
   function resolveCurrentDelta() {
@@ -253,6 +299,7 @@ async function boot(): Promise<void> {
     stopTranslation(false);
     translationActive = true;
     const cfg = loadConfig();
+    activeConfigSnapshot = snapshotTranslationConfig(cfg);
     syncAllStyles(cfg);
     const delta = resolveCurrentDelta();
     metrics.deltaCounts = {
@@ -266,6 +313,7 @@ async function boot(): Promise<void> {
       delta,
       coalesceMs: 25,
       getConfig: loadConfig,
+      isInspectActive: () => inspectController.isActive(),
       getProvider: (c) => {
         if (c.provider === "inspect") {
           return createInspectProvider();
@@ -301,6 +349,7 @@ async function boot(): Promise<void> {
   function stopTranslation(clearActiveFlag = true): void {
     if (clearActiveFlag) {
       translationActive = false;
+      activeConfigSnapshot = null;
       persistTabActive(false);
       basicController.setTranslated(false);
     }
@@ -314,14 +363,19 @@ async function boot(): Promise<void> {
     }
   }
 
+  let inspectMenuId: GMMenuHandle | undefined;
+  let volunteerMenuId: GMMenuHandle | undefined;
+
   const inspectController = createInspectController({
     doc: document,
+    getAdapter: () => adapter,
     getConfig: loadConfig,
     getDelta: resolveCurrentDelta,
     getMetrics: () => metrics,
     getSiteLocaleTable: getActiveLocaleTable,
     onToggle: () => {
       syncAllStyles();
+      syncInspectMenuCommand();
     },
     t: i18n.t,
   });
@@ -329,6 +383,7 @@ async function boot(): Promise<void> {
   const volunteerController = createVolunteerController({
     doc: document,
     hostname: host,
+    getAdapter: () => adapter,
     getConfig: loadConfig,
     getDelta: resolveCurrentDelta,
     getSiteLocaleTable: getActiveLocaleTable,
@@ -346,12 +401,47 @@ async function boot(): Promise<void> {
     onSiteDictUpdated: () => {
       onSiteDictUpdated?.();
     },
+    onToggle: () => {
+      syncVolunteerMenuCommand();
+    },
     isClickBlocked: () => loadConfig().volunteerBlockClicks,
     setClickBlocked: (next) => {
       saveConfig({ volunteerBlockClicks: next });
     },
     t: i18n.t,
   });
+
+  function syncInspectMenuCommand(): void {
+    if (inspectMenuId !== undefined) {
+      gmUnregisterMenuCommand(inspectMenuId);
+    }
+    inspectMenuId = gmMenuCommand(
+      formatPtrMsg(i18n.t("inspectMode"), {
+        state: i18n.t(inspectController.isActive() ? "on" : "off"),
+      }),
+      () => {
+        if (loadConfig().uiTier === "studio") {
+          inspectController.toggle();
+        }
+      }
+    );
+  }
+
+  function syncVolunteerMenuCommand(): void {
+    if (volunteerMenuId !== undefined) {
+      gmUnregisterMenuCommand(volunteerMenuId);
+    }
+    volunteerMenuId = gmMenuCommand(
+      formatPtrMsg(i18n.t("volunteerMode"), {
+        state: i18n.t(volunteerController.isActive() ? "on" : "off"),
+      }),
+      () => {
+        if (loadConfig().uiTier === "studio") {
+          volunteerController.toggle();
+        }
+      }
+    );
+  }
 
   const basicController = createBasicController({
     doc: document,
@@ -419,6 +509,15 @@ async function boot(): Promise<void> {
     basicController.syncFromConfig();
     inspectController.syncFromConfig();
     volunteerController.syncFromConfig();
+    syncInspectMenuCommand();
+    syncVolunteerMenuCommand();
+    if (
+      translationActive &&
+      didTranslationConfigChange(activeConfigSnapshot, next)
+    ) {
+      activeRunner?.clearCache();
+      startTranslation();
+    }
   };
 
   syncAllStyles();
@@ -471,16 +570,8 @@ async function boot(): Promise<void> {
     saveConfig({ uiTier: nextTier });
     basicController.syncFromConfig();
   });
-  gmMenuCommand(i18n.t("inspectMode"), () => {
-    if (loadConfig().uiTier === "studio") {
-      inspectController.toggle();
-    }
-  });
-  gmMenuCommand(i18n.t("volunteerMode"), () => {
-    if (loadConfig().uiTier === "studio") {
-      volunteerController.toggle();
-    }
-  });
+  syncInspectMenuCommand();
+  syncVolunteerMenuCommand();
   gmMenuCommand(i18n.t("openSettings"), () => {
     window.open(`${MANAGER_URL}/settings/translate/`, "_blank", "noopener");
   });

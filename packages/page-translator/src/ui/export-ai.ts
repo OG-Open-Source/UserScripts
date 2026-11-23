@@ -7,6 +7,8 @@ import {
   matchSiteTranslation,
   suggestScopeSelector,
 } from "../dict/template";
+import type { SiteStructureAdapter } from "../structure/adapter";
+import { resolveAdapter } from "../structure/registry";
 import type { CompiledSiteDelta } from "../structure/site-rules";
 
 export interface AiExportSegmentItem {
@@ -45,20 +47,31 @@ export function buildAiTranslationExport(
   doc: Document,
   delta: CompiledSiteDelta,
   options: {
+    adapter?: SiteStructureAdapter;
+    getAdapter?: () => SiteStructureAdapter;
     getStyle?: StyleReader;
     hostname: string;
     siteTable?: SiteLocaleTable | null;
     targetLang: string;
   }
 ): AiExportBundle {
-  const root = doc.body ?? doc.documentElement;
-  const segs = root
-    ? collectSegments(
-        root,
-        delta,
-        options.getStyle ? { getStyle: options.getStyle } : undefined
-      )
-    : [];
+  const adapter =
+    options.adapter ??
+    options.getAdapter?.() ??
+    resolveAdapter({ host: doc.location?.hostname ?? "", doc });
+  const scopeRoots = adapter.captureScope(doc);
+  const fallbackRoot = doc.body ?? doc.documentElement;
+  let roots: Element[] = [];
+  if (scopeRoots.length > 0) {
+    roots = scopeRoots;
+  } else if (fallbackRoot) {
+    roots = [fallbackRoot];
+  }
+  const segOpts = {
+    adapter,
+    ...(options.getStyle ? { getStyle: options.getStyle } : {}),
+  };
+  const segs = roots.flatMap((root) => collectSegments(root, delta, segOpts));
 
   const seenKeys = new Set<string>();
   const items: AiExportSegmentItem[] = [];
