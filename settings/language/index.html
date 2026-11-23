@@ -5,52 +5,40 @@
     <meta content="width=device-width, initial-scale=1" name="viewport">
     <meta content="1" name="userscripts-manager">
     <title data-i18n="pageTitle">Language — UserScripts</title>
+    <link href="https://cdn.simplecss.org/simple.min.css" rel="stylesheet">
     <link href="../shared/tokens.css" rel="stylesheet">
   </head>
   <body>
-    <div class="settings-shell">
-      <header class="breadcrumb">
-        <span data-i18n-html="breadcrumb"
-          ><a href="../../"><strong>UserScripts</strong></a> / Language</span
-        >
-        <span class="us-chip" id="statusChip"
-          ><i class="us-dot"></i
-          ><span data-i18n="detecting">Detecting…</span></span
-        >
-      </header>
+    <header>
+      <nav>
+        <a data-i18n="navHome" href="../../">← UserScripts</a>
+      </nav>
+      <h1 data-i18n="heading">Language</h1>
+      <p data-i18n="lead">
+        Applies to every installed script. The list is the languages those
+        scripts actually ship.
+      </p>
+      <p data-i18n="detecting" id="statusChip">Detecting…</p>
+    </header>
 
-      <section class="settings-group">
-        <h1 data-i18n="heading">Language</h1>
-        <p class="lead" data-i18n="lead">
-          Applies to every installed script. The list is the languages those
-          scripts actually ship.
+    <main>
+      <section>
+        <p>
+          <label data-i18n="langLabel" for="langSelect">Language</label>
+          <select id="langSelect"></select>
         </p>
 
-        <div class="field">
-          <span class="field-label" data-i18n="langLabel" id="langLabel"
-            >Language</span
-          >
-          <div id="langSelect"></div>
-        </div>
+        <p>
+          <button data-i18n="apply" id="apply" type="button">Apply</button>
+        </p>
 
-        <div class="us-row-between" style="margin-top: 14px">
-          <span class="note" id="note" style="margin: 0"></span>
-          <button
-            class="us-btn us-btn-primary"
-            data-i18n="apply"
-            id="apply"
-            type="button"
-          >
-            Apply
-          </button>
-        </div>
+        <p id="note"></p>
       </section>
-    </div>
+    </main>
 
     <script type="module">
       import {
         collectScripts,
-        createCustomSelect,
         dispatchSettings,
         onPresence,
         waitForScripts,
@@ -60,8 +48,7 @@
       const DICT = {
         "en-US": {
           pageTitle: "Language — UserScripts",
-          breadcrumb:
-            '<a href="../../"><strong>UserScripts</strong></a> / Language',
+          navHome: "← UserScripts",
           detecting: "Detecting…",
           heading: "Language",
           lead: "Applies to every installed script. The list is the languages those scripts actually ship.",
@@ -80,8 +67,7 @@
         },
         "zh-Hant-TW": {
           pageTitle: "語言 — UserScripts",
-          breadcrumb:
-            '<a href="../../"><strong>UserScripts</strong></a> / 語言',
+          navHome: "← UserScripts",
           detecting: "偵測中…",
           heading: "語言",
           lead: "套用至所有已安裝腳本。清單內容為這些腳本實際提供的語言。",
@@ -99,8 +85,7 @@
         },
         "zh-Hans-CN": {
           pageTitle: "语言 — UserScripts",
-          breadcrumb:
-            '<a href="../../"><strong>UserScripts</strong></a> / 语言',
+          navHome: "← UserScripts",
           detecting: "检测中…",
           heading: "语言",
           lead: "应用至所有已安装脚本。列表内容为这些脚本实际提供的语言。",
@@ -126,15 +111,37 @@
       const loadedScriptIds = new Set();
       const chip = document.querySelector("#statusChip");
       const note = document.querySelector("#note");
+      const langSelect = document.querySelector("#langSelect");
       let saved = localStorage.getItem(KEY) ?? "";
 
-      const langSelect = createCustomSelect(
-        document.querySelector("#langSelect"),
-        {
-          labelledBy: "langLabel",
-          initialValue: saved,
+      function populateSelect(selectEl, options, desiredValue, emptyText = "") {
+        selectEl.replaceChildren();
+        if (options.length === 0) {
+          if (emptyText) {
+            const opt = document.createElement("option");
+            opt.value = "";
+            opt.textContent = emptyText;
+            selectEl.append(opt);
+          }
+          selectEl.disabled = true;
+          return;
         }
-      );
+        selectEl.disabled = false;
+        for (const item of options) {
+          const opt = document.createElement("option");
+          opt.value = item.value;
+          opt.textContent = item.label;
+          selectEl.append(opt);
+        }
+        if (
+          desiredValue &&
+          options.some((item) => item.value === desiredValue)
+        ) {
+          selectEl.value = desiredValue;
+        } else {
+          selectEl.value = options[0].value;
+        }
+      }
 
       async function ingestScripts(list) {
         let addedLang = false;
@@ -170,19 +177,15 @@
           value: code,
           label: `${name} (${code})`,
         }));
-        langSelect.setOptions(entries, i18n.t("emptyOptions"));
-        if (saved && languages.has(saved)) {
-          langSelect.setValue(saved);
-        }
+        const desired =
+          saved && languages.has(saved) ? saved : langSelect.value;
+        populateSelect(langSelect, entries, desired, i18n.t("emptyOptions"));
       }
 
       function updateChip(list) {
-        const dot = document.createElement("i");
-        dot.className = list.length ? "us-dot ok" : "us-dot warn";
-        const label = list.length
+        chip.textContent = list.length
           ? i18n.t("statusCount", { count: list.length })
           : i18n.t("noScript");
-        chip.replaceChildren(dot, document.createTextNode(label));
       }
 
       function updateStatus(list) {
@@ -207,7 +210,7 @@
 
       document.querySelector("#apply").addEventListener("click", () => {
         const currentScripts = collectScripts();
-        const value = langSelect.getValue();
+        const { value } = langSelect;
         if (!value) {
           return;
         }
@@ -216,6 +219,7 @@
         dispatchSettings({ lang: value });
         i18n = createSettingsTranslator(DICT);
         i18n.applyDom();
+        renderOptions();
         updateChip(currentScripts);
         note.textContent = currentScripts.length
           ? i18n.t("appliedCount", {

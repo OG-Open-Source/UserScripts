@@ -314,6 +314,103 @@ test("Volunteer workbench resets translation input on Next/Prev and restores sav
   volunteer.stop();
 });
 
+test("settings pages load external Simple.css before tokens.css, omit createCustomSelect, and have no inline styles", () => {
+  const root = resolve(import.meta.dir, "../../../..");
+  const pages = [
+    { file: "index.html", tokensPath: "./settings/shared/tokens.css" },
+    {
+      file: "settings/language/index.html",
+      tokensPath: "../shared/tokens.css",
+    },
+    {
+      file: "settings/translate/index.html",
+      tokensPath: "../shared/tokens.css",
+    },
+  ];
+  const simpleCssUrl = "https://cdn.simplecss.org/simple.min.css";
+
+  for (const { file, tokensPath } of pages) {
+    const html = readFileSync(resolve(root, file), "utf8");
+    const win = new Window({ url: "https://example.com/" });
+    win.document.write(html);
+    const links = Array.from(
+      win.document.querySelectorAll('link[rel="stylesheet"]')
+    ).map((el) => el.getAttribute("href"));
+
+    const simpleIdx = links.indexOf(simpleCssUrl);
+    const tokensIdx = links.indexOf(tokensPath);
+    expect(simpleIdx).toBeGreaterThanOrEqual(0);
+    expect(tokensIdx).toBeGreaterThan(simpleIdx);
+    expect(win.document.querySelector("style")).toBeNull();
+    expect(win.document.querySelector("[style]")).toBeNull();
+    expect(html).not.toContain("createCustomSelect");
+  }
+
+  const bridgeJs = readFileSync(
+    resolve(root, "settings/shared/bridge.js"),
+    "utf8"
+  );
+  expect(bridgeJs).not.toContain("createCustomSelect");
+
+  const langHtml = readFileSync(
+    resolve(root, "settings/language/index.html"),
+    "utf8"
+  );
+  const langWin = new Window({ url: "https://example.com/settings/language/" });
+  langWin.document.write(langHtml);
+  expect(langWin.document.querySelector("select#langSelect")).not.toBeNull();
+});
+
+test("settings/translate uses native selects and keeps Typography, CJK Spacing, and #apply outside studio tier", () => {
+  const html = readFileSync(
+    resolve(import.meta.dir, "../../../../settings/translate/index.html"),
+    "utf8"
+  );
+  const win = new Window({ url: "https://example.com/settings/translate/" });
+  win.document.write(html);
+  const doc = win.document;
+
+  for (const id of [
+    "providerSelect",
+    "themeSelect",
+    "spacingSelect",
+    "punctSelect",
+    "openccSelect",
+    "localFontSelect",
+  ]) {
+    expect(doc.querySelector(`select#${id}`)).not.toBeNull();
+  }
+
+  for (const id of [
+    "customFont",
+    "customCss",
+    "spacingSelect",
+    "punctSelect",
+    "openccSelect",
+    "apply",
+    "note",
+  ]) {
+    const el = doc.querySelector(`#${id}`);
+    expect(el).not.toBeNull();
+    expect(el?.closest('[data-tier="studio"]')).toBeNull();
+  }
+
+  for (const id of [
+    "defaultInspect",
+    "defaultVolunteer",
+    "siteDeltas",
+    "dictBody",
+  ]) {
+    const el = doc.querySelector(`#${id}`);
+    expect(el).not.toBeNull();
+    const studioSection = el?.closest(
+      '[data-tier="studio"]'
+    ) as HTMLElement | null;
+    expect(studioSection).not.toBeNull();
+    expect(studioSection?.hasAttribute("hidden")).toBe(true);
+  }
+});
+
 test("settings decouples volunteerBlockClicks from defaultVolunteer", () => {
   const html = readFileSync(
     resolve(import.meta.dir, "../../../../settings/translate/index.html"),

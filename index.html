@@ -5,57 +5,59 @@
     <meta content="width=device-width, initial-scale=1" name="viewport">
     <meta content="1" name="userscripts-manager">
     <title data-i18n="pageTitle">UserScripts</title>
+    <link href="https://cdn.simplecss.org/simple.min.css" rel="stylesheet">
     <link href="./settings/shared/tokens.css" rel="stylesheet">
   </head>
   <body>
-    <div class="settings-shell">
-      <header class="breadcrumb">
-        <span><strong data-i18n="brand">UserScripts</strong></span>
-        <span class="us-chip" id="statusChip"
-          ><i class="us-dot"></i
-          ><span data-i18n="detecting">Detecting scripts…</span></span
+    <header>
+      <h1 data-i18n="brand">UserScripts</h1>
+      <p data-i18n="lead">
+        Settings for the scripts distributed by OG-Open-Source/UserScripts.
+      </p>
+      <nav>
+        <a data-i18n="navLanguageTitle" href="./settings/language/">Language</a>
+        <a data-i18n="navPtrTitle" href="./settings/translate/"
+          >Page Translator</a
         >
-      </header>
+      </nav>
+      <p data-i18n="detecting" id="statusChip">Detecting scripts…</p>
+    </header>
 
-      <section class="settings-group">
-        <h1 data-i18n="brand">UserScripts</h1>
-        <p class="lead" data-i18n="lead">
-          Settings for the scripts distributed by OG-Open-Source/UserScripts.
-        </p>
-        <ul class="us-nav-list">
+    <main>
+      <section>
+        <h2 data-i18n="settingsPages">Settings</h2>
+        <ul>
           <li>
-            <a href="./settings/language/">
-              <span
-                ><strong data-i18n="navLanguageTitle">Language</strong><br>
-                <span class="us-muted" data-i18n="navLanguageDesc"
-                  >Shared UI language across all installed scripts</span
-                ></span
-              >
-              <span class="us-muted">→</span>
-            </a>
+            <a href="./settings/language/"
+              ><strong data-i18n="navLanguageTitle">Language</strong></a
+            >
+            —
+            <span data-i18n="navLanguageDesc"
+              >Shared UI language across all installed scripts</span
+            >
           </li>
           <li>
-            <a href="./settings/translate/">
-              <span
-                ><strong data-i18n="navPtrTitle">Page Translator</strong><br>
-                <span class="us-muted" data-i18n="navPtrDesc"
-                  >Translation routing, CSS presentation, CJK spacing, inspect
-                  HUD &amp; site dictionaries</span
-                ></span
-              >
-              <span class="us-muted">→</span>
-            </a>
+            <a href="./settings/translate/"
+              ><strong data-i18n="navPtrTitle">Page Translator</strong></a
+            >
+            —
+            <span data-i18n="navPtrDesc"
+              >Translation routing, CSS presentation, CJK spacing, inspect HUD
+              &amp; site dictionaries</span
+            >
           </li>
         </ul>
       </section>
 
-      <section class="settings-group">
+      <section>
         <h2 data-i18n="installedScripts">Installed Scripts</h2>
-        <div class="note" data-i18n="waitingPresence" id="scriptsList">
-          Waiting for userscript manager presence…
+        <div id="scriptsList">
+          <p data-i18n="waitingPresence">
+            Waiting for userscript manager presence…
+          </p>
         </div>
       </section>
-    </div>
+    </main>
 
     <script type="module">
       import { onPresence, waitForScripts } from "./settings/shared/bridge.js";
@@ -69,6 +71,7 @@
           noScript: "No script detected",
           connectedCount: "{count} connected",
           lead: "Settings for the scripts distributed by OG-Open-Source/UserScripts.",
+          settingsPages: "Settings",
           navLanguageTitle: "Language",
           navLanguageDesc: "Shared UI language across all installed scripts",
           navPtrTitle: "Page Translator",
@@ -89,6 +92,7 @@
           noScript: "未偵測到腳本",
           connectedCount: "已連線 {count} 個",
           lead: "OG-Open-Source/UserScripts 所發布腳本的統一設定頁面。",
+          settingsPages: "設定頁面",
           navLanguageTitle: "語言",
           navLanguageDesc: "所有已安裝腳本共用的介面語言",
           navPtrTitle: "Page Translator",
@@ -108,6 +112,7 @@
           noScript: "未检测到脚本",
           connectedCount: "已连接 {count} 个",
           lead: "OG-Open-Source/UserScripts 所发布脚本的统一设置页面。",
+          settingsPages: "设置页面",
           navLanguageTitle: "语言",
           navLanguageDesc: "所有已安装脚本共用的界面语言",
           navPtrTitle: "Page Translator",
@@ -128,21 +133,16 @@
       const chip = document.querySelector("#statusChip");
       const listEl = document.querySelector("#scriptsList");
 
-      function setChip(dotClass, text) {
-        const dot = document.createElement("i");
-        dot.className = dotClass ? `us-dot ${dotClass}` : "us-dot";
-        chip.replaceChildren(dot, document.createTextNode(text));
-      }
-
       function renderScripts(scripts) {
         if (!scripts.length) {
-          setChip("warn", i18n.t("noScript"));
-          listEl.textContent = i18n.t("emptyHint");
+          chip.textContent = i18n.t("noScript");
+          const p = document.createElement("p");
+          p.textContent = i18n.t("emptyHint");
+          listEl.replaceChildren(p);
           return;
         }
-        setChip("ok", i18n.t("connectedCount", { count: scripts.length }));
+        chip.textContent = i18n.t("connectedCount", { count: scripts.length });
         const table = document.createElement("table");
-        table.className = "us-table";
         const thead = document.createElement("thead");
         const headRow = document.createElement("tr");
         for (const key of ["colId", "colName", "colDescription"]) {
@@ -156,12 +156,12 @@
         for (const s of scripts) {
           const tr = document.createElement("tr");
           const tdId = document.createElement("td");
-          tdId.className = "us-mono";
-          tdId.textContent = s.id;
+          const codeId = document.createElement("code");
+          codeId.textContent = s.id;
+          tdId.append(codeId);
           const tdName = document.createElement("td");
           tdName.textContent = s.name ?? s.id;
           const tdDesc = document.createElement("td");
-          tdDesc.className = "us-muted";
           tdDesc.textContent = s.description ?? "";
           tr.append(tdId, tdName, tdDesc);
           tbody.append(tr);

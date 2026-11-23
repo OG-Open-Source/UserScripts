@@ -5,185 +5,140 @@
     <meta content="width=device-width, initial-scale=1" name="viewport">
     <meta content="1" name="userscripts-manager">
     <title data-i18n="pageTitle">Page Translator — UserScripts</title>
+    <link href="https://cdn.simplecss.org/simple.min.css" rel="stylesheet">
     <link href="../shared/tokens.css" rel="stylesheet">
   </head>
   <body>
-    <div class="settings-shell">
-      <header class="breadcrumb">
-        <span data-i18n-html="breadcrumb"
-          ><a href="../../"><strong>UserScripts</strong></a> / Page
-          Translator</span
-        >
-        <span class="us-chip" id="ptrStatus"
-          ><i class="us-dot"></i
-          ><span data-i18n="ptrDetecting">Detecting ptr…</span></span
-        >
-      </header>
+    <header>
+      <nav>
+        <a data-i18n="navHome" href="../../">← UserScripts</a>
+      </nav>
+      <h1 data-i18n="heading">Page Translator</h1>
+      <p data-i18n-html="leadHtml">
+        Configure routing, CSS presentation, CJK spacing, Traditional/Simplified
+        conversion, inspect/volunteer tools, per-site
+        <code>+</code>/<code>-</code>/<code>*</code> rules, and cached
+        dictionaries.
+      </p>
+      <p data-i18n="ptrDetecting" id="ptrStatus">Detecting ptr…</p>
+    </header>
 
-      <section class="settings-group">
-        <h1 data-i18n="heading">Page Translator</h1>
-        <p class="lead" data-i18n-html="leadHtml">
-          Configure routing, CSS presentation, CJK spacing,
-          Traditional/Simplified conversion, inspect/volunteer tools, per-site
-          <code>+</code>/<code>-</code>/<code>*</code> rules, and cached
-          dictionaries.
-        </p>
-
+    <main>
+      <section>
         <h2 data-i18n="sec1">1. Core &amp; Routing</h2>
-        <div class="grid-2">
-          <div class="field">
-            <label data-i18n="targetLangLabel" for="targetLang"
-              >Target Language</label
+        <p>
+          <label data-i18n="targetLangLabel" for="targetLang"
+            >Target Language</label
+          >
+          <input id="targetLang" placeholder="zh-TW" type="text">
+        </p>
+        <p>
+          <label data-i18n="providerLabel" for="providerSelect">Provider</label>
+          <select id="providerSelect"></select>
+        </p>
+        <p>
+          <label data-i18n="themeLabel" for="themeSelect">UI Theme Rule</label>
+          <select id="themeSelect"></select>
+        </p>
+        <p>
+          <label data-i18n="apiKeyLabel" for="apiKey"
+            >translate-pa API Key</label
+          >
+          <input
+            autocomplete="off"
+            data-i18n-placeholder="apiKeyPlaceholder"
+            id="apiKey"
+            placeholder="Leave blank to use built-in default key"
+            type="password"
+          >
+          <button data-i18n="clear" id="clearApiKey" type="button">
+            Clear
+          </button>
+        </p>
+        <p>
+          <label>
+            <input id="studioMode" type="checkbox">
+            <span data-i18n-html="studioModeHtml"
+              >Studio Mode (<code>uiTier: "studio"</code> — Inspect HUD,
+              Volunteer Workbench, advanced controls)</span
             >
-            <input
-              class="us-input"
-              id="targetLang"
-              placeholder="zh-TW"
-              type="text"
-            >
-          </div>
-          <div class="field">
-            <span
-              class="field-label"
-              data-i18n="providerLabel"
-              id="providerLabel"
-              >Provider</span
-            >
-            <div id="providerSelect"></div>
-          </div>
-        </div>
-        <div class="grid-2">
-          <div class="field">
-            <span class="field-label" data-i18n="themeLabel" id="themeLabel"
-              >UI Theme Rule</span
-            >
-            <div id="themeSelect"></div>
-          </div>
-          <div class="field">
-            <label data-i18n="apiKeyLabel" for="apiKey"
-              >translate-pa API Key</label
-            >
-            <div class="us-row">
-              <input
-                autocomplete="off"
-                class="us-input"
-                data-i18n-placeholder="apiKeyPlaceholder"
-                id="apiKey"
-                placeholder="Leave blank to use built-in default key"
-                style="flex: 1"
-                type="password"
-              >
-              <button
-                class="us-btn us-btn-sm"
-                data-i18n="clear"
-                id="clearApiKey"
-                type="button"
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-        </div>
-        <label class="check-row"
-          ><input class="us-checkbox" id="studioMode" type="checkbox">
-          <span data-i18n-html="studioModeHtml"
-            >Studio Mode (<code>uiTier: "studio"</code> — Inspect HUD, Volunteer
-            Workbench, advanced controls)</span
-          ></label
-        >
+          </label>
+        </p>
       </section>
 
-      <section class="settings-group">
+      <section>
         <h2 data-i18n="sec2">2. Presentation &amp; Typography</h2>
-        <div class="field">
+        <p>
           <label data-i18n-html="customFontHtml" for="customFont"
             >Custom Font (<code>--ptr-font</code>)</label
           >
-          <div class="us-row">
-            <input
-              class="us-input"
-              id="customFont"
-              list="localFontsList"
-              placeholder='"Noto Sans TC", system-ui, sans-serif'
-              style="flex: 1 1 220px"
-              type="text"
-            >
-            <button
-              class="us-btn us-btn-sm"
-              data-i18n="loadFonts"
-              id="loadFonts"
-              type="button"
-            >
-              Load Local Fonts
-            </button>
-          </div>
-          <div hidden id="localFontSelectWrap" style="margin-top: 6px"></div>
-          <datalist id="localFontsList"></datalist>
-          <p class="note" id="fontNote"></p>
-        </div>
-        <div class="field">
+          <input
+            id="customFont"
+            list="localFontsList"
+            placeholder='"Noto Sans TC", system-ui, sans-serif'
+            type="text"
+          >
+          <button data-i18n="loadFonts" id="loadFonts" type="button">
+            Load Local Fonts
+          </button>
+        </p>
+        <p hidden id="localFontSelectWrap">
+          <label data-i18n="localFontsLabel" for="localFontSelect"
+            >Local Fonts</label
+          >
+          <select id="localFontSelect"></select>
+        </p>
+        <datalist id="localFontsList"></datalist>
+        <p id="fontNote"></p>
+        <p>
           <label data-i18n="customCssLabel" for="customCss"
             >Presentation CSS</label
           >
-          <div class="us-row" style="margin-bottom: 6px">
-            <button
-              class="us-btn us-btn-sm"
-              data-i18n="presetReplace"
-              data-preset="replace"
-              type="button"
-            >
-              Preset: Replace (default)
-            </button>
-            <button
-              class="us-btn us-btn-sm"
-              data-i18n="presetBilingual"
-              data-preset="bilingual"
-              type="button"
-            >
-              Preset: Bilingual Stacked
-            </button>
-            <button
-              class="us-btn us-btn-sm"
-              data-i18n="presetHover"
-              data-preset="hover"
-              type="button"
-            >
-              Preset: Hover Original
-            </button>
-          </div>
           <textarea
-            class="us-textarea"
             data-i18n-placeholder="customCssPlaceholder"
             id="customCss"
             placeholder="/* Override [data-tr-orig] / [data-tr-dst] */"
             rows="5"
           ></textarea>
-        </div>
+        </p>
+        <p>
+          <button data-i18n="presetReplace" data-preset="replace" type="button">
+            Preset: Replace (default)
+          </button>
+          <button
+            data-i18n="presetBilingual"
+            data-preset="bilingual"
+            type="button"
+          >
+            Preset: Bilingual Stacked
+          </button>
+          <button data-i18n="presetHover" data-preset="hover" type="button">
+            Preset: Hover Original
+          </button>
+        </p>
       </section>
 
-      <section class="settings-group" data-tier="studio" hidden>
+      <section>
         <h2 data-i18n="sec3">3. CJK Spacing &amp; Conversion</h2>
-        <div class="field">
-          <span class="field-label" data-i18n="spacingLabel" id="spacingLabel"
-            >CJK / ASCII Spacing Mode</span
+        <p>
+          <label data-i18n="spacingLabel" for="spacingSelect"
+            >CJK / ASCII Spacing Mode</label
           >
-          <div id="spacingSelect"></div>
-        </div>
-        <div class="grid-2">
-          <div class="field">
-            <span class="field-label" data-i18n="punctLabel" id="punctLabel"
-              >Punctuation Width Normalization</span
-            >
-            <div id="punctSelect"></div>
-          </div>
-          <div class="field">
-            <span class="field-label" data-i18n="openccLabel" id="openccLabel"
-              >Traditional / Simplified Conversion</span
-            >
-            <div id="openccSelect"></div>
-          </div>
-        </div>
-        <p class="note" data-i18n-html="spacingNoteHtml">
+          <select id="spacingSelect"></select>
+        </p>
+        <p>
+          <label data-i18n="punctLabel" for="punctSelect"
+            >Punctuation Width Normalization</label
+          >
+          <select id="punctSelect"></select>
+        </p>
+        <p>
+          <label data-i18n="openccLabel" for="openccSelect"
+            >Traditional / Simplified Conversion</label
+          >
+          <select id="openccSelect"></select>
+        </p>
+        <p data-i18n-html="spacingNoteHtml">
           <code>js</code> inserts ASCII spaces between CJK and Latin/numbers;
           <code>w3c</code> applies CSS <code>text-autospace: normal</code>
           without inserting characters. CJK parentheses normalize to fullwidth
@@ -191,65 +146,74 @@
         </p>
       </section>
 
-      <section class="settings-group" data-tier="studio" hidden>
+      <section data-tier="studio" hidden>
         <h2 data-i18n="sec4">4. Capture Inspector &amp; Volunteer Tools</h2>
-        <label class="check-row"
-          ><input class="us-checkbox" id="autoTranslate" type="checkbox">
-          <span data-i18n="autoTranslate"
-            >Auto-translate on page load</span
-          ></label
-        >
-        <label class="check-row"
-          ><input class="us-checkbox" id="debugSpacingMarks" type="checkbox">
-          <span data-i18n-html="debugSpacingMarksHtml"
-            >Debug spacing marks (show <code>^</code> and <code>_</code>)</span
-          ></label
-        >
-        <label class="check-row"
-          ><input class="us-checkbox" id="defaultInspect" type="checkbox">
-          <span data-i18n-html="defaultInspectHtml"
-            >Open Capture Preview HUD in new tabs (<code>defaultInspect</code
-            >)</span
-          ></label
-        >
-        <label class="check-row"
-          ><input class="us-checkbox" id="defaultVolunteer" type="checkbox">
-          <span data-i18n-html="defaultVolunteerHtml"
-            >Open Volunteer Workbench in new tabs (<code>defaultVolunteer</code
-            >)</span
-          ></label
-        >
-        <label class="check-row" id="lockRow"
-          ><input class="us-checkbox" id="volunteerBlockClicks" type="checkbox">
-          <span data-i18n-html="volunteerBlockClicksHtml"
-            >Lock page clicks while Volunteer Mode is active (<code
-              >volunteerBlockClicks</code
-            >)</span
-          ></label
-        >
+        <p>
+          <label>
+            <input id="autoTranslate" type="checkbox">
+            <span data-i18n="autoTranslate">Auto-translate on page load</span>
+          </label>
+        </p>
+        <p>
+          <label>
+            <input id="debugSpacingMarks" type="checkbox">
+            <span data-i18n-html="debugSpacingMarksHtml"
+              >Debug spacing marks (show <code>^</code> and
+              <code>_</code>)</span
+            >
+          </label>
+        </p>
+        <p>
+          <label>
+            <input id="defaultInspect" type="checkbox">
+            <span data-i18n-html="defaultInspectHtml"
+              >Open Capture Preview HUD in new tabs (<code>defaultInspect</code
+              >)</span
+            >
+          </label>
+        </p>
+        <p>
+          <label>
+            <input id="defaultVolunteer" type="checkbox">
+            <span data-i18n-html="defaultVolunteerHtml"
+              >Open Volunteer Workbench in new tabs (<code
+                >defaultVolunteer</code
+              >)</span
+            >
+          </label>
+        </p>
+        <p id="lockRow">
+          <label>
+            <input id="volunteerBlockClicks" type="checkbox">
+            <span data-i18n-html="volunteerBlockClicksHtml"
+              >Lock page clicks while Volunteer Mode is active (<code
+                >volunteerBlockClicks</code
+              >)</span
+            >
+          </label>
+        </p>
       </section>
 
-      <section class="settings-group" data-tier="studio" hidden>
+      <section data-tier="studio" hidden>
         <h2 data-i18n="sec5">5. Per-Site Delta Rules</h2>
-        <div class="field">
+        <p>
           <label data-i18n-html="siteDeltasHtml" for="siteDeltas">
             JSON map of host/glob → multiline <code>+</code>, <code>-</code>,
             <code>*</code> CSS selectors
           </label>
           <textarea
-            class="us-textarea"
             id="siteDeltas"
             placeholder='{&#10;  "github.com": "- [class*=\"languageList__\"]\n* [class*=\"kbd__\"] : inline-atomic, no-opencc"&#10;}'
             rows="5"
           ></textarea>
-        </div>
+        </p>
       </section>
 
-      <section class="settings-group" data-tier="studio" hidden>
+      <section data-tier="studio" hidden>
         <h2 data-i18n-html="sec6Html">
           6. Cached Site Dictionaries (<code>ptr:site-tr:*</code>)
         </h2>
-        <table class="us-table">
+        <table>
           <thead>
             <tr>
               <th data-i18n="colHost">Host</th>
@@ -259,9 +223,9 @@
               <th data-i18n="colActions">Actions</th>
             </tr>
           </thead>
-          <tbody class="us-mono" id="dictBody">
+          <tbody id="dictBody">
             <tr>
-              <td class="us-muted" colspan="5" data-i18n="dictInitial">
+              <td colspan="5" data-i18n="dictInitial">
                 No cached host dictionaries loaded yet.
               </td>
             </tr>
@@ -273,41 +237,28 @@
           id="importDictFile"
           type="file"
         >
-        <div class="us-row-between" style="margin-top: 12px">
-          <div class="us-row">
-            <button
-              class="us-btn us-btn-sm"
-              data-i18n="importDict"
-              id="importDictBtn"
-              type="button"
-            >
-              Import JSON…
-            </button>
-            <button
-              class="us-btn us-btn-sm"
-              data-i18n="refresh"
-              id="refreshDictBtn"
-              type="button"
-            >
-              Refresh
-            </button>
-          </div>
-          <button
-            class="us-btn us-btn-primary"
-            data-i18n="applySettings"
-            id="apply"
-            type="button"
-          >
+        <p>
+          <button data-i18n="importDict" id="importDictBtn" type="button">
+            Import JSON…
+          </button>
+          <button data-i18n="refresh" id="refreshDictBtn" type="button">
+            Refresh
+          </button>
+        </p>
+      </section>
+
+      <section>
+        <p>
+          <button data-i18n="applySettings" id="apply" type="button">
             Apply Settings
           </button>
-        </div>
-        <p class="note" id="note"></p>
+        </p>
+        <p id="note"></p>
       </section>
-    </div>
+    </main>
 
     <script type="module">
       import {
-        createCustomSelect,
         dispatchSettings,
         hasScript,
         onPresence,
@@ -318,8 +269,7 @@
       const DICT = {
         "en-US": {
           pageTitle: "Page Translator — UserScripts",
-          breadcrumb:
-            '<a href="../../"><strong>UserScripts</strong></a> / Page Translator',
+          navHome: "← UserScripts",
           ptrDetecting: "Detecting ptr…",
           ptrConnected: "ptr connected",
           ptrNotDetected: "ptr not detected",
@@ -345,6 +295,7 @@
           sec2: "2. Presentation & Typography",
           customFontHtml: "Custom Font (<code>--ptr-font</code>)",
           loadFonts: "Load Local Fonts",
+          localFontsLabel: "Local Fonts",
           customCssLabel: "Presentation CSS",
           presetReplace: "Preset: Replace (default)",
           presetBilingual: "Preset: Bilingual Stacked",
@@ -408,8 +359,7 @@
         },
         "zh-Hant-TW": {
           pageTitle: "Page Translator — UserScripts",
-          breadcrumb:
-            '<a href="../../"><strong>UserScripts</strong></a> / Page Translator',
+          navHome: "← UserScripts",
           ptrDetecting: "正在偵測 ptr…",
           ptrConnected: "ptr 已連線",
           ptrNotDetected: "未偵測到 ptr",
@@ -435,6 +385,7 @@
           sec2: "2. 呈現與字體排版",
           customFontHtml: "自訂字型（<code>--ptr-font</code>）",
           loadFonts: "載入本機字型",
+          localFontsLabel: "本機字型",
           customCssLabel: "呈現 CSS",
           presetReplace: "預設：取代原文",
           presetBilingual: "預設：雙語上下並列",
@@ -497,8 +448,7 @@
         },
         "zh-Hans-CN": {
           pageTitle: "Page Translator — UserScripts",
-          breadcrumb:
-            '<a href="../../"><strong>UserScripts</strong></a> / Page Translator',
+          navHome: "← UserScripts",
           ptrDetecting: "正在检测 ptr…",
           ptrConnected: "ptr 已连接",
           ptrNotDetected: "未检测到 ptr",
@@ -524,6 +474,7 @@
           sec2: "2. 呈现与字体排版",
           customFontHtml: "自定义字体（<code>--ptr-font</code>）",
           loadFonts: "加载本地字体",
+          localFontsLabel: "本地字体",
           customCssLabel: "呈现 CSS",
           presetReplace: "预设：替换原文",
           presetBilingual: "预设：双语上下堆叠",
@@ -600,72 +551,107 @@
 
       const el = (id) => document.querySelector(`#${id}`);
 
-      const providerSelect = createCustomSelect(el("providerSelect"), {
-        labelledBy: "providerLabel",
-        initialValue: "translate-pa",
-      });
-      providerSelect.setOptions([
-        { value: "translate-pa", label: i18n.t("providerTranslatePa") },
-        { value: "inspect", label: i18n.t("providerInspect") },
-        { value: "human-only", label: i18n.t("providerHumanOnly") },
-      ]);
-
-      const themeSelect = createCustomSelect(el("themeSelect"), {
-        labelledBy: "themeLabel",
-        initialValue: "system",
-        onChange: (val) => {
-          if (val === "light" || val === "dark") {
-            document.documentElement.setAttribute("data-theme-mode", val);
-          } else {
-            document.documentElement.removeAttribute("data-theme-mode");
+      function populateSelect(selectEl, options, desiredValue, emptyText = "") {
+        selectEl.replaceChildren();
+        if (options.length === 0) {
+          if (emptyText) {
+            const opt = document.createElement("option");
+            opt.value = "";
+            opt.textContent = emptyText;
+            selectEl.append(opt);
           }
-        },
-      });
-      themeSelect.setOptions([
-        { value: "system", label: i18n.t("themeSystem") },
-        { value: "light", label: i18n.t("themeLight") },
-        { value: "dark", label: i18n.t("themeDark") },
-      ]);
+          selectEl.disabled = true;
+          return;
+        }
+        selectEl.disabled = false;
+        for (const item of options) {
+          const opt = document.createElement("option");
+          opt.value = item.value;
+          opt.textContent = item.label;
+          selectEl.append(opt);
+        }
+        if (
+          desiredValue &&
+          options.some((item) => item.value === desiredValue)
+        ) {
+          selectEl.value = desiredValue;
+        } else {
+          selectEl.value = options[0].value;
+        }
+      }
 
-      const spacingSelect = createCustomSelect(el("spacingSelect"), {
-        labelledBy: "spacingLabel",
-        initialValue: "both",
-      });
-      spacingSelect.setOptions([
-        { value: "both", label: i18n.t("spacingBoth") },
-        { value: "js", label: i18n.t("spacingJs") },
-        { value: "w3c", label: i18n.t("spacingW3c") },
-        { value: "off", label: i18n.t("spacingOff") },
-      ]);
+      function setSelectValue(selectEl, value) {
+        if (Array.from(selectEl.options).some((opt) => opt.value === value)) {
+          selectEl.value = value;
+        }
+      }
 
-      const punctSelect = createCustomSelect(el("punctSelect"), {
-        labelledBy: "punctLabel",
-        initialValue: "zh-norm",
-      });
-      punctSelect.setOptions([
-        { value: "zh-norm", label: i18n.t("punctZhNorm") },
-        { value: "off", label: i18n.t("spacingOff") },
-      ]);
+      const providerSelect = el("providerSelect");
+      populateSelect(
+        providerSelect,
+        [
+          { value: "translate-pa", label: i18n.t("providerTranslatePa") },
+          { value: "inspect", label: i18n.t("providerInspect") },
+          { value: "human-only", label: i18n.t("providerHumanOnly") },
+        ],
+        "translate-pa"
+      );
 
-      const openccSelect = createCustomSelect(el("openccSelect"), {
-        labelledBy: "openccLabel",
-        initialValue: "off",
+      const themeSelect = el("themeSelect");
+      populateSelect(
+        themeSelect,
+        [
+          { value: "system", label: i18n.t("themeSystem") },
+          { value: "light", label: i18n.t("themeLight") },
+          { value: "dark", label: i18n.t("themeDark") },
+        ],
+        "system"
+      );
+      themeSelect.addEventListener("change", () => {
+        applyThemeAttr(themeSelect.value);
       });
-      openccSelect.setOptions([
-        { value: "off", label: i18n.t("spacingOff") },
-        { value: "s2twp", label: i18n.t("openccS2twp") },
-        { value: "tw2sp", label: i18n.t("openccTw2sp") },
-        { value: "s2t", label: i18n.t("openccS2t") },
-        { value: "t2s", label: i18n.t("openccT2s") },
-      ]);
+
+      const spacingSelect = el("spacingSelect");
+      populateSelect(
+        spacingSelect,
+        [
+          { value: "both", label: i18n.t("spacingBoth") },
+          { value: "js", label: i18n.t("spacingJs") },
+          { value: "w3c", label: i18n.t("spacingW3c") },
+          { value: "off", label: i18n.t("spacingOff") },
+        ],
+        "both"
+      );
+
+      const punctSelect = el("punctSelect");
+      populateSelect(
+        punctSelect,
+        [
+          { value: "zh-norm", label: i18n.t("punctZhNorm") },
+          { value: "off", label: i18n.t("spacingOff") },
+        ],
+        "zh-norm"
+      );
+
+      const openccSelect = el("openccSelect");
+      populateSelect(
+        openccSelect,
+        [
+          { value: "off", label: i18n.t("spacingOff") },
+          { value: "s2twp", label: i18n.t("openccS2twp") },
+          { value: "tw2sp", label: i18n.t("openccTw2sp") },
+          { value: "s2t", label: i18n.t("openccS2t") },
+          { value: "t2s", label: i18n.t("openccT2s") },
+        ],
+        "off"
+      );
 
       const localFontWrap = el("localFontSelectWrap");
-      const localFontSelect = createCustomSelect(localFontWrap, {
-        onChange: (val) => {
-          if (val) {
-            el("customFont").value = val;
-          }
-        },
+      const localFontSelect = el("localFontSelect");
+      localFontSelect.addEventListener("change", () => {
+        if (localFontSelect.value) {
+          el("customFont").value = localFontSelect.value;
+        }
       });
 
       const studioInput = el("studioMode");
@@ -691,23 +677,23 @@
 
       function fillSelectFields(cfg) {
         if (cfg.provider !== undefined) {
-          providerSelect.setValue(cfg.provider);
+          setSelectValue(providerSelect, cfg.provider);
         }
         if (cfg.themeMode !== undefined) {
           const nextTheme = cfg.themeMode === "host" ? "system" : cfg.themeMode;
-          themeSelect.setValue(nextTheme);
+          setSelectValue(themeSelect, nextTheme);
           applyThemeAttr(nextTheme);
         }
         if (cfg.spacingMode !== undefined) {
-          spacingSelect.setValue(cfg.spacingMode);
+          setSelectValue(spacingSelect, cfg.spacingMode);
         } else if (cfg.autoSpacing !== undefined) {
-          spacingSelect.setValue(cfg.autoSpacing ? "both" : "off");
+          setSelectValue(spacingSelect, cfg.autoSpacing ? "both" : "off");
         }
         if (cfg.punctNorm !== undefined) {
-          punctSelect.setValue(cfg.punctNorm);
+          setSelectValue(punctSelect, cfg.punctNorm);
         }
         if (cfg.openccMode !== undefined) {
-          openccSelect.setValue(cfg.openccMode);
+          setSelectValue(openccSelect, cfg.openccMode);
         }
       }
 
@@ -763,12 +749,9 @@
       const ptrStatus = el("ptrStatus");
       function updatePtrStatus() {
         const connected = hasScript("ptr");
-        const dot = document.createElement("i");
-        dot.className = connected ? "us-dot ok" : "us-dot warn";
-        const label = connected
+        ptrStatus.textContent = connected
           ? i18n.t("ptrConnected")
           : i18n.t("ptrNotDetected");
-        ptrStatus.replaceChildren(dot, document.createTextNode(label));
       }
 
       const requestBridgeState = () => {
@@ -793,13 +776,6 @@
         return { s, d, sc };
       }
 
-      function makeLayerBadge(kind, label) {
-        const badge = document.createElement("span");
-        badge.className = `us-badge us-badge-${kind}`;
-        badge.textContent = label;
-        return badge;
-      }
-
       function renderDicts(list) {
         const tbody = el("dictBody");
         tbody.replaceChildren();
@@ -807,7 +783,6 @@
           const tr = document.createElement("tr");
           const td = document.createElement("td");
           td.colSpan = 5;
-          td.className = "us-muted";
           td.textContent = i18n.t("dictEmpty");
           tr.append(td);
           tbody.append(tr);
@@ -829,18 +804,21 @@
           const tr = document.createElement("tr");
 
           const tdHost = document.createElement("td");
-          const hostWrap = document.createElement("div");
-          hostWrap.className = "us-host-cell";
-          const hostName = document.createElement("span");
+          const hostName = document.createElement("code");
           hostName.textContent = file.host;
-          hostWrap.append(hostName);
+          tdHost.append(hostName);
           if (hasRemote) {
-            hostWrap.append(makeLayerBadge("remote", i18n.t("layerRemote")));
+            tdHost.append(document.createTextNode(" "));
+            const badge = document.createElement("mark");
+            badge.textContent = i18n.t("layerRemote");
+            tdHost.append(badge);
           }
           if (hasLocal) {
-            hostWrap.append(makeLayerBadge("local", i18n.t("layerLocal")));
+            tdHost.append(document.createTextNode(" "));
+            const badge = document.createElement("mark");
+            badge.textContent = i18n.t("layerLocal");
+            tdHost.append(badge);
           }
-          tdHost.append(hostWrap);
 
           const tdS = document.createElement("td");
           tdS.textContent = String(s);
@@ -848,12 +826,11 @@
           tdD.textContent = String(d);
           const tdSc = document.createElement("td");
           tdSc.textContent = String(sc);
+
           const tdAct = document.createElement("td");
-          tdAct.className = "us-row";
 
           const expBtn = document.createElement("button");
           expBtn.type = "button";
-          expBtn.className = "us-btn us-btn-sm";
           expBtn.textContent = i18n.t("exportDict");
           expBtn.addEventListener("click", () => {
             const blob = new Blob([JSON.stringify(file, null, 2)], {
@@ -869,7 +846,6 @@
 
           const delBtn = document.createElement("button");
           delBtn.type = "button";
-          delBtn.className = "us-btn us-btn-sm";
           delBtn.textContent =
             hasLocal && hasRemote ? i18n.t("clearLocal") : i18n.t("clear");
           delBtn.addEventListener("click", () => {
@@ -880,7 +856,7 @@
             );
           });
 
-          tdAct.append(expBtn, delBtn);
+          tdAct.append(expBtn, document.createTextNode(" "), delBtn);
           tr.append(tdHost, tdS, tdD, tdSc, tdAct);
           tbody.append(tr);
         }
@@ -950,11 +926,15 @@
               dlOpt.value = `"${fam}", sans-serif`;
               fontList.append(dlOpt);
             }
-            localFontSelect.setOptions(
+            const desiredFont =
+              localFontSelect.value || el("customFont").value.trim();
+            populateSelect(
+              localFontSelect,
               families.map((fam) => ({
                 value: `"${fam}", sans-serif`,
                 label: fam,
               })),
+              desiredFont,
               i18n.t("fontEmpty")
             );
             localFontWrap.hidden = families.length === 0;
@@ -990,19 +970,19 @@
           }
         }
 
-        const spacingMode = spacingSelect.getValue();
+        const spacingMode = spacingSelect.value;
         const ptr = {
           targetLang: el("targetLang").value.trim() || "zh-TW",
-          provider: providerSelect.getValue(),
-          themeMode: themeSelect.getValue(),
+          provider: providerSelect.value,
+          themeMode: themeSelect.value,
           uiTier: studioInput.checked ? "studio" : "basic",
           translatePaApiKey: el("apiKey").value,
           customFont: el("customFont").value.trim(),
           customCss: el("customCss").value,
           spacingMode,
           autoSpacing: spacingMode !== "off",
-          punctNorm: punctSelect.getValue(),
-          openccMode: openccSelect.getValue(),
+          punctNorm: punctSelect.value,
+          openccMode: openccSelect.value,
           debugSpacingMarks: el("debugSpacingMarks").checked,
           autoTranslate: el("autoTranslate").checked,
           defaultInspect: el("defaultInspect").checked,
