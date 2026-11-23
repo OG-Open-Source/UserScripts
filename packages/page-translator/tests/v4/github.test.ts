@@ -112,7 +112,7 @@ async function loadGitHubModule() {
   }
 }
 
-test("detect accepts GitHub hosts and GitHub meta or DOM markers", () => {
+test("detect accepts GitHub hosts and GitHub metadata", () => {
   const cases = [
     { body: "<main>Repository</main>", head: "", host: "GITHUB.COM" },
     { body: "<main>Gist</main>", head: "", host: "gist.github.com" },
@@ -124,11 +124,6 @@ test("detect accepts GitHub hosts and GitHub meta or DOM markers", () => {
     {
       body: "<main>GitHub app</main>",
       head: '<meta name="apple-itunes-app" content="app-name=GitHub">',
-      host: "example.test",
-    },
-    {
-      body: '<header class="AppHeader"></header><main>GitHub DOM</main>',
-      head: "",
       host: "example.test",
     },
   ];
@@ -152,6 +147,51 @@ test("resolveAdapter returns the exported githubAdapter", async () => {
   expect(resolveAdapter({ host: "github.com", doc })).toBe(
     githubModule.githubAdapter
   );
+});
+
+test("generic headers and AppHeader without Turbo do not detect as GitHub", () => {
+  const cases = [
+    {
+      body: '<header class="Header"></header><main>Generic</main>',
+      turbo: false,
+    },
+    {
+      body: '<header class="Header"></header><main>Generic</main>',
+      turbo: true,
+    },
+    {
+      body: '<header class="AppHeader"></header><main>Generic</main>',
+      turbo: false,
+    },
+  ];
+
+  for (const fixture of cases) {
+    const { doc } = createDocument(fixture.body);
+    if (fixture.turbo) {
+      doc.body?.setAttribute("data-turbo-body", "");
+    }
+    const adapter = defaultAdapters.find((entry) => entry.id === "github");
+
+    expect(adapter?.detect({ host: "example.test", doc })).toBe(false);
+    expect(resolveAdapter({ host: "example.test", doc })).toBe(fallbackAdapter);
+  }
+});
+
+test("Turbo combined with GitHub-specific DOM markers detects as GitHub", () => {
+  const markers = [
+    '<header class="AppHeader"></header>',
+    '<div id="repository-container-header"></div>',
+    '<div id="repo-content-turbo-frame"></div>',
+  ];
+
+  for (const marker of markers) {
+    const { doc } = createDocument(`${marker}<main>Repository</main>`);
+    doc.body?.setAttribute("data-turbo-body", "");
+    const adapter = defaultAdapters.find((entry) => entry.id === "github");
+
+    expect(adapter?.detect({ host: "example.test", doc })).toBe(true);
+    expect(resolveAdapter({ host: "example.test", doc }).id).toBe("github");
+  }
 });
 
 test("generic Turbo pages and Discourse pages do not detect as GitHub", () => {

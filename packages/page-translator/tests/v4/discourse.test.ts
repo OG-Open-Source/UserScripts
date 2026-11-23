@@ -152,6 +152,26 @@ test("createDiscourseAdapter honors an injected fingerprint", async () => {
   expect(adapter.onSpaNavigate(doc)).toEqual([content]);
 });
 
+test("createDiscourseAdapter deduplicates descendant-first capture and SPA roots", async () => {
+  const { createDiscourseAdapter } = await import(
+    "../../src/structure/discourse"
+  );
+  const fingerprint: FingerprintData = {
+    ...discourseJson,
+    captureSelectors: [".cooked", "#main-outlet"],
+    spaRescanSelectors: [".cooked", "#main-outlet"],
+  };
+  const { doc } = createDocument(
+    '<main id="main-outlet"><article class="cooked" id="post-content">Post</article></main>'
+  );
+  const adapter = createDiscourseAdapter(fingerprint);
+  const capture = adapter.captureScope(doc);
+  const spa = adapter.onSpaNavigate(doc);
+
+  expect(capture.map((element) => element.id)).toEqual(["main-outlet"]);
+  expect(spa.map((element) => element.id)).toEqual(["main-outlet"]);
+});
+
 test("regions map Discourse chrome and content without duplicate elements", () => {
   const { doc } = setupFixture();
   const regions = resolveDiscourse(doc).regions(doc);
