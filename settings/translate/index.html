@@ -680,17 +680,6 @@
 
       const volInput = el("defaultVolunteer");
       const lockInput = el("volunteerBlockClicks");
-      const lockRow = el("lockRow");
-
-      function syncLockAvailability() {
-        const active = volInput.checked;
-        lockInput.disabled = !active;
-        if (!active) {
-          lockInput.checked = false;
-        }
-        lockRow.classList.toggle("disabled", !active);
-      }
-      volInput.addEventListener("change", syncLockAvailability);
 
       function applyThemeAttr(mode) {
         if (mode === "light" || mode === "dark") {
@@ -759,7 +748,6 @@
         fillInputFields(cfg);
         fillSelectFields(cfg);
         syncStudioTier();
-        syncLockAvailability();
       }
 
       try {
@@ -771,7 +759,6 @@
         // ignore invalid localStorage
       }
       syncStudioTier();
-      syncLockAvailability();
 
       const ptrStatus = el("ptrStatus");
       function updatePtrStatus() {
@@ -1020,7 +1007,7 @@
           autoTranslate: el("autoTranslate").checked,
           defaultInspect: el("defaultInspect").checked,
           defaultVolunteer: volInput.checked,
-          volunteerBlockClicks: volInput.checked ? lockInput.checked : false,
+          volunteerBlockClicks: lockInput.checked,
           siteDeltas,
         };
 

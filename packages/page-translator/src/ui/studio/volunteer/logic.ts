@@ -12,6 +12,8 @@ import {
 import type { CompiledSiteDelta } from "../../../structure/site-rules";
 import type { ParsedAiImport } from "../../export-ai";
 
+const INLINE_PLACEHOLDER_RE = /<x\s+id="\d+"/u;
+
 export interface VolunteerConflict {
   existing: string;
   id: string;
@@ -80,6 +82,53 @@ export function scanVolunteerEntries(
 
 export function suggestEntryScope(entry: CapturedVolunteerEntry): string {
   return suggestScopeSelector(entry.seg.container);
+}
+
+export function resolveSavedTranslation(
+  entry: CapturedVolunteerEntry,
+  scopeSelector: string,
+  localTable: SiteLocaleTable | null,
+  siteTable: SiteLocaleTable | null
+): string | null {
+  const bucketKey = entry.kind === "dynamic" ? "dynamic" : "static";
+  const scope = scopeSelector.trim();
+  for (const table of [localTable, siteTable]) {
+    if (!table) {
+      continue;
+    }
+    if (scope) {
+      const scopedHit = table.scoped?.[scope]?.[bucketKey]?.[entry.key];
+      if (typeof scopedHit === "string") {
+        return scopedHit;
+      }
+    }
+    const flatHit = table[bucketKey]?.[entry.key];
+    if (typeof flatHit === "string") {
+      return flatHit;
+    }
+  }
+  return null;
+}
+
+export function resolveInitialEntryValue(
+  entry: CapturedVolunteerEntry,
+  scopeSelector: string,
+  localTable: SiteLocaleTable | null,
+  siteTable: SiteLocaleTable | null
+): string {
+  const saved = resolveSavedTranslation(
+    entry,
+    scopeSelector,
+    localTable,
+    siteTable
+  );
+  if (saved !== null) {
+    return saved;
+  }
+  if (entry.kind === "dynamic" || INLINE_PLACEHOLDER_RE.test(entry.key)) {
+    return entry.key;
+  }
+  return "";
 }
 
 export function buildDraftPatch(

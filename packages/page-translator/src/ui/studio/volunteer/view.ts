@@ -32,7 +32,8 @@ export interface VolunteerView {
     entry: CapturedVolunteerEntry | null,
     index: number,
     total: number,
-    targetLang: string
+    targetLang: string,
+    initialValue: string
   ) => void;
   renderLock: (locked: boolean) => void;
   renderScan: (scan: VolunteerScanResult, themeMode: PtrThemeMode) => void;
@@ -316,7 +317,8 @@ export function mountVolunteerView(
       entry: CapturedVolunteerEntry | null,
       index: number,
       total: number,
-      targetLang: string
+      targetLang: string,
+      initialValue: string
     ): void {
       if (!entry) {
         emptyEl.hidden = false;
@@ -328,6 +330,7 @@ export function mountVolunteerView(
       posEl.textContent = `${index + 1} / ${total}`;
       keyEl.textContent = entry.key;
       scopeInput.value = entry.matchedScope ?? "";
+      valInput.value = initialValue;
       valInput.placeholder = formatPtrMsg(t("volTransPlaceholder"), {
         lang: targetLang,
       });

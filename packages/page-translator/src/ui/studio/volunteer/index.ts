@@ -18,6 +18,7 @@ import {
   buildDraftPatch,
   buildVolunteerExportJson,
   diffImportConflicts,
+  resolveInitialEntryValue,
   scanVolunteerEntries,
   suggestEntryScope,
 } from "./logic";
@@ -75,11 +76,26 @@ export function createVolunteerController(
     if (currentIndex >= entries.length) {
       currentIndex = Math.max(0, entries.length - 1);
     }
+    const entry = entries[currentIndex] ?? null;
+    const effectiveLocal =
+      mergeLocaleTables(
+        options.getLocalLocaleTable?.() ?? undefined,
+        draftPatch ?? undefined
+      ) ?? null;
+    const initialValue = entry
+      ? resolveInitialEntryValue(
+          entry,
+          entry.matchedScope ?? "",
+          effectiveLocal,
+          options.getSiteLocaleTable()
+        )
+      : "";
     view?.renderEntry(
-      entries[currentIndex] ?? null,
+      entry,
       currentIndex,
       entries.length,
-      options.getTargetLang()
+      options.getTargetLang(),
+      initialValue
     );
   };
 

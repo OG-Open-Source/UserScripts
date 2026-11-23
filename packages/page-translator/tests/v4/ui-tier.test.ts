@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { Window } from "happy-dom";
+import { mergeLocaleTables } from "../../src/dict/store";
+import type { SiteLocaleTable } from "../../src/dict/template";
 import type { TranslatorConfig } from "../../src/platform/config";
 import { DEFAULT_CONFIG } from "../../src/platform/config";
 import { MESSAGES_EN } from "../../src/platform/i18n";
@@ -254,4 +256,73 @@ test("v4 UI modules never import legacy source", async () => {
   for (const file of await sourceFiles(uiRoot)) {
     expect(readFileSync(file, "utf8")).not.toMatch(LEGACY_IMPORT_RE);
   }
+});
+
+test("Volunteer workbench resets translation input on Next/Prev and restores saved entries", () => {
+  const { doc, getStyle } = setup();
+  doc.body.innerHTML =
+    "<main><p>First static line.</p><p>Second item 42 items</p><p>Third static line.</p></main>";
+  const cfg = config({ uiTier: "studio", defaultVolunteer: true });
+  let localTable: SiteLocaleTable | null = null;
+  const volunteer = createVolunteerController({
+    ...commonStudioOptions(doc, getStyle, () => cfg),
+    hostname: "github.com",
+    getLocalLocaleTable: () => localTable,
+    getSiteLocaleTable: () => localTable,
+    getTargetLang: () => cfg.targetLang,
+    onSyncLocalTable: (patch) => {
+      localTable = mergeLocaleTables(localTable ?? undefined, patch) ?? null;
+    },
+  });
+
+  volunteer.syncFromConfig();
+  const host = doc.querySelector("#ptr-volunteer-workbench") as HTMLElement;
+  const shadow = host.shadowRoot as ShadowRoot;
+  const buttons = Array.from(shadow.querySelectorAll("button"));
+  const nextBtn = buttons.find(
+    (btn) => btn.textContent === MESSAGES_EN.volNext
+  ) as HTMLButtonElement;
+  const prevBtn = buttons.find(
+    (btn) => btn.textContent === MESSAGES_EN.volPrev
+  ) as HTMLButtonElement;
+  const saveBtn = buttons.find(
+    (btn) => btn.textContent === MESSAGES_EN.volSave
+  ) as HTMLButtonElement;
+  const valInput = shadow.querySelector(
+    ".ptr-vol-editor > input.ptr-input"
+  ) as HTMLInputElement;
+
+  expect(valInput.value).toBe("");
+  valInput.value = "Unsaved draft";
+  nextBtn.click();
+  expect(valInput.value).toBe("Second item {v0} items");
+
+  nextBtn.click();
+  expect(valInput.value).toBe("");
+
+  prevBtn.click();
+  prevBtn.click();
+  expect(valInput.value).toBe("");
+
+  valInput.value = "第一行譯文";
+  saveBtn.click();
+  nextBtn.click();
+  expect(valInput.value).toBe("Second item {v0} items");
+  prevBtn.click();
+  expect(valInput.value).toBe("第一行譯文");
+
+  volunteer.stop();
+});
+
+test("settings decouples volunteerBlockClicks from defaultVolunteer", () => {
+  const html = readFileSync(
+    resolve(import.meta.dir, "../../../../settings/translate/index.html"),
+    "utf8"
+  );
+  expect(html).not.toContain("syncLockAvailability");
+  expect(html).not.toContain("lockInput.disabled");
+  expect(html).toContain("volunteerBlockClicks: lockInput.checked");
+  expect(html).not.toContain(
+    "volunteerBlockClicks: volInput.checked ? lockInput.checked : false"
+  );
 });
