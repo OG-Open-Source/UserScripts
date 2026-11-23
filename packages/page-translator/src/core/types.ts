@@ -1,5 +1,5 @@
-import type { TranslatorConfig } from "../legacy/config";
-import type { PtrMetrics } from "../legacy/metrics";
+import type { TranslatorConfig } from "../platform/config";
+import type { PtrMetrics } from "../platform/metrics";
 import type { CompiledSiteDelta, SiteModifier } from "../structure/site-rules";
 
 export type ProviderId = "translate-pa" | "inspect" | "human-only";

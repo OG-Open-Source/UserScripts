@@ -1,4 +1,4 @@
-import type { TranslatorConfig } from "../legacy/config";
+import type { TranslatorConfig } from "../platform/config";
 import { extractVisibleText, normalizeChineseText } from "../text/normalize";
 import type { OpenCCConverter } from "../text/opencc";
 import { scheduleOpenCC } from "../text/opencc";

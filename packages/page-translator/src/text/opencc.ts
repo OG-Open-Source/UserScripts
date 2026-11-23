@@ -1,4 +1,4 @@
-import type { OpenCCMode, TranslatorConfig } from "../legacy/config";
+import type { OpenCCMode, TranslatorConfig } from "../platform/config";
 
 export interface OpenCCConverter {
   convert: (text: string) => string;

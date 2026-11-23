@@ -1,4 +1,4 @@
-import type { PunctNormMode, SpacingMode } from "../legacy/config";
+import type { PunctNormMode, SpacingMode } from "../platform/config";
 
 export interface NormalizeChineseOptions {
   debugSpacingMarks?: boolean;

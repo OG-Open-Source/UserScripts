@@ -84,6 +84,13 @@
             </div>
           </div>
         </div>
+        <label class="check-row"
+          ><input class="us-checkbox" id="studioMode" type="checkbox">
+          <span data-i18n-html="studioModeHtml"
+            >Studio Mode (<code>uiTier: "studio"</code> — Inspect HUD, Volunteer
+            Workbench, advanced controls)</span
+          ></label
+        >
       </section>
 
       <section class="settings-group">
@@ -154,7 +161,7 @@
         </div>
       </section>
 
-      <section class="settings-group">
+      <section class="settings-group" data-tier="studio" hidden>
         <h2 data-i18n="sec3">3. CJK Spacing &amp; Conversion</h2>
         <div class="field">
           <span class="field-label" data-i18n="spacingLabel" id="spacingLabel"
@@ -176,13 +183,6 @@
             <div id="openccSelect"></div>
           </div>
         </div>
-        <label class="check-row"
-          ><input class="us-checkbox" id="spaceSkippedCjk" type="checkbox">
-          <span data-i18n="spaceSkippedCjk"
-            >Also apply CJK spacing &amp; normalization to same-language skipped
-            segments</span
-          ></label
-        >
         <p class="note" data-i18n-html="spacingNoteHtml">
           <code>js</code> inserts ASCII spaces between CJK and Latin/numbers;
           <code>w3c</code> applies CSS <code>text-autospace: normal</code>
@@ -191,7 +191,7 @@
         </p>
       </section>
 
-      <section class="settings-group">
+      <section class="settings-group" data-tier="studio" hidden>
         <h2 data-i18n="sec4">4. Capture Inspector &amp; Volunteer Tools</h2>
         <label class="check-row"
           ><input class="us-checkbox" id="autoTranslate" type="checkbox">
@@ -206,15 +206,17 @@
           ></label
         >
         <label class="check-row"
-          ><input class="us-checkbox" id="debugInspect" type="checkbox">
-          <span data-i18n-html="debugInspectHtml"
-            >Capture Preview Inspector HUD (<code>debugInspect</code>)</span
+          ><input class="us-checkbox" id="defaultInspect" type="checkbox">
+          <span data-i18n-html="defaultInspectHtml"
+            >Open Capture Preview HUD in new tabs (<code>defaultInspect</code
+            >)</span
           ></label
         >
         <label class="check-row"
-          ><input class="us-checkbox" id="volunteerMode" type="checkbox">
-          <span data-i18n-html="volunteerModeHtml"
-            >Volunteer Dictionary Mode (<code>volunteerMode</code>)</span
+          ><input class="us-checkbox" id="defaultVolunteer" type="checkbox">
+          <span data-i18n-html="defaultVolunteerHtml"
+            >Open Volunteer Workbench in new tabs (<code>defaultVolunteer</code
+            >)</span
           ></label
         >
         <label class="check-row" id="lockRow"
@@ -227,7 +229,7 @@
         >
       </section>
 
-      <section class="settings-group">
+      <section class="settings-group" data-tier="studio" hidden>
         <h2 data-i18n="sec5">5. Per-Site Delta Rules</h2>
         <div class="field">
           <label data-i18n-html="siteDeltasHtml" for="siteDeltas">
@@ -243,7 +245,7 @@
         </div>
       </section>
 
-      <section class="settings-group">
+      <section class="settings-group" data-tier="studio" hidden>
         <h2 data-i18n-html="sec6Html">
           6. Cached Site Dictionaries (<code>ptr:site-tr:*</code>)
         </h2>
@@ -329,11 +331,13 @@
           providerLabel: "Provider",
           providerTranslatePa: "Google translate-pa (default)",
           providerInspect: "Capture Inspector only (no API calls)",
+          providerHumanOnly: "Human-only (dictionary hits only)",
           themeLabel: "UI Theme Rule",
           themeSystem: "System (prefers-color-scheme)",
           themeLight: "Light",
           themeDark: "Dark",
-          themeHost: "Host Page (Oklab derived)",
+          studioModeHtml:
+            'Studio Mode (<code>uiTier: "studio"</code> — Inspect HUD, Volunteer Workbench, advanced controls)',
           apiKeyLabel: "translate-pa API Key",
           apiKeyPlaceholder: "Leave blank to clear saved key",
           clear: "Clear",
@@ -365,18 +369,16 @@
           openccTw2sp: "Traditional (TW) → Simplified",
           openccS2t: "Simplified → Traditional (Std)",
           openccT2s: "Traditional → Simplified (Std)",
-          spaceSkippedCjk:
-            "Also apply CJK spacing & normalization to same-language skipped segments",
           spacingNoteHtml:
             "<code>js</code> inserts ASCII spaces between CJK and Latin/numbers; <code>w3c</code> applies CSS <code>text-autospace: normal</code> without inserting characters. CJK parentheses normalize to fullwidth <code>（）</code> with no extra gap after fullwidth punctuation.",
           sec4: "4. Capture Inspector & Volunteer Tools",
           autoTranslate: "Auto-translate on page load",
           debugSpacingMarksHtml:
             "Debug spacing marks (show <code>^</code> and <code>_</code>)",
-          debugInspectHtml:
-            "Capture Preview Inspector HUD (<code>debugInspect</code>)",
-          volunteerModeHtml:
-            "Volunteer Dictionary Mode (<code>volunteerMode</code>)",
+          defaultInspectHtml:
+            "Open Capture Preview HUD in new tabs (<code>defaultInspect</code>)",
+          defaultVolunteerHtml:
+            "Open Volunteer Workbench in new tabs (<code>defaultVolunteer</code>)",
           volunteerBlockClicksHtml:
             "Lock page clicks while Volunteer Mode is active (<code>volunteerBlockClicks</code>)",
           sec5: "5. Per-Site Delta Rules",
@@ -419,11 +421,13 @@
           providerLabel: "翻譯服務",
           providerTranslatePa: "Google translate-pa（預設）",
           providerInspect: "僅捕捉預覽模式（不呼叫 API）",
+          providerHumanOnly: "僅人工詞典（未命中保留原文）",
           themeLabel: "介面主題規則",
           themeSystem: "跟隨系統 (prefers-color-scheme)",
           themeLight: "淺色",
           themeDark: "深色",
-          themeHost: "依宿主網頁（Oklab 推導）",
+          studioModeHtml:
+            'Studio 工作室模式（<code>uiTier: "studio"</code> — 捕捉預覽 HUD、志工工作台與進階控制）',
           apiKeyLabel: "translate-pa API 金鑰",
           apiKeyPlaceholder: "留空即可清除已儲存的金鑰",
           clear: "清除",
@@ -455,15 +459,16 @@
           openccTw2sp: "臺灣繁體 → 簡體",
           openccS2t: "簡體 → 標準繁體",
           openccT2s: "繁體 → 標準簡體",
-          spaceSkippedCjk: "同語系跳過片段也套用 CJK 間距與標點正規化",
           spacingNoteHtml:
             "<code>js</code> 會在 CJK 與拉丁字母／數字之間插入半形空白；<code>w3c</code> 則套用 CSS <code>text-autospace: normal</code> 而不插入字元。CJK 括號會正規化為全形 <code>（）</code>，全形標點後不再額外加空隙。",
           sec4: "4. 捕捉預覽與志工工具",
           autoTranslate: "頁面載入時自動翻譯",
           debugSpacingMarksHtml:
             "除錯間距標記（顯示 <code>^</code> 與 <code>_</code>）",
-          debugInspectHtml: "捕捉預覽檢視器 HUD（<code>debugInspect</code>）",
-          volunteerModeHtml: "志工詞典協作模式（<code>volunteerMode</code>）",
+          defaultInspectHtml:
+            "新分頁預設開啟捕捉預覽 HUD（<code>defaultInspect</code>）",
+          defaultVolunteerHtml:
+            "新分頁預設開啟志工詞典工作台（<code>defaultVolunteer</code>）",
           volunteerBlockClicksHtml:
             "志工模式啟用時鎖定頁面點擊（<code>volunteerBlockClicks</code>）",
           sec5: "5. 站點增量規則",
@@ -505,11 +510,13 @@
           providerLabel: "翻译服务",
           providerTranslatePa: "Google translate-pa（默认）",
           providerInspect: "仅采集预览模式（不调用 API）",
+          providerHumanOnly: "仅人工词典（未命中保留原文）",
           themeLabel: "界面主题规则",
           themeSystem: "跟随系统 (prefers-color-scheme)",
           themeLight: "浅色",
           themeDark: "深色",
-          themeHost: "依宿主网页（Oklab 推导）",
+          studioModeHtml:
+            'Studio 工作室模式（<code>uiTier: "studio"</code> — 采集预览 HUD、志愿工作台与高级控制）',
           apiKeyLabel: "translate-pa API 密钥",
           apiKeyPlaceholder: "留空即可清除已保存的密钥",
           clear: "清除",
@@ -541,15 +548,16 @@
           openccTw2sp: "台湾繁体 → 简体",
           openccS2t: "简体 → 标准繁体",
           openccT2s: "繁体 → 标准简体",
-          spaceSkippedCjk: "同语系跳过片段也应用 CJK 间距与标点规范化",
           spacingNoteHtml:
             "<code>js</code> 会在 CJK 与拉丁字母／数字之间插入半角空格；<code>w3c</code> 则应用 CSS <code>text-autospace: normal</code> 而不插入字符。CJK 括号会规范化为全角 <code>（）</code>，全角标点后不再额外添加空隙。",
           sec4: "4. 采集预览与志愿工具",
           autoTranslate: "页面加载时自动翻译",
           debugSpacingMarksHtml:
             "调试间距标记（显示 <code>^</code> 与 <code>_</code>）",
-          debugInspectHtml: "采集预览检查器 HUD（<code>debugInspect</code>）",
-          volunteerModeHtml: "志愿词典协作模式（<code>volunteerMode</code>）",
+          defaultInspectHtml:
+            "新标签页默认开启采集预览 HUD（<code>defaultInspect</code>）",
+          defaultVolunteerHtml:
+            "新标签页默认开启志愿词典工作台（<code>defaultVolunteer</code>）",
           volunteerBlockClicksHtml:
             "志愿模式启用时锁定页面点击（<code>volunteerBlockClicks</code>）",
           sec5: "5. 站点增量规则",
@@ -599,6 +607,7 @@
       providerSelect.setOptions([
         { value: "translate-pa", label: i18n.t("providerTranslatePa") },
         { value: "inspect", label: i18n.t("providerInspect") },
+        { value: "human-only", label: i18n.t("providerHumanOnly") },
       ]);
 
       const themeSelect = createCustomSelect(el("themeSelect"), {
@@ -616,7 +625,6 @@
         { value: "system", label: i18n.t("themeSystem") },
         { value: "light", label: i18n.t("themeLight") },
         { value: "dark", label: i18n.t("themeDark") },
-        { value: "host", label: i18n.t("themeHost") },
       ]);
 
       const spacingSelect = createCustomSelect(el("spacingSelect"), {
@@ -660,7 +668,17 @@
         },
       });
 
-      const volInput = el("volunteerMode");
+      const studioInput = el("studioMode");
+      const studioSections = document.querySelectorAll('[data-tier="studio"]');
+      function syncStudioTier() {
+        const isStudio = studioInput.checked;
+        for (const section of studioSections) {
+          section.hidden = !isStudio;
+        }
+      }
+      studioInput.addEventListener("change", syncStudioTier);
+
+      const volInput = el("defaultVolunteer");
       const lockInput = el("volunteerBlockClicks");
       const lockRow = el("lockRow");
 
@@ -687,8 +705,9 @@
           providerSelect.setValue(cfg.provider);
         }
         if (cfg.themeMode !== undefined) {
-          themeSelect.setValue(cfg.themeMode);
-          applyThemeAttr(cfg.themeMode);
+          const nextTheme = cfg.themeMode === "host" ? "system" : cfg.themeMode;
+          themeSelect.setValue(nextTheme);
+          applyThemeAttr(nextTheme);
         }
         if (cfg.spacingMode !== undefined) {
           spacingSelect.setValue(cfg.spacingMode);
@@ -719,11 +738,11 @@
           el("siteDeltas").value = JSON.stringify(cfg.siteDeltas, null, 2);
         }
         const checkMap = [
-          ["spaceSkippedCjk", cfg.spaceSkippedCjk],
+          ["studioMode", cfg.uiTier === "studio"],
           ["debugSpacingMarks", cfg.debugSpacingMarks],
           ["autoTranslate", cfg.autoTranslate],
-          ["debugInspect", cfg.debugInspect],
-          ["volunteerMode", cfg.volunteerMode],
+          ["defaultInspect", cfg.defaultInspect ?? cfg.debugInspect],
+          ["defaultVolunteer", cfg.defaultVolunteer ?? cfg.volunteerMode],
           ["volunteerBlockClicks", cfg.volunteerBlockClicks],
         ];
         for (const [id, val] of checkMap) {
@@ -739,6 +758,7 @@
         }
         fillInputFields(cfg);
         fillSelectFields(cfg);
+        syncStudioTier();
         syncLockAvailability();
       }
 
@@ -750,6 +770,7 @@
       } catch {
         // ignore invalid localStorage
       }
+      syncStudioTier();
       syncLockAvailability();
 
       const ptrStatus = el("ptrStatus");
@@ -987,6 +1008,7 @@
           targetLang: el("targetLang").value.trim() || "zh-TW",
           provider: providerSelect.getValue(),
           themeMode: themeSelect.getValue(),
+          uiTier: studioInput.checked ? "studio" : "basic",
           translatePaApiKey: el("apiKey").value,
           customFont: el("customFont").value.trim(),
           customCss: el("customCss").value,
@@ -994,11 +1016,10 @@
           autoSpacing: spacingMode !== "off",
           punctNorm: punctSelect.getValue(),
           openccMode: openccSelect.getValue(),
-          spaceSkippedCjk: el("spaceSkippedCjk").checked,
           debugSpacingMarks: el("debugSpacingMarks").checked,
           autoTranslate: el("autoTranslate").checked,
-          debugInspect: el("debugInspect").checked,
-          volunteerMode: volInput.checked,
+          defaultInspect: el("defaultInspect").checked,
+          defaultVolunteer: volInput.checked,
           volunteerBlockClicks: volInput.checked ? lockInput.checked : false,
           siteDeltas,
         };
