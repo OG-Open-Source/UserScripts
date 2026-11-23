@@ -1,7 +1,13 @@
 import { expect, test } from "bun:test";
 import { Window } from "happy-dom";
-import type { CaptureCandidate } from "../../src/capture/export";
-import { exportCaptureCandidates } from "../../src/capture/export";
+import type {
+  CaptureCandidate,
+  LiveCaptureCandidate,
+} from "../../src/capture/export";
+import {
+  collectLiveCaptureCandidates,
+  exportCaptureCandidates,
+} from "../../src/capture/export";
 import type { SiteStructureAdapter } from "../../src/structure/adapter";
 import { fallbackAdapter } from "../../src/structure/fallback";
 import { parseSiteDelta } from "../../src/structure/site-rules";
@@ -398,4 +404,21 @@ test("explicit delta takes precedence over host site deltas", () => {
     included: true,
     excludeReason: null,
   });
+});
+
+test("collectLiveCaptureCandidates binds live elements with sequential indices and keeps exportCaptureCandidates JSON-serializable", () => {
+  const { doc, options } = createScopedDocument();
+  const live: LiveCaptureCandidate[] = collectLiveCaptureCandidates(
+    doc,
+    options
+  );
+  const exported = exportCaptureCandidates(doc, options);
+
+  expect(live.length).toBeGreaterThan(0);
+  expect(live.map((entry) => entry.index)).toEqual(live.map((_, idx) => idx));
+  for (const entry of live) {
+    expect(doc.querySelector(entry.candidate.domPath)).toBe(entry.element);
+  }
+  expect(exported).toEqual(live.map((entry) => entry.candidate));
+  expect(JSON.parse(JSON.stringify(exported))).toEqual(exported);
 });

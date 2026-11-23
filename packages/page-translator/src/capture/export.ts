@@ -37,6 +37,12 @@ export interface CaptureCandidate {
   textPreview: string;
 }
 
+export interface LiveCaptureCandidate {
+  candidate: CaptureCandidate;
+  element: Element;
+  index: number;
+}
+
 export interface ExportCaptureOptions {
   adapter?: SiteStructureAdapter;
   adapters?: readonly SiteStructureAdapter[];
@@ -212,10 +218,10 @@ function getInheritableReason(
   return reason === "out-of-scope" ? null : reason;
 }
 
-export function exportCaptureCandidates(
+export function collectLiveCaptureCandidates(
   doc: Document,
   opts: ExportCaptureOptions = {}
-): CaptureCandidate[] {
+): LiveCaptureCandidate[] {
   const host = opts.host ?? doc.location?.hostname ?? "";
   const adapter = opts.adapter ?? resolveAdapter({ doc, host }, opts.adapters);
   const delta =
@@ -230,7 +236,7 @@ export function exportCaptureCandidates(
   const regions = adapter.regions(doc);
   const maxPreviewLength = opts.maxPreviewLength ?? DEFAULT_MAX_PREVIEW_LENGTH;
   const evaluationOptions = { adapter, getStyle, scope };
-  const candidates: CaptureCandidate[] = [];
+  const candidates: LiveCaptureCandidate[] = [];
   const seen = new Set<Element>();
 
   function evaluate(el: Element): CaptureCandidateDecision {
@@ -269,13 +275,17 @@ export function exportCaptureCandidates(
     const ownReason = getOwnExcludeReason(el, delta, decision);
     const excludeReason = mergeExcludeReason(ancestorReason, ownReason);
     candidates.push({
-      domPath: getDomPath(el),
-      region: getRegion(el, regions),
-      classification: decision.classification,
-      included: excludeReason === null,
-      excludeReason,
-      computedStyleSummary: decision.computedStyleSummary,
-      textPreview: getTextPreview(el, maxPreviewLength),
+      candidate: {
+        domPath: getDomPath(el),
+        region: getRegion(el, regions),
+        classification: decision.classification,
+        included: excludeReason === null,
+        excludeReason,
+        computedStyleSummary: decision.computedStyleSummary,
+        textPreview: getTextPreview(el, maxPreviewLength),
+      },
+      element: el,
+      index: candidates.length,
     });
 
     const childReason = getInheritableReason(excludeReason);
@@ -289,4 +299,13 @@ export function exportCaptureCandidates(
 
   walk(root, inheritedReason);
   return candidates;
+}
+
+export function exportCaptureCandidates(
+  doc: Document,
+  opts: ExportCaptureOptions = {}
+): CaptureCandidate[] {
+  return collectLiveCaptureCandidates(doc, opts).map(
+    (entry) => entry.candidate
+  );
 }
