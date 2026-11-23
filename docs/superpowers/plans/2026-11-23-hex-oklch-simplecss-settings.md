@@ -32,11 +32,13 @@
 ### Task 1: Hex-Led 0-Error OkLch Color Engine in `@userscripts/shared`
 
 **Files:**
+
 - Modify: `packages/shared/src/color.ts`
 - Modify: `packages/shared/src/index.ts`
 - Test: `packages/shared/tests/color.test.ts`
 
 **Interfaces:**
+
 - Consumes: existing Oklab/Oklch math in `packages/shared/src/color.ts`
 - Produces (exported from `packages/shared/src/color.ts` and re-exported from `packages/shared/src/index.ts`):
   - `export interface ZeroErrorOklchResult { C: number; css: string; h: number; hex: string; L: number; maxChannelError: number; }`
@@ -50,6 +52,7 @@
 - [ ] **Step 1: Write failing tests in `packages/shared/tests/color.test.ts`**
 
 Add tests verifying:
+
 1. `normalizeHex` handles `"#D71"` -> `"#DD7711"`, `"677"` -> `"#667777"`, `"#334"` -> `"#333344"`, `"#aabbcc"` -> `"#AABBCC"`, and rejects `"nope"` / `"#12"` as `null`.
 2. `hexToOklab("#D71")` equals `hexToOklab("#DD7711")`.
 3. `hexToZeroErrorOklch` returns exact 0-error `<= 2`-decimal CSS strings for the brand triad:
@@ -67,6 +70,7 @@ Expected: FAIL (missing exports `normalizeHex`, `hexToZeroErrorOklch`, `formatZe
 - [ ] **Step 3: Implement hex-led 0-error OkLch conversion and palette in `packages/shared/src/color.ts` and export in `packages/shared/src/index.ts`**
 
 Algorithm details:
+
 - Support both `#RGB` and `#RRGGBB` in `normalizeHex` and `hexToOklab`.
 - `oklchToHex(lch)` delegates to `oklabToHex(oklchToOklab(lch))`.
 - `hexToZeroErrorOklch(hex)`:
@@ -96,6 +100,7 @@ git commit -m "feat(shared): add hex-led 0-error OkLch engine and brand palette"
 ### Task 2: Programmatic Theme Tokens, Simple.css Variable Sheet & Sync Script
 
 **Files:**
+
 - Modify: `packages/shared/src/theme-mode.ts`
 - Modify: `packages/shared/src/ui-tokens.ts`
 - Modify: `packages/shared/src/index.ts`
@@ -106,6 +111,7 @@ git commit -m "feat(shared): add hex-led 0-error OkLch engine and brand palette"
 - Test: `packages/shared/tests/ui-tokens.test.ts`
 
 **Interfaces:**
+
 - Consumes: `US_PALETTE_OKLCH`, `US_PALETTE_HEX`, `formatZeroErrorOklch` from `packages/shared/src/color.ts`
 - Produces:
   - `export interface SimpleCssThemeTokens { accent: string; accentBg: string; accentHover: string; accentText: string; bg: string; border: string; code: string; disabled: string; marked: string; preformatted: string; text: string; textLight: string; }` in `packages/shared/src/theme-mode.ts`
@@ -116,11 +122,13 @@ git commit -m "feat(shared): add hex-led 0-error OkLch engine and brand palette"
 - [ ] **Step 1: Write failing tests in `packages/shared/tests/theme-mode.test.ts` and `packages/shared/tests/ui-tokens.test.ts`**
 
 In `theme-mode.test.ts`:
+
 - Assert `resolveThemeTokens("dark")` uses `US_PALETTE_OKLCH` values (`bg === US_PALETTE_OKLCH.inkDark`, `surface === US_PALETTE_OKLCH.surfaceDark`, `surface2 === US_PALETTE_OKLCH.slate`, `surface3 === US_PALETTE_OKLCH.surfaceDark3`, `fg === US_PALETTE_OKLCH.surfaceLight`, `muted === US_PALETTE_OKLCH.mutedDark`, `accentBg === US_PALETTE_OKLCH.accent`, `accentFg === US_PALETTE_OKLCH.inkDark`).
 - Assert `resolveThemeTokens("light")` uses `US_PALETTE_OKLCH` values (`bg === US_PALETTE_OKLCH.canvasLight`, `surface === US_PALETTE_OKLCH.surfaceLight`, `surface2 === US_PALETTE_OKLCH.borderLight`, `surface3 === US_PALETTE_OKLCH.surfaceLight3`, `fg === US_PALETTE_OKLCH.slate`, `muted === US_PALETTE_OKLCH.secondary`, `accentBg === US_PALETTE_OKLCH.accent`, `accentFg === US_PALETTE_OKLCH.inkDark`).
 - Assert `SIMPLE_CSS_LIGHT_TOKENS` and `SIMPLE_CSS_DARK_TOKENS` match the spec mapping.
 
 In `ui-tokens.test.ts`:
+
 - Assert `getSimpleCssThemeVarsCss()` contains `:root`, `@media (prefers-color-scheme: dark)`, `:root:not([data-theme-mode="light"])`, `:root[data-theme-mode="light"]`, `:root[data-theme-mode="dark"]`, `--accent: ${US_PALETTE_OKLCH.accent}`, `--border: ${US_PALETTE_OKLCH.secondary}`, and contains NO element/class selectors (`body`, `header`, `.us-`, `border:`, `padding:`, `margin:`).
 - Assert `settings/shared/tokens.css` read from disk equals `${getSimpleCssThemeVarsCss()}\n` (exact drift check!).
 
@@ -156,6 +164,7 @@ git commit -m "feat(shared,settings): bind hex-led 0-error OkLch tokens and gene
 ### Task 3: Migrate `settings/` Pages & `bridge.js` to External Simple.css URI and Native `<select>`
 
 **Files:**
+
 - Modify: `settings/shared/bridge.js`
 - Modify: `index.html`
 - Modify: `settings/language/index.html`
@@ -163,6 +172,7 @@ git commit -m "feat(shared,settings): bind hex-led 0-error OkLch tokens and gene
 - Modify: `packages/page-translator/tests/v4/ui-tier.test.ts`
 
 **Interfaces:**
+
 - Consumes: `https://cdn.simplecss.org/simple.min.css`, `settings/shared/tokens.css`, `settings/shared/i18n.js`, `settings/shared/bridge.js`
 - Produces:
   - Lean `settings/shared/bridge.js` exporting `readScripts`, `collectScripts`, `hasScript`, `waitForScripts`, `onPresence`, `dispatchSettings` (removes `createCustomSelect` and custom dropdown SVG code).
@@ -171,6 +181,7 @@ git commit -m "feat(shared,settings): bind hex-led 0-error OkLch tokens and gene
 - [ ] **Step 1: Write failing tests in `packages/page-translator/tests/v4/ui-tier.test.ts`**
 
 Add / update tests verifying:
+
 1. All three settings pages (`index.html`, `settings/language/index.html`, `settings/translate/index.html`) include `<link href="https://cdn.simplecss.org/simple.min.css" rel="stylesheet">` (or attribute order agnostic match on `https://cdn.simplecss.org/simple.min.css`), include `tokens.css`, do NOT import `createCustomSelect`, and have zero `style="` inline attributes.
 2. `settings/shared/bridge.js` no longer defines `createCustomSelect`.
 3. `settings/translate/index.html`:
@@ -209,6 +220,7 @@ Expected: FAIL (pages still use `createCustomSelect`, lack external `simple.min.
 - [ ] **Step 4: Run full repo verification suite**
 
 Run:
+
 ```bash
 bun test ./packages
 bun run --filter '*' typecheck
@@ -216,6 +228,7 @@ bun run check
 bun run --filter '*' build
 ```
 Expected:
+
 - `bun test ./packages`: 0 failures across all packages.
 - `bun run --filter '*' typecheck`: exit 0 for all 3 packages.
 - `bun run check`: 0 errors.

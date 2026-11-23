@@ -13,6 +13,7 @@ Two problems exist in the current UI layer across `@userscripts/shared` and `set
 ## 2. Goals, Non-Goals, Anti-Goals
 
 **Goals:**
+
 - Make `#RGB` / `#RRGGBB` hex anchors the single programmatic source of truth in `@userscripts/shared`, converting them to **0-error (`maxChannelError === 0`), `<= 2` decimal** `oklch()` CSS strings (matching `NovaKit/tools/hex-oklch-explorer.html`).
 - Anchor the UserScripts UI palette on the user's 3-color brand spine (`#D71`, `#677`, `#334`) plus minimal 0-error `<= 2`-decimal `#RGB` neutral/accessible companions (`#111`, `#222`, `#444`, `#899`, `#CCC`, `#DDD`, `#EEE`, `#FFF`, `#952`, `#C72`).
 - Programmatically generate `settings/shared/tokens.css` from `@userscripts/shared` with a sync script and a drift-detection unit test.
@@ -20,11 +21,13 @@ Two problems exist in the current UI layer across `@userscripts/shared` and `set
 - Keep Typography/Presentation, CJK Spacing & Conversion, and the Apply action always visible on `settings/translate/index.html` (outside `data-tier="studio"`).
 
 **Non-Goals:**
+
 - Redesigning `packages/page-translator` in-page Basic Mode or Industrial Studio Mode (deferred to Project B).
 - Breaking `packages/hanime1-download-manager`'s 4-mode `ThemeMode` (`dark | light | system | host`) or existing `--nk-*` / `--us-*` Shadow DOM token consumers.
 - Modifying `dist/` release artifacts.
 
 **Anti-Goals:**
+
 - Hand-copying `oklch()` values across files or overriding Simple.css typography, borders, or form geometry in `settings/shared/tokens.css`.
 - Introducing runtime network fetches to build color tokens or non-0-error palette anchors.
 
@@ -40,21 +43,21 @@ Two problems exist in the current UI layer across `@userscripts/shared` and `set
 
 ## 4. Palette & Token Mapping (All 0-Error, `<= 2` Decimals)
 
-| Key | Hex | 0-Error `oklch()` (`<= 2` dec) | Role |
-|---|---|---|---|
-| `accent` | `#D71` | `oklch(67.15% 0.16 56)` | Primary accent (buttons, active highlights, dark code) |
-| `accentDeep` | `#952` | `oklch(52.05% 0.11 54)` | Light accent hover & inline code (`5.71:1` on `#FFF`) |
-| `accentSoft` | `#C72` | `oklch(64.96% 0.14 60)` | Dark accent hover (`5.60:1` with `#111`) |
-| `secondary` | `#677` | `oklch(55.54% 0.02 197)` | Borders, light muted text (`4.70:1` on `#FFF`) |
-| `mutedDark` | `#899` | `oklch(66.95% 0.02 197)` | Dark muted text (hue `197`, `6.35:1` on `#111`) |
-| `slate` | `#334` | `oklch(32.84% 0.03 285)` | Light main text (`12.37:1` on `#FFF`), dark elevated surface |
-| `inkDark` | `#111` | `oklch(17.76% 0 0)` | Dark canvas & text on `#D71` (`6.04:1`) |
-| `surfaceDark` | `#222` | `oklch(25.2% 0 0)` | Dark surface / disabled fill |
-| `surfaceDark3` | `#444` | `oklch(38.67% 0 0)` | Dark surface-3 hover layer |
-| `surfaceLight3` | `#CCC` | `oklch(84.52% 0 0)` | Light surface-3 hover layer |
-| `borderLight` | `#DDD` | `oklch(89.75% 0 0)` | Light surface-2 / disabled fill |
-| `surfaceLight` | `#EEE` | `oklch(94.91% 0 0)` | Light `--accent-bg` surface & dark main text (`16.28:1` on `#111`) |
-| `canvasLight` | `#FFF` | `oklch(100% 0 0)` | Light canvas background |
+| Key             | Hex    | 0-Error `oklch()` (`<= 2` dec) | Role                                                               |
+| --------------- | ------ | ------------------------------ | ------------------------------------------------------------------ |
+| `accent`        | `#D71` | `oklch(67.15% 0.16 56)`        | Primary accent (buttons, active highlights, dark code)             |
+| `accentDeep`    | `#952` | `oklch(52.05% 0.11 54)`        | Light accent hover & inline code (`5.71:1` on `#FFF`)              |
+| `accentSoft`    | `#C72` | `oklch(64.96% 0.14 60)`        | Dark accent hover (`5.60:1` with `#111`)                           |
+| `secondary`     | `#677` | `oklch(55.54% 0.02 197)`       | Borders, light muted text (`4.70:1` on `#FFF`)                     |
+| `mutedDark`     | `#899` | `oklch(66.95% 0.02 197)`       | Dark muted text (hue `197`, `6.35:1` on `#111`)                    |
+| `slate`         | `#334` | `oklch(32.84% 0.03 285)`       | Light main text (`12.37:1` on `#FFF`), dark elevated surface       |
+| `inkDark`       | `#111` | `oklch(17.76% 0 0)`            | Dark canvas & text on `#D71` (`6.04:1`)                            |
+| `surfaceDark`   | `#222` | `oklch(25.2% 0 0)`             | Dark surface / disabled fill                                       |
+| `surfaceDark3`  | `#444` | `oklch(38.67% 0 0)`            | Dark surface-3 hover layer                                         |
+| `surfaceLight3` | `#CCC` | `oklch(84.52% 0 0)`            | Light surface-3 hover layer                                        |
+| `borderLight`   | `#DDD` | `oklch(89.75% 0 0)`            | Light surface-2 / disabled fill                                    |
+| `surfaceLight`  | `#EEE` | `oklch(94.91% 0 0)`            | Light `--accent-bg` surface & dark main text (`16.28:1` on `#111`) |
+| `canvasLight`   | `#FFF` | `oklch(100% 0 0)`              | Light canvas background                                            |
 
 ### Simple.css Variable Mapping (`settings/shared/tokens.css`, generated)
 
