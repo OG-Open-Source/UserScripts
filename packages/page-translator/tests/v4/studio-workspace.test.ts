@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { Window } from "happy-dom";
 import locales from "../../locales.json" with { type: "json" };
 import { mergeLocaleTables } from "../../src/dict/store";
@@ -689,6 +691,131 @@ describe("Industrial Studio Workspace", () => {
       "border-radius: calc(var(--rho) * min(240px, 60px));"
     );
     expect(styleText).toContain("corner-shape: superellipse(2);");
+
+    controller.stop();
+  });
+
+  test("13. Studio Workspace view and overlay use Lit templates without customElements.define", () => {
+    const viewSrc = readFileSync(
+      resolve(import.meta.dir, "../../src/ui/studio/workspace/view.ts"),
+      "utf8"
+    );
+    const overlaySrc = readFileSync(
+      resolve(import.meta.dir, "../../src/ui/studio/workspace/overlay.ts"),
+      "utf8"
+    );
+
+    expect(viewSrc).toContain('from "lit"');
+    expect(viewSrc).toContain("html`");
+    expect(viewSrc).not.toContain("customElements.define");
+    expect(viewSrc).not.toContain("function makeButton");
+
+    expect(overlaySrc).toContain('from "lit"');
+    expect(overlaySrc).toContain("html`");
+    expect(overlaySrc).not.toContain("customElements.define");
+  });
+
+  test("14. typing in controlled Studio inputs is not overwritten by unrelated view updates", () => {
+    const { breakpointGate, controller, doc, win } = createTestEnv(
+      `<main>
+        <section aria-label="Nav">
+          <p id="p1">Hello Alpha</p>
+          <p id="p2">Hello Beta</p>
+        </section>
+      </main>`
+    );
+
+    controller.syncFromConfig();
+    const sr = getShellShadow(doc);
+    const litRoot = sr.querySelector(".ptr-lit-root");
+    expect(litRoot).not.toBeNull();
+
+    const searchInput = sr.querySelector(
+      "[data-studio-search]"
+    ) as HTMLInputElement;
+    const selectorInput = sr.querySelector(
+      "[data-studio-rule-selector]"
+    ) as HTMLInputElement;
+    const deltaTextarea = sr.querySelector(
+      "[data-studio-delta-textarea]"
+    ) as HTMLTextAreaElement;
+    const scopeInput = sr.querySelector(
+      '[data-studio-dict="scope"]'
+    ) as HTMLInputElement;
+    const transInput = sr.querySelector(
+      '[data-studio-dict="trans"]'
+    ) as HTMLInputElement;
+    const importTextarea = sr.querySelector(
+      '[data-studio-dict="import-text"]'
+    ) as HTMLTextAreaElement;
+
+    const typeInto = (
+      el: HTMLInputElement | HTMLTextAreaElement,
+      value: string
+    ): void => {
+      el.value = value;
+      el.dispatchEvent(
+        new win.Event("input", { bubbles: true }) as unknown as Event
+      );
+    };
+
+    typeInto(searchInput, "Alpha");
+    typeInto(selectorInput, "#custom-rule");
+    typeInto(deltaTextarea, "+ #custom-rule");
+    typeInto(scopeInput, "section[aria-label='Nav']");
+    typeInto(transInput, "哈囉阿爾法");
+    typeInto(importTextarea, '{"translations":{"Hello Alpha":"你好"}}');
+
+    // Unrelated updates: collapse bottom dock, switch bottom tabs, toggle record, toggle breakpoint, switch right tabs
+    const collapseBtn = sr.querySelector(
+      '[data-studio-action="collapse-bottom"]'
+    ) as HTMLButtonElement;
+    collapseBtn.click();
+    const recordTab = sr.querySelector(
+      '[data-studio-bottom-tab="record"]'
+    ) as HTMLButtonElement;
+    recordTab.click();
+    const recordToggle = sr.querySelector(
+      '[data-studio-action="record-toggle"]'
+    ) as HTMLButtonElement;
+    recordToggle.click();
+    breakpointGate.setPaused(true);
+    breakpointGate.setPaused(false);
+    const dictTab = sr.querySelector(
+      '[data-studio-right-tab="dict"]'
+    ) as HTMLButtonElement;
+    dictTab.click();
+    const nodeTab = sr.querySelector(
+      '[data-studio-right-tab="node"]'
+    ) as HTMLButtonElement;
+    nodeTab.click();
+    const translateBtn = sr.querySelector(
+      '[data-studio-action="translate"]'
+    ) as HTMLButtonElement;
+    translateBtn.click();
+
+    expect(searchInput.value).toBe("Alpha");
+    expect(selectorInput.value).toBe("#custom-rule");
+    expect(deltaTextarea.value).toBe("+ #custom-rule");
+    expect(scopeInput.value).toBe("section[aria-label='Nav']");
+    expect(transInput.value).toBe("哈囉阿爾法");
+    expect(importTextarea.value).toBe(
+      '{"translations":{"Hello Alpha":"你好"}}'
+    );
+
+    // Programmatic updates still work after user typing
+    const excludeBtn = sr.querySelector(
+      '[data-studio-action="rule-remove"]'
+    ) as HTMLButtonElement;
+    excludeBtn.click();
+    expect(deltaTextarea.value).toContain("- #custom-rule");
+
+    dictTab.click();
+    const nextBtn = sr.querySelector(
+      '[data-studio-dict="next"]'
+    ) as HTMLButtonElement;
+    nextBtn.click();
+    expect(transInput.value).toBe("");
 
     controller.stop();
   });

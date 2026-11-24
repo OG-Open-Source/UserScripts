@@ -1,5 +1,9 @@
+import "../../lit-dom";
+
 import { US_PALETTE_OKLCH } from "@userscripts/shared";
+import { html, nothing } from "lit";
 import type { LiveCaptureCandidate } from "../../../capture/export";
+import { renderLit } from "../../lit-render";
 import type { StudioStageGeometry } from "./stage";
 
 export type StudioBoxMode = "all" | "included" | "excluded" | "off";
@@ -20,6 +24,20 @@ export interface ProjectedBox {
 }
 
 const DEFAULT_MAX_BOXES = 300;
+
+const LABEL_BASE_STYLE = [
+  "position:absolute",
+  "top:-16px",
+  "left:0",
+  "padding:1px 5px",
+  "font-size:10px",
+  "line-height:14px",
+  "font-family:ui-monospace,SFMono-Regular,monospace",
+  `background:${US_PALETTE_OKLCH.accent}`,
+  `color:${US_PALETTE_OKLCH.inkDark}`,
+  "border-radius:3px",
+  "white-space:nowrap",
+].join(";");
 
 function formatRegion(region: string | string[] | null): string {
   if (Array.isArray(region)) {
@@ -134,64 +152,66 @@ export function projectCandidateBoxes(
   return capProjectedBoxes(projected, maxBoxes);
 }
 
-/** Renders projected bounding boxes into the Studio overlay layer without innerHTML. */
+function resolveBoxVisuals(box: ProjectedBox): {
+  active: boolean;
+  background: string;
+  border: string;
+} {
+  const active = box.selected || box.hovered;
+  if (active) {
+    return {
+      active,
+      border: `2px solid ${US_PALETTE_OKLCH.accent}`,
+      background: "oklch(0.68 0.19 46 / 0.14)",
+    };
+  }
+  if (box.included) {
+    return {
+      active,
+      border: `1px solid ${US_PALETTE_OKLCH.accentSoft}`,
+      background: "oklch(0.75 0.15 55 / 0.06)",
+    };
+  }
+  return {
+    active,
+    border: `1px dashed ${US_PALETTE_OKLCH.mutedDark}`,
+    background: "transparent",
+  };
+}
+
+function renderBox(box: ProjectedBox) {
+  const { active, background, border } = resolveBoxVisuals(box);
+  const boxStyle = [
+    "position:fixed",
+    "pointer-events:none",
+    "box-sizing:border-box",
+    `left:${box.left}px`,
+    `top:${box.top}px`,
+    `width:${box.width}px`,
+    `height:${box.height}px`,
+    `border:${border}`,
+    `background:${background}`,
+    `z-index:${active ? "2" : "1"}`,
+  ].join(";");
+
+  return html`
+    <div
+      data-box-index=${String(box.index)}
+      data-included=${box.included ? "1" : "0"}
+      data-selected=${box.selected ? "1" : nothing}
+      data-hovered=${box.hovered ? "1" : nothing}
+      style=${boxStyle}
+    >
+      ${active ? html`<span style=${LABEL_BASE_STYLE}>${box.label}</span>` : nothing}
+    </div>
+  `;
+}
+
+/** Renders projected bounding boxes into the Studio overlay layer with Lit. */
 export function renderOverlayBoxes(
   layer: HTMLElement,
   doc: Document,
   boxes: readonly ProjectedBox[]
 ): void {
-  layer.replaceChildren();
-
-  for (const box of boxes) {
-    const node = doc.createElement("div");
-    node.setAttribute("data-box-index", String(box.index));
-    node.setAttribute("data-included", box.included ? "1" : "0");
-    if (box.selected) {
-      node.setAttribute("data-selected", "1");
-    }
-    if (box.hovered) {
-      node.setAttribute("data-hovered", "1");
-    }
-
-    const active = box.selected || box.hovered;
-    let border = `1px dashed ${US_PALETTE_OKLCH.mutedDark}`;
-    let background = "transparent";
-    if (active) {
-      border = `2px solid ${US_PALETTE_OKLCH.accent}`;
-      background = "oklch(0.68 0.19 46 / 0.14)";
-    } else if (box.included) {
-      border = `1px solid ${US_PALETTE_OKLCH.accentSoft}`;
-      background = "oklch(0.75 0.15 55 / 0.06)";
-    }
-
-    node.style.position = "fixed";
-    node.style.pointerEvents = "none";
-    node.style.boxSizing = "border-box";
-    node.style.left = `${box.left}px`;
-    node.style.top = `${box.top}px`;
-    node.style.width = `${box.width}px`;
-    node.style.height = `${box.height}px`;
-    node.style.border = border;
-    node.style.background = background;
-    node.style.zIndex = active ? "2" : "1";
-
-    if (active) {
-      const tag = doc.createElement("span");
-      tag.textContent = box.label;
-      tag.style.position = "absolute";
-      tag.style.top = "-16px";
-      tag.style.left = "0";
-      tag.style.padding = "1px 5px";
-      tag.style.fontSize = "10px";
-      tag.style.lineHeight = "14px";
-      tag.style.fontFamily = "ui-monospace, SFMono-Regular, monospace";
-      tag.style.background = US_PALETTE_OKLCH.accent;
-      tag.style.color = US_PALETTE_OKLCH.inkDark;
-      tag.style.borderRadius = "3px";
-      tag.style.whiteSpace = "nowrap";
-      node.appendChild(tag);
-    }
-
-    layer.appendChild(node);
-  }
+  renderLit(html`${boxes.map(renderBox)}`, layer, doc);
 }

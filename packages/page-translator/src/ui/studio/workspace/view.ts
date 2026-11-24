@@ -1,9 +1,15 @@
-import { markUiRoot } from "@userscripts/shared";
+import "../../lit-dom";
+
+import type { TemplateResult } from "lit";
+import { html, nothing } from "lit";
+import type { Ref } from "lit/directives/ref.js";
+import { createRef, ref } from "lit/directives/ref.js";
 import type { LiveCaptureCandidate } from "../../../capture/export";
 import type { PtrThemeMode } from "../../../platform/config";
 import type { PtrMessageKey } from "../../../platform/i18n";
 import { formatPtrMsg, MESSAGES_EN } from "../../../platform/i18n";
 import type { SiteModifier } from "../../../structure/site-rules";
+import { mountLitShadow } from "../../lit-render";
 import { applyPtrTheme, getSharedPanelCss } from "../../theme";
 import type { InspectScanResult } from "../inspect/logic";
 import type {
@@ -26,8 +32,23 @@ const MODIFIER_OPTIONS: readonly SiteModifier[] = [
   "keep-orig",
 ];
 
+const BOX_OPTIONS: readonly [StudioBoxMode, PtrMessageKey][] = [
+  ["all", "studioBoxesAll"],
+  ["included", "studioBoxesIncluded"],
+  ["excluded", "studioBoxesExcluded"],
+  ["off", "studioBoxesOff"],
+];
+
+const FILTER_DEFS: readonly [StudioNodeFilterTab, PtrMessageKey][] = [
+  ["all", "studioTabAll"],
+  ["captured", "studioTabCaptured"],
+  ["excluded", "studioTabExcluded"],
+  ["manual", "studioTabManual"],
+];
+
 export type StudioRightTab = "node" | "dict";
 export type StudioBottomTab = "diag" | "record";
+export type TranslatorFn = (key: PtrMessageKey) => string;
 
 export interface StudioWorkspaceViewHandlers {
   onApplyDelta: (rawDelta: string) => void;
@@ -112,6 +133,50 @@ export interface StudioWorkspaceView {
   }) => void;
   setDeltaText: (rawDelta: string) => void;
   setStatusMessage: (msg: string) => void;
+}
+
+interface StudioWorkspaceViewState {
+  activity: readonly StudioActivityEntry[];
+  adapterId: string;
+  bottomCollapsed: boolean;
+  bottomTab: StudioBottomTab;
+  boxMode: StudioBoxMode;
+  bpPaused: boolean;
+  bpWaiting: boolean;
+  capturedCount: number;
+  conflicts: readonly VolunteerConflict[];
+  deltaText: string;
+  dictEntry: CapturedVolunteerEntry | null;
+  dictIndex: number;
+  dictScan: VolunteerScanResult | null;
+  filteredNodes: readonly LiveCaptureCandidate[];
+  filterTab: StudioNodeFilterTab;
+  importDrawerOpen: boolean;
+  inspectScan: InspectScanResult | null;
+  manualElements: ReadonlySet<Element>;
+  recording: boolean;
+  rightTab: StudioRightTab;
+  selectedEntry: LiveCaptureCandidate | null;
+  selectedIndex: number | null;
+  selectedModifier: SiteModifier;
+  selectMode: boolean;
+  statusMessage: string;
+  targetLang: string;
+  totalCount: number;
+  translated: boolean;
+  zoom: StudioZoomPreset;
+}
+
+interface StudioWorkspaceRefs {
+  delta: Ref<HTMLTextAreaElement>;
+  importText: Ref<HTMLTextAreaElement>;
+  modSelect: Ref<HTMLSelectElement>;
+  nodeList: Ref<HTMLDivElement>;
+  overlay: Ref<HTMLDivElement>;
+  scope: Ref<HTMLInputElement>;
+  search: Ref<HTMLInputElement>;
+  selector: Ref<HTMLInputElement>;
+  trans: Ref<HTMLInputElement>;
 }
 
 function getWorkspaceCss(): string {
@@ -203,6 +268,10 @@ ${getSharedPanelCss()}
   padding: 6px 10px;
   background: var(--us-surface);
   border-radius: 0;
+}
+
+.ptr-studio-bottom-head {
+  justify-content: space-between;
 }
 
 .ptr-studio-row {
@@ -339,22 +408,6 @@ select.ptr-input.ptr-studio-select-inline {
 `.trim();
 }
 
-function makeButton(
-  doc: Document,
-  label: string,
-  attrs: Record<string, string> = {},
-  primary = false
-): HTMLButtonElement {
-  const btn = doc.createElement("button");
-  btn.type = "button";
-  btn.className = primary ? "ptr-btn ptr-btn-primary" : "ptr-btn";
-  btn.textContent = label;
-  for (const [key, val] of Object.entries(attrs)) {
-    btn.setAttribute(key, val);
-  }
-  return btn;
-}
-
 function formatRegion(region: string | string[] | null): string {
   if (Array.isArray(region)) {
     return region.join(", ");
@@ -362,58 +415,827 @@ function formatRegion(region: string | string[] | null): string {
   return region ?? "-";
 }
 
-function buildNodeRow(
-  doc: Document,
+function renderTopToolbar(
+  state: StudioWorkspaceViewState,
+  hostname: string,
+  handlers: StudioWorkspaceViewHandlers,
+  t: TranslatorFn
+): TemplateResult {
+  const zoomOptions: readonly [StudioZoomPreset, string][] = [
+    ["fit", t("studioZoomFit")],
+    ["50", "50%"],
+    ["75", "75%"],
+    ["100", "100%"],
+  ];
+  const summaryText = `${state.capturedCount}/${state.totalCount}`;
+  const adapterText = formatPtrMsg(t("hudFramework"), {
+    adapterId: state.adapterId,
+  });
+
+  return html`
+    <header class="ptr-studio-dock ptr-studio-top" data-studio-dock="top">
+      <div class="ptr-studio-row-nowrap ptr-studio-top-left">
+        <strong class="drag-title"
+          >${formatPtrMsg(t("studioTitle"), { host: hostname })}</strong
+        >
+        <span class="ptr-chip ptr-mono" data-studio-adapter="1"
+          >${adapterText}</span
+        >
+        <span class="ptr-chip ptr-mono" data-studio-summary="1"
+          >${summaryText}</span
+        >
+      </div>
+      <div class="ptr-studio-row-nowrap ptr-studio-top-actions">
+        <button
+          type="button"
+          class="ptr-btn ptr-btn-primary"
+          data-studio-action="translate"
+          @click=${handlers.onToggleTranslate}
+        >
+          ${t(state.translated ? "restorePage" : "translatePage")}
+        </button>
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-action="rescan"
+          @click=${handlers.onRescan}
+        >
+          ${t("volRescan")}
+        </button>
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-action="select-mode"
+          aria-pressed=${state.selectMode ? "true" : "false"}
+          @click=${handlers.onToggleSelectMode}
+        >
+          ${t(state.selectMode ? "studioModeSelect" : "studioModeInteract")}
+        </button>
+        <select
+          class="ptr-input ptr-studio-select-inline"
+          data-studio-action="box-mode"
+          .value=${state.boxMode}
+          @change=${(e: Event) => {
+            const nextMode = (e.target as HTMLSelectElement)
+              .value as StudioBoxMode;
+            state.boxMode = nextMode;
+            handlers.onBoxModeChange(nextMode);
+          }}
+        >
+          ${BOX_OPTIONS.map(
+            ([val, key]) => html`
+              <option value=${val} ?selected=${val === state.boxMode}>
+                ${t(key)}
+              </option>
+            `
+          )}
+        </select>
+        <select
+          class="ptr-input ptr-studio-select-inline"
+          data-studio-action="zoom"
+          .value=${state.zoom}
+          @change=${(e: Event) => {
+            const nextZoom = (e.target as HTMLSelectElement)
+              .value as StudioZoomPreset;
+            state.zoom = nextZoom;
+            handlers.onZoomChange(nextZoom);
+          }}
+        >
+          ${zoomOptions.map(
+            ([val, label]) => html`
+              <option value=${val} ?selected=${val === state.zoom}>
+                ${label}
+              </option>
+            `
+          )}
+        </select>
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-action="export-nodes"
+          @click=${handlers.onExportNodes}
+        >
+          ${t("studioExportNodes")}
+        </button>
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-action="settings"
+          @click=${handlers.onOpenSettings}
+        >
+          ${t("basicOpenSettings")}
+        </button>
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-action="exit"
+          @click=${handlers.onExit}
+        >
+          ${t("studioExit")}
+        </button>
+      </div>
+    </header>
+  `;
+}
+
+function renderNodeRow(
   entry: LiveCaptureCandidate,
-  options: {
-    isManual: boolean;
-    isSelected: boolean;
-    onSelect: (index: number) => void;
-    t: (key: PtrMessageKey) => string;
-  }
-): HTMLButtonElement {
-  const { candidate, index } = entry;
-  const { isManual, isSelected, onSelect, t } = options;
-
-  const row = doc.createElement("button");
-  row.type = "button";
-  row.className = "ptr-studio-node-row";
-  row.setAttribute("data-studio-node-index", String(index));
-  row.setAttribute("aria-selected", isSelected ? "true" : "false");
-
-  const header = doc.createElement("div");
-  header.className = "ptr-studio-row";
-
-  const statusPill = doc.createElement("span");
-  statusPill.className = candidate.included
-    ? "ptr-studio-pill ptr-studio-pill-accent"
-    : "ptr-studio-pill";
-  statusPill.textContent = candidate.included
+  state: StudioWorkspaceViewState,
+  onSelect: (index: number) => void,
+  t: TranslatorFn
+): TemplateResult {
+  const { candidate, element, index } = entry;
+  const isManual = state.manualElements.has(element);
+  const isSelected = index === state.selectedIndex;
+  const statusLabel = candidate.included
     ? t("studioTabCaptured")
     : (candidate.excludeReason ?? t("studioTabExcluded"));
 
-  const classPill = doc.createElement("span");
-  classPill.className = "ptr-studio-pill ptr-mono";
-  classPill.textContent = candidate.classification;
+  return html`
+    <button
+      type="button"
+      class="ptr-studio-node-row"
+      data-studio-node-index=${String(index)}
+      aria-selected=${isSelected ? "true" : "false"}
+      @click=${() => onSelect(index)}
+    >
+      <div class="ptr-studio-row">
+        <span
+          class=${
+            candidate.included
+              ? "ptr-studio-pill ptr-studio-pill-accent"
+              : "ptr-studio-pill"
+          }
+          >${statusLabel}</span
+        >
+        <span class="ptr-studio-pill ptr-mono">${candidate.classification}</span>
+        ${isManual ? html`<span class="ptr-studio-pill">${t("segManual")}</span>` : nothing}
+      </div>
+      <div class="ptr-mono ptr-muted">${candidate.domPath}</div>
+      <div>${candidate.textPreview}</div>
+    </button>
+  `;
+}
 
-  header.append(statusPill, classPill);
-  if (isManual) {
-    const manualPill = doc.createElement("span");
-    manualPill.className = "ptr-studio-pill";
-    manualPill.textContent = t("segManual");
-    header.append(manualPill);
+function renderLeftDock(
+  state: StudioWorkspaceViewState,
+  refs: StudioWorkspaceRefs,
+  handlers: StudioWorkspaceViewHandlers,
+  t: TranslatorFn
+): TemplateResult {
+  return html`
+    <aside class="ptr-studio-dock ptr-studio-left" data-studio-dock="left">
+      <input
+        type="search"
+        class="ptr-input"
+        placeholder=${t("studioSearchPlaceholder")}
+        data-studio-search="1"
+        ${ref(refs.search)}
+        @input=${(e: Event) => {
+          handlers.onSearchChange((e.target as HTMLInputElement).value);
+        }}
+      />
+      <div class="ptr-studio-row">
+        ${FILTER_DEFS.map(
+          ([tabId, key]) => html`
+            <button
+              type="button"
+              class="ptr-btn"
+              data-studio-filter=${tabId}
+              aria-pressed=${state.filterTab === tabId ? "true" : "false"}
+              @click=${() => handlers.onFilterTabChange(tabId)}
+            >
+              ${t(key)}
+            </button>
+          `
+        )}
+      </div>
+      <div
+        class="ptr-studio-scroll"
+        data-studio-node-list="1"
+        ${ref(refs.nodeList)}
+      >
+        ${
+          state.filteredNodes.length === 0
+            ? html`<div class="ptr-muted">${t("studioNoNodes")}</div>`
+            : state.filteredNodes.map((entry) =>
+                renderNodeRow(entry, state, handlers.onSelectNode, t)
+              )
+        }
+      </div>
+    </aside>
+  `;
+}
+
+function renderNodeMeta(
+  entry: LiveCaptureCandidate | null,
+  t: TranslatorFn
+): TemplateResult {
+  if (!entry) {
+    return html`<div class="ptr-muted">${t("studioSelectPrompt")}</div>`;
   }
 
-  const pathEl = doc.createElement("div");
-  pathEl.className = "ptr-mono ptr-muted";
-  pathEl.textContent = candidate.domPath;
+  const { candidate } = entry;
+  const statusLabel = candidate.included
+    ? t("studioTabCaptured")
+    : (candidate.excludeReason ?? t("studioTabExcluded"));
+  const styleLine = `${candidate.computedStyleSummary.display} | ${candidate.computedStyleSummary.visibility} | ${candidate.computedStyleSummary.fontFamily}`;
 
-  const previewEl = doc.createElement("div");
-  previewEl.textContent = candidate.textPreview;
+  return html`
+    <div class="ptr-studio-row">
+      <span
+        class=${
+          candidate.included
+            ? "ptr-studio-pill ptr-studio-pill-accent"
+            : "ptr-studio-pill"
+        }
+        >${statusLabel}</span
+      >
+      <span class="ptr-studio-pill ptr-mono">${candidate.classification}</span>
+      <span class="ptr-studio-pill ptr-mono"
+        >${formatRegion(candidate.region)}</span
+      >
+    </div>
+    <div class="code-inline">${candidate.domPath}</div>
+    <div class="ptr-mono ptr-muted">${styleLine}</div>
+    <div>${candidate.textPreview}</div>
+  `;
+}
 
-  row.append(header, pathEl, previewEl);
-  row.addEventListener("click", () => onSelect(index));
-  return row;
+function renderNodePanel(
+  state: StudioWorkspaceViewState,
+  refs: StudioWorkspaceRefs,
+  handlers: StudioWorkspaceViewHandlers,
+  t: TranslatorFn,
+  onModifierChange: (mod: SiteModifier) => void,
+  onDeltaInput: (val: string) => void
+): TemplateResult {
+  const readSelector = (): string => refs.selector.value?.value ?? "";
+  const readMod = (): SiteModifier =>
+    (refs.modSelect.value?.value as SiteModifier | undefined) ??
+    state.selectedModifier;
+  const readDelta = (): string => refs.delta.value?.value ?? state.deltaText;
+
+  return html`
+    <div
+      class=${
+        state.rightTab === "node"
+          ? "ptr-studio-scroll"
+          : "ptr-studio-scroll ptr-studio-hidden"
+      }
+      data-studio-panel="node"
+    >
+      <div class="ptr-studio-card">
+        ${renderNodeMeta(state.selectedEntry, t)}
+      </div>
+      <div class="ptr-studio-card">
+        <label class="ptr-muted">${t("studioRuleSelector")}</label>
+        <input
+          type="text"
+          class="ptr-input ptr-mono"
+          data-studio-rule-selector="1"
+          ${ref(refs.selector)}
+        />
+        <div class="ptr-studio-row">
+          <button
+            type="button"
+            class="ptr-btn"
+            data-studio-action="rule-add"
+            @click=${() => handlers.onRuleAction("add", readSelector(), readMod())}
+          >
+            ${t("studioRuleAdd")}
+          </button>
+          <button
+            type="button"
+            class="ptr-btn"
+            data-studio-action="rule-remove"
+            @click=${() => handlers.onRuleAction("remove", readSelector(), readMod())}
+          >
+            ${t("studioRuleRemove")}
+          </button>
+          <button
+            type="button"
+            class="ptr-btn"
+            data-studio-action="rule-mod"
+            @click=${() => handlers.onRuleAction("mod", readSelector(), readMod())}
+          >
+            ${t("studioRuleMod")}
+          </button>
+          <select
+            class="ptr-input ptr-studio-select-inline"
+            data-studio-rule-mod-select="1"
+            ${ref(refs.modSelect)}
+            .value=${state.selectedModifier}
+            @change=${(e: Event) => {
+              onModifierChange(
+                (e.target as HTMLSelectElement).value as SiteModifier
+              );
+            }}
+          >
+            ${MODIFIER_OPTIONS.map(
+              (mod) => html`
+                <option value=${mod} ?selected=${mod === state.selectedModifier}>
+                  ${mod}
+                </option>
+              `
+            )}
+          </select>
+        </div>
+        <label class="ptr-muted">${t("studioSiteDeltas")}</label>
+        <textarea
+          rows="4"
+          class="ptr-input"
+          data-studio-delta-textarea="1"
+          ${ref(refs.delta)}
+          @input=${(e: Event) => {
+            onDeltaInput((e.target as HTMLTextAreaElement).value);
+          }}
+        ></textarea>
+        <button
+          type="button"
+          class="ptr-btn ptr-btn-primary"
+          data-studio-action="rule-apply"
+          @click=${() => handlers.onApplyDelta(readDelta())}
+        >
+          ${t("studioRuleApply")}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderConflicts(
+  conflicts: readonly VolunteerConflict[],
+  handlers: StudioWorkspaceViewHandlers,
+  t: TranslatorFn
+): TemplateResult {
+  const cls =
+    conflicts.length === 0
+      ? "ptr-studio-card ptr-studio-hidden"
+      : "ptr-studio-card";
+
+  return html`
+    <div class=${cls} data-studio-dict="conflicts">
+      ${
+        conflicts.length === 0
+          ? nothing
+          : html`
+            <div class="ptr-studio-row">
+              <strong
+                >${formatPtrMsg(t("volConflictsHeader"), {
+                  count: conflicts.length,
+                })}</strong
+              >
+              <button
+                type="button"
+                class="ptr-btn"
+                data-studio-conflict-keep-all="1"
+                @click=${() => handlers.onResolveAllConflicts("keep")}
+              >
+                ${t("volConflictKeepAll")}
+              </button>
+              <button
+                type="button"
+                class="ptr-btn"
+                data-studio-conflict-overwrite-all="1"
+                @click=${() => handlers.onResolveAllConflicts("overwrite")}
+              >
+                ${t("volConflictOverwriteAll")}
+              </button>
+            </div>
+            ${conflicts.map(
+              (c) => html`
+                <div class="ptr-studio-card">
+                  <div class="code-inline">${c.key}</div>
+                  <div>${`${t("volConflictExisting")}: ${c.existing}`}</div>
+                  <div>${`${t("volConflictImported")}: ${c.imported}`}</div>
+                  <div class="ptr-studio-row">
+                    <button
+                      type="button"
+                      class="ptr-btn"
+                      data-studio-conflict-keep=${c.id}
+                      @click=${() => handlers.onResolveConflict(c.id, "keep")}
+                    >
+                      ${t("volConflictKeep")}
+                    </button>
+                    <button
+                      type="button"
+                      class="ptr-btn"
+                      data-studio-conflict-overwrite=${c.id}
+                      @click=${() =>
+                        handlers.onResolveConflict(c.id, "overwrite")}
+                    >
+                      ${t("volConflictOverwrite")}
+                    </button>
+                  </div>
+                </div>
+              `
+            )}
+          `
+      }
+    </div>
+  `;
+}
+
+function renderDictPanel(
+  state: StudioWorkspaceViewState,
+  refs: StudioWorkspaceRefs,
+  hostname: string,
+  handlers: StudioWorkspaceViewHandlers,
+  t: TranslatorFn,
+  onSetImportDrawerOpen: (open: boolean) => void
+): TemplateResult {
+  const total = state.dictScan?.entries.length ?? 0;
+  const entry = state.dictEntry;
+  const counterText = total > 0 ? `${state.dictIndex + 1} / ${total}` : "0 / 0";
+  let kindLabel = "-";
+  if (entry) {
+    kindLabel = t(
+      entry.kind === "dynamic" ? "volBadgeDynamic" : "volBadgeStatic"
+    );
+  }
+  const sourceText = entry ? entry.key : t("volEmpty");
+  const transPlaceholder = formatPtrMsg(t("volTransPlaceholder"), {
+    lang: state.targetLang,
+  });
+
+  return html`
+    <div
+      class=${
+        state.rightTab === "dict"
+          ? "ptr-studio-scroll"
+          : "ptr-studio-scroll ptr-studio-hidden"
+      }
+      data-studio-panel="dict"
+    >
+      <div class="ptr-studio-row">
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-dict="prev"
+          @click=${handlers.onPrevSegment}
+        >
+          ${t("volPrev")}
+        </button>
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-dict="next"
+          @click=${handlers.onNextSegment}
+        >
+          ${t("volNext")}
+        </button>
+        <span class="ptr-chip ptr-mono">${counterText}</span>
+        <span class="ptr-studio-pill">${kindLabel}</span>
+      </div>
+      <div class="code-inline">${sourceText}</div>
+      <div class="ptr-studio-row-nowrap">
+        <input
+          type="text"
+          class="ptr-input ptr-mono"
+          placeholder=${t("volScopePlaceholder")}
+          data-studio-dict="scope"
+          ${ref(refs.scope)}
+        />
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-dict="suggest"
+          @click=${() => {
+            const suggested = handlers.onSuggestScope();
+            if (suggested && refs.scope.value) {
+              refs.scope.value.value = suggested;
+            }
+          }}
+        >
+          ${t("volSuggest")}
+        </button>
+      </div>
+      <input
+        type="text"
+        class="ptr-input"
+        placeholder=${transPlaceholder}
+        data-studio-dict="trans"
+        ${ref(refs.trans)}
+      />
+      <button
+        type="button"
+        class="ptr-btn ptr-btn-primary"
+        data-studio-dict="save"
+        @click=${() => {
+          handlers.onSaveDraft(
+            refs.trans.value?.value ?? "",
+            refs.scope.value?.value ?? ""
+          );
+        }}
+      >
+        ${t("volSave")}
+      </button>
+      <div class="ptr-studio-row">
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-dict="copy-json"
+          @click=${handlers.onCopyDictJson}
+        >
+          ${t("volCopyJson")}
+        </button>
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-dict="download"
+          @click=${handlers.onDownloadDictJson}
+        >
+          ${formatPtrMsg(t("volDownload"), { host: hostname })}
+        </button>
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-dict="export-ai"
+          @click=${handlers.onExportAi}
+        >
+          ${t("volExportAi")}
+        </button>
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-dict="import-ai"
+          @click=${() => onSetImportDrawerOpen(!state.importDrawerOpen)}
+        >
+          ${t("volImportAi")}
+        </button>
+      </div>
+      <div
+        class=${
+          state.importDrawerOpen
+            ? "ptr-studio-card"
+            : "ptr-studio-card ptr-studio-hidden"
+        }
+      >
+        <textarea
+          rows="3"
+          class="ptr-input"
+          placeholder=${t("volImportPlaceholder")}
+          data-studio-dict="import-text"
+          ${ref(refs.importText)}
+        ></textarea>
+        <div class="ptr-studio-row">
+          <button
+            type="button"
+            class="ptr-btn ptr-btn-primary"
+            data-studio-dict="import-apply"
+            @click=${() => {
+              handlers.onApplyImport(refs.importText.value?.value ?? "");
+            }}
+          >
+            ${t("volImportApply")}
+          </button>
+          <button
+            type="button"
+            class="ptr-btn"
+            data-studio-dict="import-cancel"
+            @click=${() => onSetImportDrawerOpen(false)}
+          >
+            ${t("volImportCancel")}
+          </button>
+        </div>
+      </div>
+      ${renderConflicts(state.conflicts, handlers, t)}
+    </div>
+  `;
+}
+
+function renderRightDock(
+  state: StudioWorkspaceViewState,
+  refs: StudioWorkspaceRefs,
+  hostname: string,
+  handlers: StudioWorkspaceViewHandlers,
+  t: TranslatorFn,
+  actions: {
+    onDeltaInput: (val: string) => void;
+    onModifierChange: (mod: SiteModifier) => void;
+    onSetImportDrawerOpen: (open: boolean) => void;
+  }
+): TemplateResult {
+  return html`
+    <aside class="ptr-studio-dock ptr-studio-right" data-studio-dock="right">
+      <div class="ptr-studio-row">
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-right-tab="node"
+          aria-pressed=${state.rightTab === "node" ? "true" : "false"}
+          @click=${() => handlers.onSelectRightTab("node")}
+        >
+          ${t("studioInspectorNode")}
+        </button>
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-right-tab="dict"
+          aria-pressed=${state.rightTab === "dict" ? "true" : "false"}
+          @click=${() => handlers.onSelectRightTab("dict")}
+        >
+          ${t("studioInspectorDict")}
+        </button>
+      </div>
+      ${renderNodePanel(
+        state,
+        refs,
+        handlers,
+        t,
+        actions.onModifierChange,
+        actions.onDeltaInput
+      )}
+      ${renderDictPanel(
+        state,
+        refs,
+        hostname,
+        handlers,
+        t,
+        actions.onSetImportDrawerOpen
+      )}
+      <div class="ptr-studio-status" data-studio-status="1">
+        ${state.statusMessage}
+      </div>
+    </aside>
+  `;
+}
+
+function renderDiagPanel(
+  state: StudioWorkspaceViewState,
+  handlers: StudioWorkspaceViewHandlers,
+  t: TranslatorFn
+): TemplateResult {
+  const scan = state.inspectScan;
+  const items: readonly [string, number][] = scan
+    ? [
+        [t("mSegments"), scan.counts.total],
+        [t("volStatStatic"), scan.counts.static],
+        [t("volStatDynamic"), scan.counts.dynamic],
+        [t("volStatHits"), scan.counts.manual],
+        [t("mRouteApi"), scan.metrics.routing.api],
+        [t("mRouteOpencc"), scan.metrics.routing.opencc],
+        [t("mRouteSkip"), scan.metrics.routing.skip],
+        [t("mExcluded"), scan.metrics.excludedCount],
+      ]
+    : [];
+  const hidden = state.bottomCollapsed || state.bottomTab !== "diag";
+
+  return html`
+    <div
+      class=${hidden ? "ptr-studio-scroll ptr-studio-hidden" : "ptr-studio-scroll"}
+      data-studio-panel="diag"
+    >
+      <div class="ptr-studio-row">
+        ${items.map(
+          ([label, value]) => html`
+            <span class="ptr-chip ptr-mono">${`${label}: ${value}`}</span>
+          `
+        )}
+      </div>
+      <div class="ptr-studio-row">
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-action="copy-diag"
+          @click=${handlers.onCopyDiag}
+        >
+          ${t("btnCopyDiag")}
+        </button>
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-action="copy-nodes"
+          @click=${handlers.onCopyNodes}
+        >
+          ${t("studioCopyNodes")}
+        </button>
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-action="export-nodes-bottom"
+          @click=${handlers.onExportNodes}
+        >
+          ${t("studioExportNodes")}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderRecordPanel(
+  state: StudioWorkspaceViewState,
+  handlers: StudioWorkspaceViewHandlers,
+  t: TranslatorFn
+): TemplateResult {
+  const hidden = state.bottomCollapsed || state.bottomTab !== "record";
+  const bpActive = state.bpPaused || state.bpWaiting;
+  const bpText = bpActive
+    ? formatPtrMsg(t("studioBpWaiting"), { count: state.bpWaiting ? 1 : 0 })
+    : "";
+
+  return html`
+    <div
+      class=${hidden ? "ptr-studio-scroll ptr-studio-hidden" : "ptr-studio-scroll"}
+      data-studio-panel="record"
+    >
+      <div class="ptr-studio-row">
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-action="record-toggle"
+          aria-pressed=${state.recording ? "true" : "false"}
+          @click=${handlers.onToggleRecord}
+        >
+          ${t(state.recording ? "studioRecordStop" : "studioRecordStart")}
+        </button>
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-action="record-clear"
+          @click=${handlers.onClearActivity}
+        >
+          ${t("studioRecordClear")}
+        </button>
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-action="bp-pause"
+          aria-pressed=${state.bpPaused ? "true" : "false"}
+          @click=${handlers.onTogglePauseApi}
+        >
+          ${t("studioBpPauseApi")}
+        </button>
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-action="bp-resume"
+          ?disabled=${!bpActive}
+          @click=${handlers.onResumeApi}
+        >
+          ${t("studioBpResume")}
+        </button>
+        <span class="ptr-studio-status">${bpText}</span>
+      </div>
+      <div class="ptr-studio-scroll" data-studio-activity-list="1">
+        ${
+          state.activity.length === 0
+            ? html`<div class="ptr-muted">${t("studioRecordEmpty")}</div>`
+            : state.activity.map(
+                (entry) => html`
+                <div class="ptr-mono">
+                  ${`[${entry.timestamp}] (${entry.kind}) ${entry.summary}`}
+                </div>
+              `
+              )
+        }
+      </div>
+    </div>
+  `;
+}
+
+function renderBottomDock(
+  state: StudioWorkspaceViewState,
+  handlers: StudioWorkspaceViewHandlers,
+  t: TranslatorFn
+): TemplateResult {
+  return html`
+    <footer class="ptr-studio-dock ptr-studio-bottom" data-studio-dock="bottom">
+      <div class="ptr-studio-row ptr-studio-bottom-head">
+        <div class="ptr-studio-row">
+          <button
+            type="button"
+            class="ptr-btn"
+            data-studio-bottom-tab="diag"
+            aria-pressed=${state.bottomTab === "diag" ? "true" : "false"}
+            @click=${() => handlers.onSelectBottomTab("diag")}
+          >
+            ${t("studioBottomDiag")}
+          </button>
+          <button
+            type="button"
+            class="ptr-btn"
+            data-studio-bottom-tab="record"
+            aria-pressed=${state.bottomTab === "record" ? "true" : "false"}
+            @click=${() => handlers.onSelectBottomTab("record")}
+          >
+            ${t("studioBottomRecord")}
+          </button>
+        </div>
+        <button
+          type="button"
+          class="ptr-btn"
+          data-studio-action="collapse-bottom"
+          @click=${handlers.onToggleBottomCollapse}
+        >
+          ${t(state.bottomCollapsed ? "studioExpand" : "studioCollapse")}
+        </button>
+      </div>
+      ${renderDiagPanel(state, handlers, t)}
+      ${renderRecordPanel(state, handlers, t)}
+    </footer>
+  `;
 }
 
 /** Mounts the Industrial Studio Workspace Shadow DOM shell on doc.documentElement. */
@@ -421,541 +1243,111 @@ export function mountStudioWorkspaceView(
   doc: Document,
   hostname: string,
   handlers: StudioWorkspaceViewHandlers,
-  t: (key: PtrMessageKey) => string = (key) => MESSAGES_EN[key]
+  t: TranslatorFn = (key) => MESSAGES_EN[key]
 ): StudioWorkspaceView {
-  doc.querySelector(`#${SHELL_ID}`)?.remove();
-
-  const host = doc.createElement("div");
-  host.id = SHELL_ID;
-  markUiRoot(host, "ptr");
-
-  const shadow = host.attachShadow({ mode: "open" });
-  const styleEl = doc.createElement("style");
-  styleEl.textContent = getWorkspaceCss();
-
-  const shell = doc.createElement("div");
-  shell.className = "ptr-studio-shell";
-
-  const overlayLayer = doc.createElement("div");
-  overlayLayer.className = "ptr-studio-overlay";
-  overlayLayer.setAttribute("data-studio-overlay", "1");
-
-  // --- Top Toolbar ---
-  const topDock = doc.createElement("header");
-  topDock.className = "ptr-studio-dock ptr-studio-top";
-  topDock.setAttribute("data-studio-dock", "top");
-
-  const topLeft = doc.createElement("div");
-  topLeft.className = "ptr-studio-row-nowrap ptr-studio-top-left";
-  const titleEl = doc.createElement("strong");
-  titleEl.className = "drag-title";
-  titleEl.textContent = formatPtrMsg(t("studioTitle"), { host: hostname });
-  const adapterBadge = doc.createElement("span");
-  adapterBadge.className = "ptr-chip ptr-mono";
-  adapterBadge.setAttribute("data-studio-adapter", "1");
-  const summaryChip = doc.createElement("span");
-  summaryChip.className = "ptr-chip ptr-mono";
-  summaryChip.setAttribute("data-studio-summary", "1");
-  topLeft.append(titleEl, adapterBadge, summaryChip);
-
-  const topActions = doc.createElement("div");
-  topActions.className = "ptr-studio-row-nowrap ptr-studio-top-actions";
-  const translateBtn = makeButton(
+  const mounted = mountLitShadow({
+    css: getWorkspaceCss(),
     doc,
-    t("translatePage"),
-    { "data-studio-action": "translate" },
-    true
-  );
-  translateBtn.addEventListener("click", handlers.onToggleTranslate);
-
-  const rescanBtn = makeButton(doc, t("volRescan"), {
-    "data-studio-action": "rescan",
+    hostId: SHELL_ID,
+    mountTarget: doc.documentElement,
+    uiTag: "ptr",
   });
-  rescanBtn.addEventListener("click", handlers.onRescan);
 
-  const selectModeBtn = makeButton(doc, t("studioModeSelect"), {
-    "data-studio-action": "select-mode",
-    "aria-pressed": "true",
-  });
-  selectModeBtn.addEventListener("click", handlers.onToggleSelectMode);
+  const refs: StudioWorkspaceRefs = {
+    delta: createRef<HTMLTextAreaElement>(),
+    importText: createRef<HTMLTextAreaElement>(),
+    modSelect: createRef<HTMLSelectElement>(),
+    nodeList: createRef<HTMLDivElement>(),
+    overlay: createRef<HTMLDivElement>(),
+    scope: createRef<HTMLInputElement>(),
+    search: createRef<HTMLInputElement>(),
+    selector: createRef<HTMLInputElement>(),
+    trans: createRef<HTMLInputElement>(),
+  };
 
-  const boxSelect = doc.createElement("select");
-  boxSelect.className = "ptr-input ptr-studio-select-inline";
-  boxSelect.setAttribute("data-studio-action", "box-mode");
-  const boxOptions: [StudioBoxMode, PtrMessageKey][] = [
-    ["all", "studioBoxesAll"],
-    ["included", "studioBoxesIncluded"],
-    ["excluded", "studioBoxesExcluded"],
-    ["off", "studioBoxesOff"],
-  ];
-  for (const [val, key] of boxOptions) {
-    const opt = doc.createElement("option");
-    opt.value = val;
-    opt.textContent = t(key);
-    boxSelect.append(opt);
+  const state: StudioWorkspaceViewState = {
+    activity: [],
+    adapterId: "generic",
+    bottomCollapsed: false,
+    bottomTab: "diag",
+    boxMode: "all",
+    bpPaused: false,
+    bpWaiting: false,
+    capturedCount: 0,
+    conflicts: [],
+    deltaText: "",
+    dictEntry: null,
+    dictIndex: 0,
+    dictScan: null,
+    filteredNodes: [],
+    filterTab: "all",
+    importDrawerOpen: false,
+    inspectScan: null,
+    manualElements: new Set<Element>(),
+    recording: false,
+    rightTab: "node",
+    selectedEntry: null,
+    selectedIndex: null,
+    selectedModifier: "block",
+    selectMode: true,
+    statusMessage: "",
+    targetLang: "zh-Hant-TW",
+    totalCount: 0,
+    translated: false,
+    zoom: "fit",
+  };
+
+  const renderNow = (): void => {
+    mounted.render(html`
+      <div
+        class="ptr-studio-shell"
+        data-bottom-collapsed=${state.bottomCollapsed ? "1" : "0"}
+      >
+        <div
+          class="ptr-studio-overlay"
+          data-studio-overlay="1"
+          ${ref(refs.overlay)}
+        ></div>
+        ${renderTopToolbar(state, hostname, handlers, t)}
+        ${renderLeftDock(state, refs, handlers, t)}
+        ${renderRightDock(state, refs, hostname, handlers, t, {
+          onDeltaInput: (val) => {
+            state.deltaText = val;
+          },
+          onModifierChange: (mod) => {
+            state.selectedModifier = mod;
+          },
+          onSetImportDrawerOpen: (open) => {
+            state.importDrawerOpen = open;
+            renderNow();
+          },
+        })}
+        ${renderBottomDock(state, handlers, t)}
+      </div>
+    `);
+  };
+
+  renderNow();
+
+  const overlayLayer = refs.overlay.value;
+  if (!overlayLayer) {
+    throw new Error("Expected Studio overlay layer");
   }
-  boxSelect.addEventListener("change", () => {
-    handlers.onBoxModeChange(boxSelect.value as StudioBoxMode);
-  });
-
-  const zoomSelect = doc.createElement("select");
-  zoomSelect.className = "ptr-input ptr-studio-select-inline";
-  zoomSelect.setAttribute("data-studio-action", "zoom");
-  const zoomOptions: [StudioZoomPreset, string][] = [
-    ["fit", t("studioZoomFit")],
-    ["50", "50%"],
-    ["75", "75%"],
-    ["100", "100%"],
-  ];
-  for (const [val, label] of zoomOptions) {
-    const opt = doc.createElement("option");
-    opt.value = val;
-    opt.textContent = label;
-    zoomSelect.append(opt);
-  }
-  zoomSelect.addEventListener("change", () => {
-    handlers.onZoomChange(zoomSelect.value as StudioZoomPreset);
-  });
-
-  const exportNodesBtn = makeButton(doc, t("studioExportNodes"), {
-    "data-studio-action": "export-nodes",
-  });
-  exportNodesBtn.addEventListener("click", handlers.onExportNodes);
-
-  const settingsBtn = makeButton(doc, t("basicOpenSettings"), {
-    "data-studio-action": "settings",
-  });
-  settingsBtn.addEventListener("click", handlers.onOpenSettings);
-
-  const exitBtn = makeButton(doc, t("studioExit"), {
-    "data-studio-action": "exit",
-  });
-  exitBtn.addEventListener("click", handlers.onExit);
-
-  topActions.append(
-    translateBtn,
-    rescanBtn,
-    selectModeBtn,
-    boxSelect,
-    zoomSelect,
-    exportNodesBtn,
-    settingsBtn,
-    exitBtn
-  );
-  topDock.append(topLeft, topActions);
-
-  // --- Left Dock: Raw Nodes Explorer ---
-  const leftDock = doc.createElement("aside");
-  leftDock.className = "ptr-studio-dock ptr-studio-left";
-  leftDock.setAttribute("data-studio-dock", "left");
-
-  const searchInput = doc.createElement("input");
-  searchInput.type = "search";
-  searchInput.className = "ptr-input";
-  searchInput.placeholder = t("studioSearchPlaceholder");
-  searchInput.setAttribute("data-studio-search", "1");
-  searchInput.addEventListener("input", () => {
-    handlers.onSearchChange(searchInput.value);
-  });
-
-  const filterRow = doc.createElement("div");
-  filterRow.className = "ptr-studio-row";
-  const filterTabs = new Map<StudioNodeFilterTab, HTMLButtonElement>();
-  const filterDefs: [StudioNodeFilterTab, PtrMessageKey][] = [
-    ["all", "studioTabAll"],
-    ["captured", "studioTabCaptured"],
-    ["excluded", "studioTabExcluded"],
-    ["manual", "studioTabManual"],
-  ];
-  for (const [tabId, key] of filterDefs) {
-    const tabBtn = makeButton(doc, t(key), {
-      "data-studio-filter": tabId,
-      "aria-pressed": tabId === "all" ? "true" : "false",
-    });
-    tabBtn.addEventListener("click", () => handlers.onFilterTabChange(tabId));
-    filterTabs.set(tabId, tabBtn);
-    filterRow.append(tabBtn);
-  }
-
-  const nodeList = doc.createElement("div");
-  nodeList.className = "ptr-studio-scroll";
-  nodeList.setAttribute("data-studio-node-list", "1");
-
-  leftDock.append(searchInput, filterRow, nodeList);
-
-  // --- Right Dock: Node & Rules + Site Dict ---
-  const rightDock = doc.createElement("aside");
-  rightDock.className = "ptr-studio-dock ptr-studio-right";
-  rightDock.setAttribute("data-studio-dock", "right");
-
-  const rightTabRow = doc.createElement("div");
-  rightTabRow.className = "ptr-studio-row";
-  const nodeTabBtn = makeButton(doc, t("studioInspectorNode"), {
-    "data-studio-right-tab": "node",
-    "aria-pressed": "true",
-  });
-  nodeTabBtn.addEventListener("click", () => handlers.onSelectRightTab("node"));
-
-  const dictTabBtn = makeButton(doc, t("studioInspectorDict"), {
-    "data-studio-right-tab": "dict",
-    "aria-pressed": "false",
-  });
-  dictTabBtn.addEventListener("click", () => handlers.onSelectRightTab("dict"));
-  rightTabRow.append(nodeTabBtn, dictTabBtn);
-
-  // Right Panel 1: Node & Rules
-  const nodePanel = doc.createElement("div");
-  nodePanel.className = "ptr-studio-scroll";
-  nodePanel.setAttribute("data-studio-panel", "node");
-
-  const nodeMetaCard = doc.createElement("div");
-  nodeMetaCard.className = "ptr-studio-card";
-  const nodeMetaPrompt = doc.createElement("div");
-  nodeMetaPrompt.className = "ptr-muted";
-  nodeMetaPrompt.textContent = t("studioSelectPrompt");
-  nodeMetaCard.append(nodeMetaPrompt);
-
-  const ruleCard = doc.createElement("div");
-  ruleCard.className = "ptr-studio-card";
-  const selectorLabel = doc.createElement("label");
-  selectorLabel.className = "ptr-muted";
-  selectorLabel.textContent = t("studioRuleSelector");
-
-  const selectorInput = doc.createElement("input");
-  selectorInput.type = "text";
-  selectorInput.className = "ptr-input ptr-mono";
-  selectorInput.setAttribute("data-studio-rule-selector", "1");
-
-  const modSelect = doc.createElement("select");
-  modSelect.className = "ptr-input ptr-studio-select-inline";
-  modSelect.setAttribute("data-studio-rule-mod-select", "1");
-  for (const mod of MODIFIER_OPTIONS) {
-    const opt = doc.createElement("option");
-    opt.value = mod;
-    opt.textContent = mod;
-    modSelect.append(opt);
-  }
-
-  const ruleBtnRow = doc.createElement("div");
-  ruleBtnRow.className = "ptr-studio-row";
-  const addRuleBtn = makeButton(doc, t("studioRuleAdd"), {
-    "data-studio-action": "rule-add",
-  });
-  addRuleBtn.addEventListener("click", () => {
-    handlers.onRuleAction(
-      "add",
-      selectorInput.value,
-      modSelect.value as SiteModifier
-    );
-  });
-
-  const removeRuleBtn = makeButton(doc, t("studioRuleRemove"), {
-    "data-studio-action": "rule-remove",
-  });
-  removeRuleBtn.addEventListener("click", () => {
-    handlers.onRuleAction(
-      "remove",
-      selectorInput.value,
-      modSelect.value as SiteModifier
-    );
-  });
-
-  const modRuleBtn = makeButton(doc, t("studioRuleMod"), {
-    "data-studio-action": "rule-mod",
-  });
-  modRuleBtn.addEventListener("click", () => {
-    handlers.onRuleAction(
-      "mod",
-      selectorInput.value,
-      modSelect.value as SiteModifier
-    );
-  });
-  ruleBtnRow.append(addRuleBtn, removeRuleBtn, modRuleBtn, modSelect);
-
-  const deltaLabel = doc.createElement("label");
-  deltaLabel.className = "ptr-muted";
-  deltaLabel.textContent = t("studioSiteDeltas");
-
-  const deltaTextarea = doc.createElement("textarea");
-  deltaTextarea.rows = 4;
-  deltaTextarea.className = "ptr-input";
-  deltaTextarea.setAttribute("data-studio-delta-textarea", "1");
-
-  const applyDeltaBtn = makeButton(
-    doc,
-    t("studioRuleApply"),
-    { "data-studio-action": "rule-apply" },
-    true
-  );
-  applyDeltaBtn.addEventListener("click", () => {
-    handlers.onApplyDelta(deltaTextarea.value);
-  });
-
-  ruleCard.append(
-    selectorLabel,
-    selectorInput,
-    ruleBtnRow,
-    deltaLabel,
-    deltaTextarea,
-    applyDeltaBtn
-  );
-  nodePanel.append(nodeMetaCard, ruleCard);
-
-  // Right Panel 2: Site Dict
-  const dictPanel = doc.createElement("div");
-  dictPanel.className = "ptr-studio-scroll ptr-studio-hidden";
-  dictPanel.setAttribute("data-studio-panel", "dict");
-
-  const dictNavRow = doc.createElement("div");
-  dictNavRow.className = "ptr-studio-row";
-  const prevSegBtn = makeButton(doc, t("volPrev"), {
-    "data-studio-dict": "prev",
-  });
-  prevSegBtn.addEventListener("click", handlers.onPrevSegment);
-  const nextSegBtn = makeButton(doc, t("volNext"), {
-    "data-studio-dict": "next",
-  });
-  nextSegBtn.addEventListener("click", handlers.onNextSegment);
-  const segCounter = doc.createElement("span");
-  segCounter.className = "ptr-chip ptr-mono";
-  const segKindBadge = doc.createElement("span");
-  segKindBadge.className = "ptr-studio-pill";
-  dictNavRow.append(prevSegBtn, nextSegBtn, segCounter, segKindBadge);
-
-  const dictSourceBox = doc.createElement("div");
-  dictSourceBox.className = "code-inline";
-
-  const scopeRow = doc.createElement("div");
-  scopeRow.className = "ptr-studio-row-nowrap";
-  const scopeInput = doc.createElement("input");
-  scopeInput.type = "text";
-  scopeInput.className = "ptr-input ptr-mono";
-  scopeInput.placeholder = t("volScopePlaceholder");
-  scopeInput.setAttribute("data-studio-dict", "scope");
-  const suggestScopeBtn = makeButton(doc, t("volSuggest"), {
-    "data-studio-dict": "suggest",
-  });
-  suggestScopeBtn.addEventListener("click", () => {
-    const suggested = handlers.onSuggestScope();
-    if (suggested) {
-      scopeInput.value = suggested;
-    }
-  });
-  scopeRow.append(scopeInput, suggestScopeBtn);
-
-  const transInput = doc.createElement("input");
-  transInput.type = "text";
-  transInput.className = "ptr-input";
-  transInput.setAttribute("data-studio-dict", "trans");
-
-  const saveDraftBtn = makeButton(
-    doc,
-    t("volSave"),
-    { "data-studio-dict": "save" },
-    true
-  );
-  saveDraftBtn.addEventListener("click", () => {
-    handlers.onSaveDraft(transInput.value, scopeInput.value);
-  });
-
-  const dictActionsRow = doc.createElement("div");
-  dictActionsRow.className = "ptr-studio-row";
-  const copyDictBtn = makeButton(doc, t("volCopyJson"), {
-    "data-studio-dict": "copy-json",
-  });
-  copyDictBtn.addEventListener("click", handlers.onCopyDictJson);
-
-  const downloadDictBtn = makeButton(
-    doc,
-    formatPtrMsg(t("volDownload"), { host: hostname }),
-    { "data-studio-dict": "download" }
-  );
-  downloadDictBtn.addEventListener("click", handlers.onDownloadDictJson);
-
-  const exportAiBtn = makeButton(doc, t("volExportAi"), {
-    "data-studio-dict": "export-ai",
-  });
-  exportAiBtn.addEventListener("click", handlers.onExportAi);
-
-  const importAiBtn = makeButton(doc, t("volImportAi"), {
-    "data-studio-dict": "import-ai",
-  });
-
-  dictActionsRow.append(copyDictBtn, downloadDictBtn, exportAiBtn, importAiBtn);
-
-  const importDrawer = doc.createElement("div");
-  importDrawer.className = "ptr-studio-card ptr-studio-hidden";
-  const importTextarea = doc.createElement("textarea");
-  importTextarea.rows = 3;
-  importTextarea.className = "ptr-input";
-  importTextarea.placeholder = t("volImportPlaceholder");
-  importTextarea.setAttribute("data-studio-dict", "import-text");
-
-  const importBtnRow = doc.createElement("div");
-  importBtnRow.className = "ptr-studio-row";
-  const applyImportBtn = makeButton(
-    doc,
-    t("volImportApply"),
-    { "data-studio-dict": "import-apply" },
-    true
-  );
-  applyImportBtn.addEventListener("click", () => {
-    handlers.onApplyImport(importTextarea.value);
-  });
-  const cancelImportBtn = makeButton(doc, t("volImportCancel"), {
-    "data-studio-dict": "import-cancel",
-  });
-  cancelImportBtn.addEventListener("click", () => {
-    importDrawer.classList.add("ptr-studio-hidden");
-  });
-  importBtnRow.append(applyImportBtn, cancelImportBtn);
-  importDrawer.append(importTextarea, importBtnRow);
-
-  importAiBtn.addEventListener("click", () => {
-    importDrawer.classList.toggle("ptr-studio-hidden");
-  });
-
-  const conflictsBox = doc.createElement("div");
-  conflictsBox.className = "ptr-studio-card ptr-studio-hidden";
-  conflictsBox.setAttribute("data-studio-dict", "conflicts");
-
-  dictPanel.append(
-    dictNavRow,
-    dictSourceBox,
-    scopeRow,
-    transInput,
-    saveDraftBtn,
-    dictActionsRow,
-    importDrawer,
-    conflictsBox
-  );
-
-  const statusLine = doc.createElement("div");
-  statusLine.className = "ptr-studio-status";
-  statusLine.setAttribute("data-studio-status", "1");
-
-  rightDock.append(rightTabRow, nodePanel, dictPanel, statusLine);
-
-  // --- Bottom Dock: Diagnostics & Export + Record & Log ---
-  const bottomDock = doc.createElement("footer");
-  bottomDock.className = "ptr-studio-dock ptr-studio-bottom";
-  bottomDock.setAttribute("data-studio-dock", "bottom");
-
-  const bottomHeader = doc.createElement("div");
-  bottomHeader.className = "ptr-studio-row";
-  bottomHeader.style.justifyContent = "space-between";
-
-  const bottomTabRow = doc.createElement("div");
-  bottomTabRow.className = "ptr-studio-row";
-  const diagTabBtn = makeButton(doc, t("studioBottomDiag"), {
-    "data-studio-bottom-tab": "diag",
-    "aria-pressed": "true",
-  });
-  diagTabBtn.addEventListener("click", () =>
-    handlers.onSelectBottomTab("diag")
-  );
-  const recordTabBtn = makeButton(doc, t("studioBottomRecord"), {
-    "data-studio-bottom-tab": "record",
-    "aria-pressed": "false",
-  });
-  recordTabBtn.addEventListener("click", () =>
-    handlers.onSelectBottomTab("record")
-  );
-  bottomTabRow.append(diagTabBtn, recordTabBtn);
-
-  const collapseBtn = makeButton(doc, t("studioCollapse"), {
-    "data-studio-action": "collapse-bottom",
-  });
-  collapseBtn.addEventListener("click", handlers.onToggleBottomCollapse);
-  bottomHeader.append(bottomTabRow, collapseBtn);
-
-  // Bottom Panel 1: Diagnostics & Export
-  const diagPanel = doc.createElement("div");
-  diagPanel.className = "ptr-studio-scroll";
-  diagPanel.setAttribute("data-studio-panel", "diag");
-
-  const diagStats = doc.createElement("div");
-  diagStats.className = "ptr-studio-row";
-  const diagActions = doc.createElement("div");
-  diagActions.className = "ptr-studio-row";
-  const copyDiagBtn = makeButton(doc, t("btnCopyDiag"), {
-    "data-studio-action": "copy-diag",
-  });
-  copyDiagBtn.addEventListener("click", handlers.onCopyDiag);
-  const copyNodesBtn = makeButton(doc, t("studioCopyNodes"), {
-    "data-studio-action": "copy-nodes",
-  });
-  copyNodesBtn.addEventListener("click", handlers.onCopyNodes);
-  const exportNodesBottomBtn = makeButton(doc, t("studioExportNodes"), {
-    "data-studio-action": "export-nodes-bottom",
-  });
-  exportNodesBottomBtn.addEventListener("click", handlers.onExportNodes);
-  diagActions.append(copyDiagBtn, copyNodesBtn, exportNodesBottomBtn);
-  diagPanel.append(diagStats, diagActions);
-
-  // Bottom Panel 2: Record & Log
-  const recordPanel = doc.createElement("div");
-  recordPanel.className = "ptr-studio-scroll ptr-studio-hidden";
-  recordPanel.setAttribute("data-studio-panel", "record");
-
-  const recordControls = doc.createElement("div");
-  recordControls.className = "ptr-studio-row";
-  const recordToggleBtn = makeButton(doc, t("studioRecordStart"), {
-    "data-studio-action": "record-toggle",
-    "aria-pressed": "false",
-  });
-  recordToggleBtn.addEventListener("click", handlers.onToggleRecord);
-
-  const recordClearBtn = makeButton(doc, t("studioRecordClear"), {
-    "data-studio-action": "record-clear",
-  });
-  recordClearBtn.addEventListener("click", handlers.onClearActivity);
-
-  const bpPauseBtn = makeButton(doc, t("studioBpPauseApi"), {
-    "data-studio-action": "bp-pause",
-    "aria-pressed": "false",
-  });
-  bpPauseBtn.addEventListener("click", handlers.onTogglePauseApi);
-
-  const bpResumeBtn = makeButton(doc, t("studioBpResume"), {
-    "data-studio-action": "bp-resume",
-  });
-  bpResumeBtn.addEventListener("click", handlers.onResumeApi);
-
-  const bpBadge = doc.createElement("span");
-  bpBadge.className = "ptr-studio-status";
-
-  recordControls.append(
-    recordToggleBtn,
-    recordClearBtn,
-    bpPauseBtn,
-    bpResumeBtn,
-    bpBadge
-  );
-
-  const activityList = doc.createElement("div");
-  activityList.className = "ptr-studio-scroll";
-  activityList.setAttribute("data-studio-activity-list", "1");
-  recordPanel.append(recordControls, activityList);
-
-  bottomDock.append(bottomHeader, diagPanel, recordPanel);
-
-  shell.append(overlayLayer, topDock, leftDock, rightDock, bottomDock);
-  shadow.append(styleEl, shell);
-  doc.documentElement.append(host);
 
   return {
-    host,
+    host: mounted.host,
     overlayLayer,
-    destroy: () => {
-      host.remove();
-    },
-    getDeltaText: () => deltaTextarea.value,
+    destroy: mounted.destroy,
+    getDeltaText: () => refs.delta.value?.value ?? state.deltaText,
     setDeltaText: (rawDelta: string) => {
-      deltaTextarea.value = rawDelta;
+      state.deltaText = rawDelta;
+      if (refs.delta.value) {
+        refs.delta.value.value = rawDelta;
+      }
     },
     setStatusMessage: (msg: string) => {
-      statusLine.textContent = msg;
+      state.statusMessage = msg;
+      renderNow();
     },
     renderToolbar: ({
       adapterId,
@@ -965,19 +1357,13 @@ export function mountStudioWorkspaceView(
       translated,
       zoom,
     }) => {
-      applyPtrTheme(host, themeMode);
-      adapterBadge.textContent = formatPtrMsg(t("hudFramework"), {
-        adapterId,
-      });
-      translateBtn.textContent = t(
-        translated ? "restorePage" : "translatePage"
-      );
-      selectModeBtn.textContent = t(
-        selectMode ? "studioModeSelect" : "studioModeInteract"
-      );
-      selectModeBtn.setAttribute("aria-pressed", selectMode ? "true" : "false");
-      boxSelect.value = boxMode;
-      zoomSelect.value = zoom;
+      applyPtrTheme(mounted.host, themeMode);
+      state.adapterId = adapterId;
+      state.boxMode = boxMode;
+      state.selectMode = selectMode;
+      state.translated = translated;
+      state.zoom = zoom;
+      renderNow();
     },
     renderNodes: ({
       filtered,
@@ -987,251 +1373,64 @@ export function mountStudioWorkspaceView(
       totalCount,
       capturedCount,
     }) => {
-      summaryChip.textContent = `${capturedCount}/${totalCount}`;
-      for (const [id, btn] of filterTabs) {
-        btn.setAttribute("aria-pressed", id === filterTab ? "true" : "false");
+      const prevScrollTop = refs.nodeList.value?.scrollTop ?? 0;
+      state.filteredNodes = filtered;
+      state.filterTab = filterTab;
+      state.manualElements = manualElements;
+      state.selectedIndex = selectedIndex;
+      state.totalCount = totalCount;
+      state.capturedCount = capturedCount;
+      renderNow();
+      if (filtered.length > 0 && refs.nodeList.value) {
+        refs.nodeList.value.scrollTop = prevScrollTop;
       }
-
-      if (filtered.length === 0) {
-        const empty = doc.createElement("div");
-        empty.className = "ptr-muted";
-        empty.textContent = t("studioNoNodes");
-        nodeList.replaceChildren(empty);
-        return;
-      }
-
-      const frag = doc.createDocumentFragment();
-      for (const entry of filtered) {
-        frag.append(
-          buildNodeRow(doc, entry, {
-            isManual: manualElements.has(entry.element),
-            isSelected: entry.index === selectedIndex,
-            onSelect: handlers.onSelectNode,
-            t,
-          })
-        );
-      }
-      const prevScrollTop = nodeList.scrollTop;
-      nodeList.replaceChildren(frag);
-      nodeList.scrollTop = prevScrollTop;
     },
     renderSelectedNode: (entry, suggestedSelector) => {
-      if (!entry) {
-        const prompt = doc.createElement("div");
-        prompt.className = "ptr-muted";
-        prompt.textContent = t("studioSelectPrompt");
-        nodeMetaCard.replaceChildren(prompt);
-        selectorInput.value = "";
-        return;
+      state.selectedEntry = entry;
+      renderNow();
+      if (refs.selector.value) {
+        refs.selector.value.value = entry ? suggestedSelector : "";
       }
-
-      const { candidate } = entry;
-      const badgeRow = doc.createElement("div");
-      badgeRow.className = "ptr-studio-row";
-
-      const incPill = doc.createElement("span");
-      incPill.className = candidate.included
-        ? "ptr-studio-pill ptr-studio-pill-accent"
-        : "ptr-studio-pill";
-      incPill.textContent = candidate.included
-        ? t("studioTabCaptured")
-        : (candidate.excludeReason ?? t("studioTabExcluded"));
-
-      const clsPill = doc.createElement("span");
-      clsPill.className = "ptr-studio-pill ptr-mono";
-      clsPill.textContent = candidate.classification;
-
-      const regPill = doc.createElement("span");
-      regPill.className = "ptr-studio-pill ptr-mono";
-      regPill.textContent = formatRegion(candidate.region);
-
-      badgeRow.append(incPill, clsPill, regPill);
-
-      const pathBox = doc.createElement("div");
-      pathBox.className = "code-inline";
-      pathBox.textContent = candidate.domPath;
-
-      const styleBox = doc.createElement("div");
-      styleBox.className = "ptr-mono ptr-muted";
-      styleBox.textContent = `${candidate.computedStyleSummary.display} | ${candidate.computedStyleSummary.visibility} | ${candidate.computedStyleSummary.fontFamily ?? "-"}`;
-
-      const textBox = doc.createElement("div");
-      textBox.textContent = candidate.textPreview;
-
-      nodeMetaCard.replaceChildren(badgeRow, pathBox, styleBox, textBox);
-      selectorInput.value = suggestedSelector;
     },
     renderRightTab: (tab) => {
-      nodeTabBtn.setAttribute(
-        "aria-pressed",
-        tab === "node" ? "true" : "false"
-      );
-      dictTabBtn.setAttribute(
-        "aria-pressed",
-        tab === "dict" ? "true" : "false"
-      );
-      nodePanel.classList.toggle("ptr-studio-hidden", tab !== "node");
-      dictPanel.classList.toggle("ptr-studio-hidden", tab !== "dict");
+      state.rightTab = tab;
+      renderNow();
     },
     renderDictEntry: ({ entry, index, initialValue, scan, targetLang }) => {
-      const total = scan?.entries.length ?? 0;
-      segCounter.textContent = total > 0 ? `${index + 1} / ${total}` : "0 / 0";
-      transInput.placeholder = formatPtrMsg(t("volTransPlaceholder"), {
-        lang: targetLang,
-      });
-
-      if (!entry) {
-        segKindBadge.textContent = "-";
-        dictSourceBox.textContent = t("volEmpty");
-        scopeInput.value = "";
-        transInput.value = "";
-        return;
+      state.dictEntry = entry;
+      state.dictIndex = index;
+      state.dictScan = scan;
+      state.targetLang = targetLang;
+      renderNow();
+      if (refs.scope.value) {
+        refs.scope.value.value = entry ? (entry.matchedScope ?? "") : "";
       }
-
-      segKindBadge.textContent = t(
-        entry.kind === "dynamic" ? "volBadgeDynamic" : "volBadgeStatic"
-      );
-      dictSourceBox.textContent = entry.key;
-      scopeInput.value = entry.matchedScope ?? "";
-      transInput.value = initialValue;
+      if (refs.trans.value) {
+        refs.trans.value.value = entry ? initialValue : "";
+      }
     },
     renderConflicts: (conflicts) => {
-      if (conflicts.length === 0) {
-        conflictsBox.classList.add("ptr-studio-hidden");
-        conflictsBox.replaceChildren();
-        return;
-      }
-      conflictsBox.classList.remove("ptr-studio-hidden");
-      const header = doc.createElement("div");
-      header.className = "ptr-studio-row";
-      const title = doc.createElement("strong");
-      title.textContent = formatPtrMsg(t("volConflictsHeader"), {
-        count: conflicts.length,
-      });
-      const keepAllBtn = makeButton(doc, t("volConflictKeepAll"), {
-        "data-studio-conflict-keep-all": "1",
-      });
-      keepAllBtn.addEventListener("click", () =>
-        handlers.onResolveAllConflicts("keep")
-      );
-      const overwriteAllBtn = makeButton(doc, t("volConflictOverwriteAll"), {
-        "data-studio-conflict-overwrite-all": "1",
-      });
-      overwriteAllBtn.addEventListener("click", () =>
-        handlers.onResolveAllConflicts("overwrite")
-      );
-      header.append(title, keepAllBtn, overwriteAllBtn);
-
-      const frag = doc.createDocumentFragment();
-      frag.append(header);
-      for (const c of conflicts) {
-        const card = doc.createElement("div");
-        card.className = "ptr-studio-card";
-        const keyEl = doc.createElement("div");
-        keyEl.className = "code-inline";
-        keyEl.textContent = c.key;
-
-        const existingEl = doc.createElement("div");
-        existingEl.textContent = `${t("volConflictExisting")}: ${c.existing}`;
-        const importedEl = doc.createElement("div");
-        importedEl.textContent = `${t("volConflictImported")}: ${c.imported}`;
-
-        const btnRow = doc.createElement("div");
-        btnRow.className = "ptr-studio-row";
-        const keepBtn = makeButton(doc, t("volConflictKeep"), {
-          "data-studio-conflict-keep": c.id,
-        });
-        keepBtn.addEventListener("click", () =>
-          handlers.onResolveConflict(c.id, "keep")
-        );
-        const overwriteBtn = makeButton(doc, t("volConflictOverwrite"), {
-          "data-studio-conflict-overwrite": c.id,
-        });
-        overwriteBtn.addEventListener("click", () =>
-          handlers.onResolveConflict(c.id, "overwrite")
-        );
-        btnRow.append(keepBtn, overwriteBtn);
-
-        card.append(keyEl, existingEl, importedEl, btnRow);
-        frag.append(card);
-      }
-      conflictsBox.replaceChildren(frag);
+      state.conflicts = conflicts;
+      renderNow();
     },
     renderBottomState: (collapsed, activeTab) => {
-      shell.setAttribute("data-bottom-collapsed", collapsed ? "1" : "0");
-      collapseBtn.textContent = t(
-        collapsed ? "studioExpand" : "studioCollapse"
-      );
-      diagTabBtn.setAttribute(
-        "aria-pressed",
-        activeTab === "diag" ? "true" : "false"
-      );
-      recordTabBtn.setAttribute(
-        "aria-pressed",
-        activeTab === "record" ? "true" : "false"
-      );
-      diagPanel.classList.toggle(
-        "ptr-studio-hidden",
-        collapsed || activeTab !== "diag"
-      );
-      recordPanel.classList.toggle(
-        "ptr-studio-hidden",
-        collapsed || activeTab !== "record"
-      );
+      state.bottomCollapsed = collapsed;
+      state.bottomTab = activeTab;
+      renderNow();
     },
     renderDiagnostics: (scan) => {
-      const items: [string, number][] = [
-        [t("mSegments"), scan.counts.total],
-        [t("volStatStatic"), scan.counts.static],
-        [t("volStatDynamic"), scan.counts.dynamic],
-        [t("volStatHits"), scan.counts.manual],
-        [t("mRouteApi"), scan.metrics.routing.api],
-        [t("mRouteOpencc"), scan.metrics.routing.opencc],
-        [t("mRouteSkip"), scan.metrics.routing.skip],
-        [t("mExcluded"), scan.metrics.excludedCount],
-      ];
-      const frag = doc.createDocumentFragment();
-      for (const [label, value] of items) {
-        const chip = doc.createElement("span");
-        chip.className = "ptr-chip ptr-mono";
-        chip.textContent = `${label}: ${value}`;
-        frag.append(chip);
-      }
-      diagStats.replaceChildren(frag);
+      state.inspectScan = scan;
+      renderNow();
     },
     renderActivity: (entries, recording) => {
-      recordToggleBtn.textContent = t(
-        recording ? "studioRecordStop" : "studioRecordStart"
-      );
-      recordToggleBtn.setAttribute(
-        "aria-pressed",
-        recording ? "true" : "false"
-      );
-
-      if (entries.length === 0) {
-        const empty = doc.createElement("div");
-        empty.className = "ptr-muted";
-        empty.textContent = t("studioRecordEmpty");
-        activityList.replaceChildren(empty);
-        return;
-      }
-
-      const frag = doc.createDocumentFragment();
-      for (const entry of entries) {
-        const line = doc.createElement("div");
-        line.className = "ptr-mono";
-        line.textContent = `[${entry.timestamp}] (${entry.kind}) ${entry.summary}`;
-        frag.append(line);
-      }
-      activityList.replaceChildren(frag);
+      state.activity = entries;
+      state.recording = recording;
+      renderNow();
     },
     renderBreakpoint: (paused, waiting) => {
-      bpPauseBtn.setAttribute("aria-pressed", paused ? "true" : "false");
-      bpResumeBtn.disabled = !(paused || waiting);
-      bpBadge.textContent =
-        paused || waiting
-          ? formatPtrMsg(t("studioBpWaiting"), { count: waiting ? 1 : 0 })
-          : "";
+      state.bpPaused = paused;
+      state.bpWaiting = waiting;
+      renderNow();
     },
     renderOverlay: (boxes) => {
       renderOverlayBoxes(overlayLayer, doc, boxes);
