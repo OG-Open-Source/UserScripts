@@ -44,6 +44,7 @@ import {
   watchSpaNavigation,
 } from "./platform/lifecycle";
 import { createPtrMetrics } from "./platform/metrics";
+import { createStudioSessionCoordinator } from "./platform/studio-session";
 import { createHumanOnlyProvider } from "./providers/human-only";
 import { createInspectProvider } from "./providers/inspect";
 import { createTranslatePaProvider } from "./providers/translate-pa";
@@ -370,6 +371,16 @@ async function boot(): Promise<void> {
     }
   }
 
+  function suspendTranslationForStudio(): void {
+    translationActive = false;
+    activeConfigSnapshot = null;
+    basicController.setTranslated(false);
+    if (studioController.isActive()) {
+      studioController.syncFromConfig();
+    }
+    stopTranslation(false);
+  }
+
   const studioController = createStudioWorkspaceController({
     breakpointGate,
     doc: document,
@@ -399,10 +410,7 @@ async function boot(): Promise<void> {
         nextDeltas[host] = rawDelta;
       }
       saveConfig({ siteDeltas: nextDeltas });
-      if (translationActive) {
-        activeRunner?.clearCache();
-        startTranslation();
-      }
+      studioSession.onDeltaSaved();
     },
     onSiteDictUpdated: () => {
       onSiteDictUpdated?.(true);
@@ -416,11 +424,7 @@ async function boot(): Promise<void> {
       recomputeSiteTranslations();
     },
     onToggleTranslate: () => {
-      if (translationActive) {
-        stopTranslation(true);
-      } else {
-        startTranslation();
-      }
+      studioSession.onToggleTranslate();
     },
     t: (key) => i18n.t(key as PtrMessageKey),
   });
@@ -430,19 +434,17 @@ async function boot(): Promise<void> {
     getConfig: loadConfig,
     isTranslated: () => translationActive,
     onToggleTranslate: () => {
-      if (translationActive) {
-        stopTranslation(true);
-      } else {
-        startTranslation();
-      }
+      studioSession.onToggleTranslate();
     },
     onStudioMount: () => {
+      studioSession.onStudioMount();
       studioController.syncFromConfig();
       syncAllStyles();
     },
     onStudioUnmount: () => {
       studioController.syncFromConfig();
       syncAllStyles();
+      studioSession.onStudioUnmount();
     },
     onOpenSettings: () => {
       window.open(`${MANAGER_URL}/settings/translate/`, "_blank", "noopener");
@@ -453,28 +455,38 @@ async function boot(): Promise<void> {
     t: i18n.t,
   });
 
-  onSiteDictUpdated = (skipStudioRescan = false) => {
-    syncDictMetrics();
-    if (!skipStudioRescan && studioController.isActive()) {
-      studioController.rescan();
-    }
-    if (translationActive) {
+  const studioSession = createStudioSessionCoordinator({
+    getAutoTranslate: () => loadConfig().autoTranslate,
+    getTabActive: readTabActive,
+    isStudioActive: () => studioController.isActive(),
+    isTranslated: () => translationActive,
+    onClearCacheAndRestart: () => {
       activeRunner?.clearCache();
       startTranslation();
-    }
+    },
+    onRescanStudio: () => {
+      studioController.rescan();
+    },
+    onRestoreForStudio: suspendTranslationForStudio,
+    onSpaNavigate: () => {
+      void spaRescan.onSpaNavigate(document);
+    },
+    onStartTranslation: startTranslation,
+    onStopTranslation: () => stopTranslation(true),
+  });
+
+  onSiteDictUpdated = (skipStudioRescan = false) => {
+    syncDictMetrics();
+    studioSession.onDictUpdated(skipStudioRescan);
   };
 
   onConfigUpdated = (next) => {
     syncAllStyles(next);
     basicController.syncFromConfig();
     studioController.syncFromConfig();
-    if (
-      translationActive &&
+    studioSession.onConfigUpdated(
       didTranslationConfigChange(activeConfigSnapshot, next)
-    ) {
-      activeRunner?.clearCache();
-      startTranslation();
-    }
+    );
   };
 
   syncAllStyles();
@@ -515,9 +527,7 @@ async function boot(): Promise<void> {
       pruneDisconnectedShadowRoots();
       syncAllStyles();
       studioController.syncFromConfig();
-      if (translationActive || loadConfig().autoTranslate) {
-        void spaRescan.onSpaNavigate(document);
-      }
+      studioSession.onSpaSettled();
     },
   });
 
@@ -532,7 +542,5 @@ async function boot(): Promise<void> {
     window.open(`${MANAGER_URL}/settings/translate/`, "_blank", "noopener");
   });
 
-  if (loadConfig().autoTranslate || readTabActive()) {
-    startTranslation();
-  }
+  studioSession.onBoot();
 }
