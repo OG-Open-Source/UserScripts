@@ -10,12 +10,41 @@
  * - No transform: scale() — press feedback is color + box-shadow pulse only.
  */
 import { US_PALETTE_OKLCH } from "./color";
-import type { SimpleCssThemeTokens, ThemeTokens } from "./theme-mode";
-import {
-  resolveThemeTokens,
-  SIMPLE_CSS_DARK_TOKENS,
-  SIMPLE_CSS_LIGHT_TOKENS,
-} from "./theme-mode";
+import type { ThemeTokens } from "./theme-mode";
+import { resolveThemeTokens } from "./theme-mode";
+
+const LIGHT_SHADOWS = {
+  shadow:
+    "0 10px 30px oklch(15% 0.02 264 / 0.14), 0 2px 8px oklch(15% 0.02 264 / 0.07)",
+  shadowSm: "0 2px 8px oklch(15% 0.02 264 / 0.08)",
+} as const;
+
+const DARK_SHADOWS = {
+  shadow:
+    "0 14px 36px oklch(5% 0.01 264 / 0.55), 0 3px 10px oklch(5% 0.01 264 / 0.35)",
+  shadowSm: "0 2px 10px oklch(5% 0.01 264 / 0.4)",
+} as const;
+
+const STATIC_SCALE_VARS = [
+  "--us-radius-lg: 12px;",
+  "--us-radius-md: 8px;",
+  "--us-radius-sm: 6px;",
+  "--us-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;",
+  "--us-sans: 13px / 1.48 system-ui, -apple-system, sans-serif;",
+  "--us-ease: cubic-bezier(0.22, 1, 0.36, 1);",
+] as const;
+
+function getDefaultLightDarkTokens(): {
+  lightTokens: ThemeTokens;
+  darkTokens: ThemeTokens;
+} {
+  const lightTokens = resolveThemeTokens("light");
+  const darkTokens = resolveThemeTokens("dark");
+  if (!(lightTokens && darkTokens)) {
+    throw new Error("Failed to resolve default light/dark theme tokens");
+  }
+  return { lightTokens, darkTokens };
+}
 
 function scopeAttr(scopeSelector: string, attrSelector: string): string {
   return scopeSelector === ":host"
@@ -23,39 +52,144 @@ function scopeAttr(scopeSelector: string, attrSelector: string): string {
     : `${scopeSelector}${attrSelector}`;
 }
 
-function tokenVarsBlock(
+function formatShadowDecl(indent: string, shadow: string): string {
+  const singleLine = `${indent}--us-shadow: ${shadow};`;
+  if (singleLine.length <= 80) {
+    return singleLine;
+  }
+  const wrapped = `${indent}--us-shadow:\n${indent}  ${shadow};`;
+  if (indent.length + 2 + shadow.length <= 80) {
+    return wrapped;
+  }
+  const parts = shadow.split(", ");
+  return `${indent}--us-shadow:\n${parts.map((part) => `${indent}  ${part}`).join(",\n")};`;
+}
+
+function surfaceTokenLines(
   tokens: ThemeTokens,
-  colorScheme?: "light" | "dark"
+  options: {
+    accentHover?: string;
+    colorScheme?: "light" | "dark" | "light dark";
+    colorSchemeLast?: boolean;
+    includeLegacyAliases?: boolean;
+    shadows?: { shadow: string; shadowSm: string };
+  } = {},
+  indent = "  "
+): string[] {
+  const lines: string[] = [];
+  if (options.colorScheme && !options.colorSchemeLast) {
+    lines.push(`${indent}color-scheme: ${options.colorScheme};`);
+  }
+  lines.push(
+    `${indent}--us-bg: ${tokens.bg};`,
+    `${indent}--us-surface: ${tokens.surface};`,
+    `${indent}--us-surface-2: ${tokens.surface2};`,
+    `${indent}--us-surface-3: ${tokens.surface3};`,
+    `${indent}--us-fg: ${tokens.fg};`,
+    `${indent}--us-muted: ${tokens.muted};`,
+    `${indent}--us-accent-bg: ${tokens.accentBg};`,
+    `${indent}--us-accent-fg: ${tokens.accentFg};`
+  );
+  if (options.accentHover) {
+    lines.push(
+      `${indent}--us-accent-hover: ${options.accentHover};`,
+      `${indent}--us-focus: ${US_PALETTE_OKLCH.accent};`
+    );
+  }
+  if (options.shadows) {
+    lines.push(
+      formatShadowDecl(indent, options.shadows.shadow),
+      `${indent}--us-shadow-sm: ${options.shadows.shadowSm};`
+    );
+  }
+  if (options.includeLegacyAliases) {
+    lines.push(
+      `${indent}--bg: var(--us-bg);`,
+      `${indent}--fg: var(--us-fg);`,
+      `${indent}--muted: var(--us-muted);`,
+      `${indent}--line: var(--us-surface-2);`,
+      `${indent}--surface: var(--us-surface);`,
+      `${indent}--accent: var(--us-accent-bg);`
+    );
+  }
+  if (options.colorScheme && options.colorSchemeLast) {
+    lines.push(`${indent}color-scheme: ${options.colorScheme};`);
+  }
+  return lines;
+}
+
+function themeModeRulesCss(
+  scopeSelector: string,
+  lightTokens: ThemeTokens,
+  darkTokens: ThemeTokens,
+  includeLegacyAliases: boolean,
+  colorSchemeLast = false
 ): string {
-  return `${colorScheme ? `  color-scheme: ${colorScheme};\n` : ""}  --us-bg: ${tokens.bg};
-  --us-surface: ${tokens.surface};
-  --us-surface-2: ${tokens.surface2};
-  --us-surface-3: ${tokens.surface3};
-  --us-fg: ${tokens.fg};
-  --us-muted: ${tokens.muted};
-  --us-accent-bg: ${tokens.accentBg};
-  --us-accent-fg: ${tokens.accentFg};
-  --bg: var(--us-bg);
-  --fg: var(--us-fg);
-  --muted: var(--us-muted);
-  --line: var(--us-surface-2);
-  --surface: var(--us-surface);
-  --accent: var(--us-accent-bg);`;
+  const darkBlock = surfaceTokenLines(
+    darkTokens,
+    {
+      accentHover: US_PALETTE_OKLCH.accentSoft,
+      colorScheme: "dark",
+      colorSchemeLast,
+      includeLegacyAliases,
+      shadows: DARK_SHADOWS,
+    },
+    "    "
+  ).join("\n");
+  const lightOverrideBlock = surfaceTokenLines(
+    lightTokens,
+    {
+      accentHover: US_PALETTE_OKLCH.accentDeep,
+      colorScheme: "light",
+      colorSchemeLast,
+      includeLegacyAliases,
+      shadows: LIGHT_SHADOWS,
+    },
+    "  "
+  ).join("\n");
+  const darkOverrideBlock = surfaceTokenLines(
+    darkTokens,
+    {
+      accentHover: US_PALETTE_OKLCH.accentSoft,
+      colorScheme: "dark",
+      colorSchemeLast,
+      includeLegacyAliases,
+      shadows: DARK_SHADOWS,
+    },
+    "  "
+  ).join("\n");
+
+  return [
+    "@media (prefers-color-scheme: dark) {",
+    `  ${scopeAttr(scopeSelector, ':not([data-theme-mode="light"])')} {`,
+    darkBlock,
+    "  }",
+    "}",
+    "",
+    `${scopeAttr(scopeSelector, '[data-theme-mode="light"]')} {`,
+    lightOverrideBlock,
+    "}",
+    "",
+    `${scopeAttr(scopeSelector, '[data-theme-mode="dark"]')} {`,
+    darkOverrideBlock,
+    "}",
+  ].join("\n");
 }
 
 export function getUiTokensCss(
   scopeSelector = ":host",
   hostTokens?: ThemeTokens
 ): string {
-  const lightTokens = resolveThemeTokens("light");
-  const darkTokens = resolveThemeTokens("dark");
-  if (!(lightTokens && darkTokens)) {
-    throw new Error("Failed to resolve default light/dark theme tokens");
-  }
+  const { lightTokens, darkTokens } = getDefaultLightDarkTokens();
+  const baseLines = surfaceTokenLines(lightTokens, {
+    accentHover: US_PALETTE_OKLCH.accentDeep,
+    includeLegacyAliases: true,
+    shadows: LIGHT_SHADOWS,
+  }).join("\n");
   const hostOverride = hostTokens
     ? `
 ${scopeAttr(scopeSelector, '[data-theme-mode="host"]')} {
-${tokenVarsBlock(hostTokens)}
+${surfaceTokenLines(hostTokens, { includeLegacyAliases: true }).join("\n")}
 }`
     : "";
 
@@ -71,9 +205,7 @@ ${scopeSelector} {
   --nk-green: oklch(74.27% 0.2039 146.60);
 
   /* Borderless tonal surfaces (light default) */
-${tokenVarsBlock(lightTokens)}
-  --us-accent-hover: ${US_PALETTE_OKLCH.accentDeep};
-  --us-focus: ${US_PALETTE_OKLCH.accent};
+${baseLines}
 
   /* Media overlay contrast tokens (over bright/dark video or images) */
   --us-overlay-bg: oklch(16.00% 0.0140 264.00 / 0.78);
@@ -82,46 +214,14 @@ ${tokenVarsBlock(lightTokens)}
   --us-overlay-shadow: 0 2px 10px oklch(4% 0.01 264 / 0.50);
 
   /* NovaKit radius scale */
-  --us-radius-lg: 12px;
-  --us-radius-md: 8px;
-  --us-radius-sm: 6px;
-
-  --us-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --us-sans: 13px/1.48 system-ui, -apple-system, sans-serif;
-  --us-shadow: 0 10px 30px oklch(15% 0.02 264 / 0.14), 0 2px 8px oklch(15% 0.02 264 / 0.07);
-  --us-shadow-sm: 0 2px 8px oklch(15% 0.02 264 / 0.08);
-  --us-ease: cubic-bezier(0.22, 1, 0.36, 1);
+${STATIC_SCALE_VARS.map((line) => `  ${line}`).join("\n")}
 
   --mono: var(--us-mono);
   font: var(--us-sans);
   color: var(--us-fg);
 }
 
-@media (prefers-color-scheme: dark) {
-  ${scopeAttr(scopeSelector, ':not([data-theme-mode="light"])')} {
-${tokenVarsBlock(darkTokens, "dark")}
-    --us-accent-hover: ${US_PALETTE_OKLCH.accentSoft};
-    --us-focus: ${US_PALETTE_OKLCH.accent};
-    --us-shadow: 0 14px 36px oklch(5% 0.01 264 / 0.55), 0 3px 10px oklch(5% 0.01 264 / 0.35);
-    --us-shadow-sm: 0 2px 10px oklch(5% 0.01 264 / 0.40);
-  }
-}
-
-${scopeAttr(scopeSelector, '[data-theme-mode="light"]')} {
-${tokenVarsBlock(lightTokens, "light")}
-  --us-accent-hover: ${US_PALETTE_OKLCH.accentDeep};
-  --us-focus: ${US_PALETTE_OKLCH.accent};
-  --us-shadow: 0 10px 30px oklch(15% 0.02 264 / 0.14), 0 2px 8px oklch(15% 0.02 264 / 0.07);
-  --us-shadow-sm: 0 2px 8px oklch(15% 0.02 264 / 0.08);
-}
-
-${scopeAttr(scopeSelector, '[data-theme-mode="dark"]')} {
-${tokenVarsBlock(darkTokens, "dark")}
-  --us-accent-hover: ${US_PALETTE_OKLCH.accentSoft};
-  --us-focus: ${US_PALETTE_OKLCH.accent};
-  --us-shadow: 0 14px 36px oklch(5% 0.01 264 / 0.55), 0 3px 10px oklch(5% 0.01 264 / 0.35);
-  --us-shadow-sm: 0 2px 10px oklch(5% 0.01 264 / 0.40);
-}
+${themeModeRulesCss(scopeSelector, lightTokens, darkTokens, true)}
 ${hostOverride}
 
 *,
@@ -406,51 +506,27 @@ input.us-checkbox:checked::after {
 `.trim();
 }
 
-function simpleCssVarsBlock(
-  tokens: SimpleCssThemeTokens,
-  colorScheme: "light" | "dark" | "light dark",
-  indent = "  "
-): string {
-  return [
-    `${indent}--bg: ${tokens.bg};`,
-    `${indent}--accent-bg: ${tokens.accentBg};`,
-    `${indent}--text: ${tokens.text};`,
-    `${indent}--text-light: ${tokens.textLight};`,
-    `${indent}--border: ${tokens.border};`,
-    `${indent}--accent: ${tokens.accent};`,
-    `${indent}--accent-hover: ${tokens.accentHover};`,
-    `${indent}--accent-text: ${tokens.accentText};`,
-    `${indent}--code: ${tokens.code};`,
-    `${indent}--preformatted: ${tokens.preformatted};`,
-    `${indent}--marked: ${tokens.marked};`,
-    `${indent}--disabled: ${tokens.disabled};`,
-    `${indent}color-scheme: ${colorScheme};`,
-  ].join("\n");
-}
-
 /**
- * Emit Simple.css theme custom properties ONLY (light/dark/data-theme-mode),
- * with zero layout, typography, or component overrides.
+ * Emit OkLch `--us-*` design tokens for the static settings pages
+ * (system, light, and dark modes via `:root` and `[data-theme-mode]`).
  */
-export function getSimpleCssThemeVarsCss(): string {
+export function getSettingsTokensCss(): string {
+  const { lightTokens, darkTokens } = getDefaultLightDarkTokens();
+  const rootLines = [
+    ...surfaceTokenLines(lightTokens, {
+      accentHover: US_PALETTE_OKLCH.accentDeep,
+      shadows: LIGHT_SHADOWS,
+    }),
+    ...STATIC_SCALE_VARS.map((line) => `  ${line}`),
+    "  color-scheme: light dark;",
+  ].join("\n");
+
   return [
     "/* Generated by tools/sync-settings-tokens.mjs from @userscripts/shared. Do not edit by hand. */",
     ":root {",
-    simpleCssVarsBlock(SIMPLE_CSS_LIGHT_TOKENS, "light dark"),
+    rootLines,
     "}",
     "",
-    "@media (prefers-color-scheme: dark) {",
-    '  :root:not([data-theme-mode="light"]) {',
-    simpleCssVarsBlock(SIMPLE_CSS_DARK_TOKENS, "dark", "    "),
-    "  }",
-    "}",
-    "",
-    ':root[data-theme-mode="light"] {',
-    simpleCssVarsBlock(SIMPLE_CSS_LIGHT_TOKENS, "light"),
-    "}",
-    "",
-    ':root[data-theme-mode="dark"] {',
-    simpleCssVarsBlock(SIMPLE_CSS_DARK_TOKENS, "dark"),
-    "}",
+    themeModeRulesCss(":root", lightTokens, darkTokens, false, true),
   ].join("\n");
 }

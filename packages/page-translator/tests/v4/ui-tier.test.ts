@@ -286,22 +286,27 @@ test("Studio Workspace Dict tab resets translation input on Next/Prev and restor
   studio.stop();
 });
 
-test("settings pages load external Simple.css before tokens.css, omit createCustomSelect, and have no inline styles", () => {
+test("settings pages load tokens.css before minimal.css, omit simple.min.css and createCustomSelect, and have no inline styles", () => {
   const root = resolve(import.meta.dir, "../../../..");
   const pages = [
-    { file: "index.html", tokensPath: "./settings/shared/tokens.css" },
+    {
+      file: "index.html",
+      tokensPath: "./settings/shared/tokens.css",
+      minimalPath: "./settings/shared/minimal.css",
+    },
     {
       file: "settings/language/index.html",
       tokensPath: "../shared/tokens.css",
+      minimalPath: "../shared/minimal.css",
     },
     {
       file: "settings/translate/index.html",
       tokensPath: "../shared/tokens.css",
+      minimalPath: "../shared/minimal.css",
     },
   ];
-  const simpleCssUrl = "https://cdn.simplecss.org/simple.min.css";
 
-  for (const { file, tokensPath } of pages) {
+  for (const { file, tokensPath, minimalPath } of pages) {
     const html = readFileSync(resolve(root, file), "utf8");
     const win = new Window({ url: "https://example.com/" });
     win.document.write(html);
@@ -309,10 +314,12 @@ test("settings pages load external Simple.css before tokens.css, omit createCust
       win.document.querySelectorAll('link[rel="stylesheet"]')
     ).map((el) => el.getAttribute("href"));
 
-    const simpleIdx = links.indexOf(simpleCssUrl);
     const tokensIdx = links.indexOf(tokensPath);
-    expect(simpleIdx).toBeGreaterThanOrEqual(0);
-    expect(tokensIdx).toBeGreaterThan(simpleIdx);
+    const minimalIdx = links.indexOf(minimalPath);
+    expect(tokensIdx).toBeGreaterThanOrEqual(0);
+    expect(minimalIdx).toBeGreaterThan(tokensIdx);
+    expect(html).not.toContain("simplecss.org");
+    expect(html).not.toContain("simple.min.css");
     expect(win.document.querySelector("style")).toBeNull();
     expect(win.document.querySelector("[style]")).toBeNull();
     expect(html).not.toContain("createCustomSelect");
@@ -331,6 +338,70 @@ test("settings pages load external Simple.css before tokens.css, omit createCust
   const langWin = new Window({ url: "https://example.com/settings/language/" });
   langWin.document.write(langHtml);
   expect(langWin.document.querySelector("select#langSelect")).not.toBeNull();
+});
+
+test("settings/shared/minimal.css is borderless, has no scale(), and styles .btn with superellipse(2)", () => {
+  const root = resolve(import.meta.dir, "../../../..");
+  const minimalCss = readFileSync(
+    resolve(root, "settings/shared/minimal.css"),
+    "utf8"
+  );
+  expect(minimalCss).not.toMatch(ONE_PIXEL_BORDER_RE);
+  expect(minimalCss).not.toContain("scale(");
+  expect(minimalCss).toContain(".btn");
+  expect(minimalCss).toContain("--rho: 0.5;");
+  expect(minimalCss).toContain(
+    "border-radius: calc(var(--rho) * min(240px, 60px));"
+  );
+  expect(minimalCss).toContain("corner-shape: superellipse(2);");
+});
+
+test("settings pages reload only themselves after saving valid settings and recording sessionStorage notice", () => {
+  const root = resolve(import.meta.dir, "../../../..");
+
+  const translateHtml = readFileSync(
+    resolve(root, "settings/translate/index.html"),
+    "utf8"
+  );
+  const applyIdx = translateHtml.indexOf(
+    'el("apply").addEventListener("click"'
+  );
+  expect(applyIdx).toBeGreaterThan(-1);
+  const applyBlock = translateHtml.slice(applyIdx);
+  const invalidIdx = applyBlock.indexOf("invalidDeltas");
+  const earlyReturnIdx = applyBlock.indexOf("return;", invalidIdx);
+  const dispatchIdx = applyBlock.indexOf("dispatchSettings({ ptr })");
+  const sessionIdx = applyBlock.indexOf("sessionStorage.setItem(");
+  const reloadIdx = applyBlock.indexOf("window.location.reload()");
+  expect(invalidIdx).toBeGreaterThan(-1);
+  expect(earlyReturnIdx).toBeGreaterThan(invalidIdx);
+  expect(dispatchIdx).toBeGreaterThan(earlyReturnIdx);
+  expect(sessionIdx).toBeGreaterThan(earlyReturnIdx);
+  expect(reloadIdx).toBeGreaterThan(dispatchIdx);
+  expect(reloadIdx).toBeGreaterThan(sessionIdx);
+  expect(translateHtml).toContain("sessionStorage.getItem(");
+  expect(translateHtml).toContain("sessionStorage.removeItem(");
+
+  const langHtml = readFileSync(
+    resolve(root, "settings/language/index.html"),
+    "utf8"
+  );
+  const langApplyIdx = langHtml.indexOf(
+    'document.querySelector("#apply").addEventListener("click"'
+  );
+  expect(langApplyIdx).toBeGreaterThan(-1);
+  const langApplyBlock = langHtml.slice(langApplyIdx);
+  const langDispatchIdx = langApplyBlock.indexOf(
+    "dispatchSettings({ lang: value })"
+  );
+  const langSessionIdx = langApplyBlock.indexOf("sessionStorage.setItem(");
+  const langReloadIdx = langApplyBlock.indexOf("window.location.reload()");
+  expect(langDispatchIdx).toBeGreaterThan(-1);
+  expect(langSessionIdx).toBeGreaterThan(-1);
+  expect(langReloadIdx).toBeGreaterThan(langDispatchIdx);
+  expect(langReloadIdx).toBeGreaterThan(langSessionIdx);
+  expect(langHtml).toContain("sessionStorage.getItem(");
+  expect(langHtml).toContain("sessionStorage.removeItem(");
 });
 
 test("settings/translate uses native selects and keeps Typography, CJK Spacing, and #apply outside studio tier", () => {

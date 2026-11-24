@@ -38,21 +38,6 @@ export interface ThemeTokens {
   surface3: string;
 }
 
-export interface SimpleCssThemeTokens {
-  accent: string;
-  accentBg: string;
-  accentHover: string;
-  accentText: string;
-  bg: string;
-  border: string;
-  code: string;
-  disabled: string;
-  marked: string;
-  preformatted: string;
-  text: string;
-  textLight: string;
-}
-
 export const DEFAULT_THEME_MODE_STORAGE_KEY = "us:theme-mode";
 
 const THEME_MODES: readonly ThemeMode[] = ["dark", "light", "system", "host"];
@@ -77,36 +62,6 @@ const LIGHT_TOKENS: ThemeTokens = {
   muted: US_PALETTE_OKLCH.secondary,
   accentBg: US_PALETTE_OKLCH.accent,
   accentFg: US_PALETTE_OKLCH.inkDark,
-};
-
-export const SIMPLE_CSS_LIGHT_TOKENS: SimpleCssThemeTokens = {
-  accent: US_PALETTE_OKLCH.accent,
-  accentBg: US_PALETTE_OKLCH.surfaceLight,
-  accentHover: US_PALETTE_OKLCH.accentDeep,
-  accentText: US_PALETTE_OKLCH.inkDark,
-  bg: US_PALETTE_OKLCH.canvasLight,
-  border: US_PALETTE_OKLCH.secondary,
-  code: US_PALETTE_OKLCH.accentDeep,
-  disabled: US_PALETTE_OKLCH.borderLight,
-  marked: US_PALETTE_OKLCH.accent,
-  preformatted: US_PALETTE_OKLCH.slate,
-  text: US_PALETTE_OKLCH.slate,
-  textLight: US_PALETTE_OKLCH.secondary,
-};
-
-export const SIMPLE_CSS_DARK_TOKENS: SimpleCssThemeTokens = {
-  accent: US_PALETTE_OKLCH.accent,
-  accentBg: US_PALETTE_OKLCH.slate,
-  accentHover: US_PALETTE_OKLCH.accentSoft,
-  accentText: US_PALETTE_OKLCH.inkDark,
-  bg: US_PALETTE_OKLCH.inkDark,
-  border: US_PALETTE_OKLCH.secondary,
-  code: US_PALETTE_OKLCH.accent,
-  disabled: US_PALETTE_OKLCH.surfaceDark,
-  marked: US_PALETTE_OKLCH.accent,
-  preformatted: US_PALETTE_OKLCH.surfaceLight,
-  text: US_PALETTE_OKLCH.surfaceLight,
-  textLight: US_PALETTE_OKLCH.mutedDark,
 };
 
 const HEX_6_RE = /^#(?<hex>[a-f\d]{6})$/iu;

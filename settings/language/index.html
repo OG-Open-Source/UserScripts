@@ -5,34 +5,45 @@
     <meta content="width=device-width, initial-scale=1" name="viewport">
     <meta content="1" name="userscripts-manager">
     <title data-i18n="pageTitle">Language — UserScripts</title>
-    <link href="https://cdn.simplecss.org/simple.min.css" rel="stylesheet">
     <link href="../shared/tokens.css" rel="stylesheet">
+    <link href="../shared/minimal.css" rel="stylesheet">
   </head>
   <body>
     <header>
-      <nav>
-        <a data-i18n="navHome" href="../../">← UserScripts</a>
-      </nav>
+      <div class="topbar">
+        <nav>
+          <a data-i18n="navHome" href="../../">← UserScripts</a>
+        </nav>
+        <span class="status-chip" data-i18n="detecting" id="statusChip"
+          >Detecting…</span
+        >
+      </div>
       <h1 data-i18n="heading">Language</h1>
       <p data-i18n="lead">
         Applies to every installed script. The list is the languages those
         scripts actually ship.
       </p>
-      <p data-i18n="detecting" id="statusChip">Detecting…</p>
     </header>
 
     <main>
       <section>
-        <p>
+        <div class="field">
           <label data-i18n="langLabel" for="langSelect">Language</label>
           <select id="langSelect"></select>
-        </p>
+        </div>
 
-        <p>
-          <button data-i18n="apply" id="apply" type="button">Apply</button>
-        </p>
+        <div class="save-bar">
+          <button
+            class="btn btn-primary"
+            data-i18n="apply"
+            id="apply"
+            type="button"
+          >
+            Apply
+          </button>
+        </div>
 
-        <p id="note"></p>
+        <p class="note" id="note"></p>
       </section>
     </main>
 
@@ -103,16 +114,37 @@
         },
       };
 
-      let i18n = createSettingsTranslator(DICT);
+      const i18n = createSettingsTranslator(DICT);
       i18n.applyDom();
 
       const KEY = "userscripts:lang";
+      const SAVED_NOTICE_KEY = "userscripts:lang:saved-note";
       const languages = new Map();
       const loadedScriptIds = new Set();
       const chip = document.querySelector("#statusChip");
       const note = document.querySelector("#note");
       const langSelect = document.querySelector("#langSelect");
       let saved = localStorage.getItem(KEY) ?? "";
+      let hasSavedNotice = false;
+
+      try {
+        const rawNotice = sessionStorage.getItem(SAVED_NOTICE_KEY);
+        if (rawNotice) {
+          sessionStorage.removeItem(SAVED_NOTICE_KEY);
+          const parsed = JSON.parse(rawNotice);
+          if (parsed?.lang) {
+            hasSavedNotice = true;
+            note.textContent = parsed.count
+              ? i18n.t("appliedCount", {
+                  lang: parsed.lang,
+                  count: parsed.count,
+                })
+              : i18n.t("savedLocal", { lang: parsed.lang });
+          }
+        }
+      } catch {
+        // Ignore storage access errors in restricted browsing contexts.
+      }
 
       function populateSelect(selectEl, options, desiredValue, emptyText = "") {
         selectEl.replaceChildren();
@@ -190,9 +222,11 @@
 
       function updateStatus(list) {
         updateChip(list);
-        note.textContent = list.length
-          ? i18n.t("noteDetected", { count: list.length })
-          : i18n.t("noteNone");
+        if (!hasSavedNotice) {
+          note.textContent = list.length
+            ? i18n.t("noteDetected", { count: list.length })
+            : i18n.t("noteNone");
+        }
       }
 
       const scripts = await waitForScripts(1800);
@@ -217,16 +251,15 @@
         localStorage.setItem(KEY, value);
         saved = value;
         dispatchSettings({ lang: value });
-        i18n = createSettingsTranslator(DICT);
-        i18n.applyDom();
-        renderOptions();
-        updateChip(currentScripts);
-        note.textContent = currentScripts.length
-          ? i18n.t("appliedCount", {
-              lang: value,
-              count: currentScripts.length,
-            })
-          : i18n.t("savedLocal", { lang: value });
+        try {
+          sessionStorage.setItem(
+            SAVED_NOTICE_KEY,
+            JSON.stringify({ lang: value, count: currentScripts.length })
+          );
+        } catch {
+          // Ignore storage access errors in restricted browsing contexts.
+        }
+        window.location.reload();
       });
     </script>
   </body>

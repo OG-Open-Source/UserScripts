@@ -5,14 +5,19 @@
     <meta content="width=device-width, initial-scale=1" name="viewport">
     <meta content="1" name="userscripts-manager">
     <title data-i18n="pageTitle">Page Translator — UserScripts</title>
-    <link href="https://cdn.simplecss.org/simple.min.css" rel="stylesheet">
     <link href="../shared/tokens.css" rel="stylesheet">
+    <link href="../shared/minimal.css" rel="stylesheet">
   </head>
   <body>
     <header>
-      <nav>
-        <a data-i18n="navHome" href="../../">← UserScripts</a>
-      </nav>
+      <div class="topbar">
+        <nav>
+          <a data-i18n="navHome" href="../../">← UserScripts</a>
+        </nav>
+        <span class="status-chip" data-i18n="ptrDetecting" id="ptrStatus"
+          >Detecting ptr…</span
+        >
+      </div>
       <h1 data-i18n="heading">Page Translator</h1>
       <p data-i18n-html="leadHtml">
         Configure routing, CSS presentation, CJK spacing, Traditional/Simplified
@@ -20,77 +25,88 @@
         <code>+</code>/<code>-</code>/<code>*</code> rules, and cached
         dictionaries.
       </p>
-      <p data-i18n="ptrDetecting" id="ptrStatus">Detecting ptr…</p>
     </header>
 
     <main>
       <section>
         <h2 data-i18n="sec1">1. Core &amp; Routing</h2>
-        <p>
+        <div class="field">
           <label data-i18n="targetLangLabel" for="targetLang"
             >Target Language</label
           >
           <input id="targetLang" placeholder="zh-TW" type="text">
-        </p>
-        <p>
+        </div>
+        <div class="field">
           <label data-i18n="providerLabel" for="providerSelect">Provider</label>
           <select id="providerSelect"></select>
-        </p>
-        <p>
+        </div>
+        <div class="field">
           <label data-i18n="themeLabel" for="themeSelect">UI Theme Rule</label>
           <select id="themeSelect"></select>
-        </p>
-        <p>
+        </div>
+        <div class="field">
           <label data-i18n="apiKeyLabel" for="apiKey"
             >translate-pa API Key</label
           >
-          <input
-            autocomplete="off"
-            data-i18n-placeholder="apiKeyPlaceholder"
-            id="apiKey"
-            placeholder="Leave blank to use built-in default key"
-            type="password"
-          >
-          <button data-i18n="clear" id="clearApiKey" type="button">
-            Clear
-          </button>
-        </p>
-        <p>
-          <label>
-            <input id="studioMode" type="checkbox">
-            <span data-i18n-html="studioModeHtml"
-              >Studio Mode (<code>uiTier: "studio"</code> — Inspect HUD,
-              Volunteer Workbench, advanced controls)</span
+          <div class="field-inline">
+            <input
+              autocomplete="off"
+              data-i18n-placeholder="apiKeyPlaceholder"
+              id="apiKey"
+              placeholder="Leave blank to use built-in default key"
+              type="password"
             >
-          </label>
-        </p>
+            <button
+              class="btn btn-sm"
+              data-i18n="clear"
+              id="clearApiKey"
+              type="button"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+        <label class="check-row">
+          <input id="studioMode" type="checkbox">
+          <span data-i18n-html="studioModeHtml"
+            >Studio Mode (<code>uiTier: "studio"</code> — Inspect HUD, Volunteer
+            Workbench, advanced controls)</span
+          >
+        </label>
       </section>
 
       <section>
         <h2 data-i18n="sec2">2. Presentation &amp; Typography</h2>
-        <p>
+        <div class="field">
           <label data-i18n-html="customFontHtml" for="customFont"
             >Custom Font (<code>--ptr-font</code>)</label
           >
-          <input
-            id="customFont"
-            list="localFontsList"
-            placeholder='"Noto Sans TC", system-ui, sans-serif'
-            type="text"
-          >
-          <button data-i18n="loadFonts" id="loadFonts" type="button">
-            Load Local Fonts
-          </button>
-        </p>
-        <p hidden id="localFontSelectWrap">
+          <div class="field-inline">
+            <input
+              id="customFont"
+              list="localFontsList"
+              placeholder='"Noto Sans TC", system-ui, sans-serif'
+              type="text"
+            >
+            <button
+              class="btn btn-sm"
+              data-i18n="loadFonts"
+              id="loadFonts"
+              type="button"
+            >
+              Load Local Fonts
+            </button>
+          </div>
+        </div>
+        <div class="field" hidden id="localFontSelectWrap">
           <label data-i18n="localFontsLabel" for="localFontSelect"
             >Local Fonts</label
           >
           <select id="localFontSelect"></select>
-        </p>
+        </div>
         <datalist id="localFontsList"></datalist>
-        <p id="fontNote"></p>
-        <p>
+        <p class="hint" id="fontNote"></p>
+        <div class="field">
           <label data-i18n="customCssLabel" for="customCss"
             >Presentation CSS</label
           >
@@ -100,45 +116,56 @@
             placeholder="/* Override [data-tr-orig] / [data-tr-dst] */"
             rows="5"
           ></textarea>
-        </p>
-        <p>
-          <button data-i18n="presetReplace" data-preset="replace" type="button">
+        </div>
+        <div class="btn-row">
+          <button
+            class="btn btn-sm"
+            data-i18n="presetReplace"
+            data-preset="replace"
+            type="button"
+          >
             Preset: Replace (default)
           </button>
           <button
+            class="btn btn-sm"
             data-i18n="presetBilingual"
             data-preset="bilingual"
             type="button"
           >
             Preset: Bilingual Stacked
           </button>
-          <button data-i18n="presetHover" data-preset="hover" type="button">
+          <button
+            class="btn btn-sm"
+            data-i18n="presetHover"
+            data-preset="hover"
+            type="button"
+          >
             Preset: Hover Original
           </button>
-        </p>
+        </div>
       </section>
 
       <section>
         <h2 data-i18n="sec3">3. CJK Spacing &amp; Conversion</h2>
-        <p>
+        <div class="field">
           <label data-i18n="spacingLabel" for="spacingSelect"
             >CJK / ASCII Spacing Mode</label
           >
           <select id="spacingSelect"></select>
-        </p>
-        <p>
+        </div>
+        <div class="field">
           <label data-i18n="punctLabel" for="punctSelect"
             >Punctuation Width Normalization</label
           >
           <select id="punctSelect"></select>
-        </p>
-        <p>
+        </div>
+        <div class="field">
           <label data-i18n="openccLabel" for="openccSelect"
             >Traditional / Simplified Conversion</label
           >
           <select id="openccSelect"></select>
-        </p>
-        <p data-i18n-html="spacingNoteHtml">
+        </div>
+        <p class="hint" data-i18n-html="spacingNoteHtml">
           <code>js</code> inserts ASCII spaces between CJK and Latin/numbers;
           <code>w3c</code> applies CSS <code>text-autospace: normal</code>
           without inserting characters. CJK parentheses normalize to fullwidth
@@ -148,55 +175,43 @@
 
       <section data-tier="studio" hidden>
         <h2 data-i18n="sec4">4. Capture Inspector &amp; Volunteer Tools</h2>
-        <p>
-          <label>
-            <input id="autoTranslate" type="checkbox">
-            <span data-i18n="autoTranslate">Auto-translate on page load</span>
-          </label>
-        </p>
-        <p>
-          <label>
-            <input id="debugSpacingMarks" type="checkbox">
-            <span data-i18n-html="debugSpacingMarksHtml"
-              >Debug spacing marks (show <code>^</code> and
-              <code>_</code>)</span
-            >
-          </label>
-        </p>
-        <p>
-          <label>
-            <input id="defaultInspect" type="checkbox">
-            <span data-i18n-html="defaultInspectHtml"
-              >Open Capture Preview HUD in new tabs (<code>defaultInspect</code
-              >)</span
-            >
-          </label>
-        </p>
-        <p>
-          <label>
-            <input id="defaultVolunteer" type="checkbox">
-            <span data-i18n-html="defaultVolunteerHtml"
-              >Open Volunteer Workbench in new tabs (<code
-                >defaultVolunteer</code
-              >)</span
-            >
-          </label>
-        </p>
-        <p id="lockRow">
-          <label>
-            <input id="volunteerBlockClicks" type="checkbox">
-            <span data-i18n-html="volunteerBlockClicksHtml"
-              >Lock page clicks while Volunteer Mode is active (<code
-                >volunteerBlockClicks</code
-              >)</span
-            >
-          </label>
-        </p>
+        <label class="check-row">
+          <input id="autoTranslate" type="checkbox">
+          <span data-i18n="autoTranslate">Auto-translate on page load</span>
+        </label>
+        <label class="check-row">
+          <input id="debugSpacingMarks" type="checkbox">
+          <span data-i18n-html="debugSpacingMarksHtml"
+            >Debug spacing marks (show <code>^</code> and <code>_</code>)</span
+          >
+        </label>
+        <label class="check-row">
+          <input id="defaultInspect" type="checkbox">
+          <span data-i18n-html="defaultInspectHtml"
+            >Open Capture Preview HUD in new tabs (<code>defaultInspect</code
+            >)</span
+          >
+        </label>
+        <label class="check-row">
+          <input id="defaultVolunteer" type="checkbox">
+          <span data-i18n-html="defaultVolunteerHtml"
+            >Open Volunteer Workbench in new tabs (<code>defaultVolunteer</code
+            >)</span
+          >
+        </label>
+        <label class="check-row" id="lockRow">
+          <input id="volunteerBlockClicks" type="checkbox">
+          <span data-i18n-html="volunteerBlockClicksHtml"
+            >Lock page clicks while Volunteer Mode is active (<code
+              >volunteerBlockClicks</code
+            >)</span
+          >
+        </label>
       </section>
 
       <section data-tier="studio" hidden>
         <h2 data-i18n="sec5">5. Per-Site Delta Rules</h2>
-        <p>
+        <div class="field">
           <label data-i18n-html="siteDeltasHtml" for="siteDeltas">
             JSON map of host/glob → multiline <code>+</code>, <code>-</code>,
             <code>*</code> CSS selectors
@@ -206,54 +221,71 @@
             placeholder='{&#10;  "github.com": "- [class*=\"languageList__\"]\n* [class*=\"kbd__\"] : inline-atomic, no-opencc"&#10;}'
             rows="5"
           ></textarea>
-        </p>
+        </div>
       </section>
 
       <section data-tier="studio" hidden>
         <h2 data-i18n-html="sec6Html">
           6. Cached Site Dictionaries (<code>ptr:site-tr:*</code>)
         </h2>
-        <table>
-          <thead>
-            <tr>
-              <th data-i18n="colHost">Host</th>
-              <th data-i18n="colStatic">Static</th>
-              <th data-i18n="colDynamic">Dynamic</th>
-              <th data-i18n="colScoped">Scoped</th>
-              <th data-i18n="colActions">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="dictBody">
-            <tr>
-              <td colspan="5" data-i18n="dictInitial">
-                No cached host dictionaries loaded yet.
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th data-i18n="colHost">Host</th>
+                <th data-i18n="colStatic">Static</th>
+                <th data-i18n="colDynamic">Dynamic</th>
+                <th data-i18n="colScoped">Scoped</th>
+                <th data-i18n="colActions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="dictBody">
+              <tr>
+                <td colspan="5" data-i18n="dictInitial">
+                  No cached host dictionaries loaded yet.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
         <input
           accept="application/json,.json"
           hidden
           id="importDictFile"
           type="file"
         >
-        <p>
-          <button data-i18n="importDict" id="importDictBtn" type="button">
+        <div class="btn-row">
+          <button
+            class="btn btn-sm"
+            data-i18n="importDict"
+            id="importDictBtn"
+            type="button"
+          >
             Import JSON…
           </button>
-          <button data-i18n="refresh" id="refreshDictBtn" type="button">
+          <button
+            class="btn btn-sm"
+            data-i18n="refresh"
+            id="refreshDictBtn"
+            type="button"
+          >
             Refresh
           </button>
-        </p>
+        </div>
       </section>
 
       <section>
-        <p>
-          <button data-i18n="applySettings" id="apply" type="button">
+        <div class="save-bar">
+          <button
+            class="btn btn-primary"
+            data-i18n="applySettings"
+            id="apply"
+            type="button"
+          >
             Apply Settings
           </button>
-        </p>
-        <p id="note"></p>
+        </div>
+        <p class="note" id="note"></p>
       </section>
     </main>
 
@@ -541,6 +573,7 @@
       i18n.applyDom();
 
       const STORAGE_KEY = "userscripts:ptr:settings";
+      const SAVED_NOTICE_KEY = "userscripts:ptr:saved-note";
       const PRESETS = {
         replace: "",
         bilingual:
@@ -550,6 +583,16 @@
       };
 
       const el = (id) => document.querySelector(`#${id}`);
+
+      try {
+        const noticeKey = sessionStorage.getItem(SAVED_NOTICE_KEY);
+        if (noticeKey) {
+          sessionStorage.removeItem(SAVED_NOTICE_KEY);
+          el("note").textContent = i18n.t(noticeKey);
+        }
+      } catch {
+        // Ignore storage access errors in restricted browsing contexts.
+      }
 
       function populateSelect(selectEl, options, desiredValue, emptyText = "") {
         selectEl.replaceChildren();
@@ -828,9 +871,12 @@
           tdSc.textContent = String(sc);
 
           const tdAct = document.createElement("td");
+          const actRow = document.createElement("div");
+          actRow.className = "btn-row";
 
           const expBtn = document.createElement("button");
           expBtn.type = "button";
+          expBtn.className = "btn btn-sm";
           expBtn.textContent = i18n.t("exportDict");
           expBtn.addEventListener("click", () => {
             const blob = new Blob([JSON.stringify(file, null, 2)], {
@@ -846,6 +892,7 @@
 
           const delBtn = document.createElement("button");
           delBtn.type = "button";
+          delBtn.className = "btn btn-sm";
           delBtn.textContent =
             hasLocal && hasRemote ? i18n.t("clearLocal") : i18n.t("clear");
           delBtn.addEventListener("click", () => {
@@ -856,7 +903,8 @@
             );
           });
 
-          tdAct.append(expBtn, document.createTextNode(" "), delBtn);
+          actRow.append(expBtn, delBtn);
+          tdAct.append(actRow);
           tr.append(tdHost, tdS, tdD, tdSc, tdAct);
           tbody.append(tr);
         }
@@ -993,9 +1041,15 @@
 
         localStorage.setItem(STORAGE_KEY, JSON.stringify(ptr));
         dispatchSettings({ ptr });
-        el("note").textContent = hasScript("ptr")
-          ? i18n.t("appliedPtr")
-          : i18n.t("savedLocalPtr");
+        try {
+          sessionStorage.setItem(
+            SAVED_NOTICE_KEY,
+            hasScript("ptr") ? "appliedPtr" : "savedLocalPtr"
+          );
+        } catch {
+          // Ignore storage access errors in restricted browsing contexts.
+        }
+        window.location.reload();
       });
     </script>
   </body>

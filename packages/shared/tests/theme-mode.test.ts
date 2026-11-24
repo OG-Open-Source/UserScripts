@@ -1,11 +1,6 @@
 import { expect, test } from "bun:test";
 import { US_PALETTE_OKLCH } from "../src/color";
-import {
-  readThemeMode,
-  resolveThemeTokens,
-  SIMPLE_CSS_DARK_TOKENS,
-  SIMPLE_CSS_LIGHT_TOKENS,
-} from "../src/theme-mode";
+import { readThemeMode, resolveThemeTokens } from "../src/theme-mode";
 
 test("dark/light return concrete oklch token sets from US_PALETTE_OKLCH", () => {
   const dark = resolveThemeTokens("dark");
@@ -30,38 +25,6 @@ test("dark/light return concrete oklch token sets from US_PALETTE_OKLCH", () => 
     muted: US_PALETTE_OKLCH.secondary,
     accentBg: US_PALETTE_OKLCH.accent,
     accentFg: US_PALETTE_OKLCH.inkDark,
-  });
-});
-
-test("SIMPLE_CSS_LIGHT_TOKENS and SIMPLE_CSS_DARK_TOKENS match spec mapping", () => {
-  expect(SIMPLE_CSS_LIGHT_TOKENS).toEqual({
-    accent: US_PALETTE_OKLCH.accent,
-    accentBg: US_PALETTE_OKLCH.surfaceLight,
-    accentHover: US_PALETTE_OKLCH.accentDeep,
-    accentText: US_PALETTE_OKLCH.inkDark,
-    bg: US_PALETTE_OKLCH.canvasLight,
-    border: US_PALETTE_OKLCH.secondary,
-    code: US_PALETTE_OKLCH.accentDeep,
-    disabled: US_PALETTE_OKLCH.borderLight,
-    marked: US_PALETTE_OKLCH.accent,
-    preformatted: US_PALETTE_OKLCH.slate,
-    text: US_PALETTE_OKLCH.slate,
-    textLight: US_PALETTE_OKLCH.secondary,
-  });
-
-  expect(SIMPLE_CSS_DARK_TOKENS).toEqual({
-    accent: US_PALETTE_OKLCH.accent,
-    accentBg: US_PALETTE_OKLCH.slate,
-    accentHover: US_PALETTE_OKLCH.accentSoft,
-    accentText: US_PALETTE_OKLCH.inkDark,
-    bg: US_PALETTE_OKLCH.inkDark,
-    border: US_PALETTE_OKLCH.secondary,
-    code: US_PALETTE_OKLCH.accent,
-    disabled: US_PALETTE_OKLCH.surfaceDark,
-    marked: US_PALETTE_OKLCH.accent,
-    preformatted: US_PALETTE_OKLCH.surfaceLight,
-    text: US_PALETTE_OKLCH.surfaceLight,
-    textLight: US_PALETTE_OKLCH.mutedDark,
   });
 });
 

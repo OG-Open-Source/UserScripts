@@ -5,46 +5,50 @@
     <meta content="width=device-width, initial-scale=1" name="viewport">
     <meta content="1" name="userscripts-manager">
     <title data-i18n="pageTitle">UserScripts</title>
-    <link href="https://cdn.simplecss.org/simple.min.css" rel="stylesheet">
     <link href="./settings/shared/tokens.css" rel="stylesheet">
+    <link href="./settings/shared/minimal.css" rel="stylesheet">
   </head>
   <body>
     <header>
+      <div class="topbar">
+        <nav>
+          <a data-i18n="navLanguageTitle" href="./settings/language/"
+            >Language</a
+          >
+          <a data-i18n="navPtrTitle" href="./settings/translate/"
+            >Page Translator</a
+          >
+        </nav>
+        <span class="status-chip" data-i18n="detecting" id="statusChip"
+          >Detecting scripts…</span
+        >
+      </div>
       <h1 data-i18n="brand">UserScripts</h1>
       <p data-i18n="lead">
         Settings for the scripts distributed by OG-Open-Source/UserScripts.
       </p>
-      <nav>
-        <a data-i18n="navLanguageTitle" href="./settings/language/">Language</a>
-        <a data-i18n="navPtrTitle" href="./settings/translate/"
-          >Page Translator</a
-        >
-      </nav>
-      <p data-i18n="detecting" id="statusChip">Detecting scripts…</p>
     </header>
 
     <main>
       <section>
         <h2 data-i18n="settingsPages">Settings</h2>
-        <ul>
+        <ul class="link-list">
           <li>
-            <a href="./settings/language/"
-              ><strong data-i18n="navLanguageTitle">Language</strong></a
-            >
-            —
-            <span data-i18n="navLanguageDesc"
-              >Shared UI language across all installed scripts</span
-            >
+            <a class="link-card" href="./settings/language/">
+              <strong data-i18n="navLanguageTitle">Language</strong>
+              <span data-i18n="navLanguageDesc"
+                >Shared UI language across all installed scripts</span
+              >
+            </a>
           </li>
           <li>
-            <a href="./settings/translate/"
-              ><strong data-i18n="navPtrTitle">Page Translator</strong></a
-            >
-            —
-            <span data-i18n="navPtrDesc"
-              >Translation routing, CSS presentation, CJK spacing, inspect HUD
-              &amp; site dictionaries</span
-            >
+            <a class="link-card" href="./settings/translate/">
+              <strong data-i18n="navPtrTitle">Page Translator</strong>
+              <span data-i18n="navPtrDesc"
+                >Translation routing, CSS presentation, CJK spacing, inspect HUD
+                &amp; site dictionaries</span
+              >
+            </a>
           </li>
         </ul>
       </section>
@@ -52,7 +56,7 @@
       <section>
         <h2 data-i18n="installedScripts">Installed Scripts</h2>
         <div id="scriptsList">
-          <p data-i18n="waitingPresence">
+          <p class="hint" data-i18n="waitingPresence">
             Waiting for userscript manager presence…
           </p>
         </div>
@@ -137,11 +141,14 @@
         if (!scripts.length) {
           chip.textContent = i18n.t("noScript");
           const p = document.createElement("p");
+          p.className = "hint";
           p.textContent = i18n.t("emptyHint");
           listEl.replaceChildren(p);
           return;
         }
         chip.textContent = i18n.t("connectedCount", { count: scripts.length });
+        const wrap = document.createElement("div");
+        wrap.className = "table-wrap";
         const table = document.createElement("table");
         const thead = document.createElement("thead");
         const headRow = document.createElement("tr");
@@ -167,7 +174,8 @@
           tbody.append(tr);
         }
         table.append(tbody);
-        listEl.replaceChildren(table);
+        wrap.append(table);
+        listEl.replaceChildren(wrap);
       }
 
       const initial = await waitForScripts(1500);
