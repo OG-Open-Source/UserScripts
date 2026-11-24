@@ -241,3 +241,63 @@ test("Basic UI shadow style applies superellipse(2) squircle shape", () => {
 
   controller.stop();
 });
+
+test("Basic view uses Lit templates without imperative button creation or customElements.define", () => {
+  const viewSrc = readFileSync(
+    resolve(import.meta.dir, "../../src/ui/basic/view.ts"),
+    "utf8"
+  );
+  expect(viewSrc).toContain('from "lit"');
+  expect(viewSrc).toContain("html`");
+  expect(viewSrc).not.toContain('createElement("button")');
+  expect(viewSrc).not.toContain("customElements.define");
+});
+
+test("Basic view mounts .ptr-lit-root inside Shadow DOM and updates in place on setTranslated", () => {
+  const doc = setupDoc();
+  let cfg = makeConfig();
+  const controller = createBasicController({
+    doc,
+    getConfig: () => cfg,
+    setUiTier: (uiTier) => {
+      cfg = { ...cfg, uiTier };
+    },
+    t: (key: PtrMessageKey) => `i18n:${key}`,
+  });
+
+  controller.syncFromConfig();
+  const host = doc.querySelector("#ptr-basic-ui") as HTMLElement;
+  const shadow = host.shadowRoot as ShadowRoot;
+  const litRoot = shadow.querySelector(".ptr-lit-root");
+  expect(litRoot).not.toBeNull();
+
+  const translateBtn = shadow.querySelector(
+    "[data-basic-action='translate']"
+  ) as HTMLButtonElement;
+  const studioBtn = shadow.querySelector(
+    "#ptr-basic-studio"
+  ) as HTMLButtonElement;
+  expect(translateBtn.getAttribute("aria-pressed")).toBe("false");
+  expect(studioBtn.getAttribute("aria-pressed")).toBe("false");
+
+  controller.setTranslated(true);
+  expect(shadow.querySelector("[data-basic-action='translate']")).toBe(
+    translateBtn
+  );
+  expect(translateBtn.textContent).toBe("i18n:restorePage");
+  expect(translateBtn.getAttribute("aria-pressed")).toBe("true");
+
+  controller.setTranslated(false);
+  expect(shadow.querySelector("[data-basic-action='translate']")).toBe(
+    translateBtn
+  );
+  expect(translateBtn.textContent).toBe("i18n:translatePage");
+  expect(translateBtn.getAttribute("aria-pressed")).toBe("false");
+
+  cfg = { ...cfg, uiTier: "studio" };
+  controller.syncFromConfig();
+  expect(studioBtn.getAttribute("aria-pressed")).toBe("true");
+  expect(host.hidden).toBe(true);
+
+  controller.stop();
+});

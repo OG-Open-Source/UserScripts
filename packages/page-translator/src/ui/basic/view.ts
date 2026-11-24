@@ -1,6 +1,9 @@
-import { markUiRoot } from "@userscripts/shared";
+import "../lit-dom";
+
+import { html } from "lit";
 import type { PtrMessageKey } from "../../platform/i18n";
 import { MESSAGES_EN } from "../../platform/i18n";
+import { mountLitShadow } from "../lit-render";
 import { applyPtrTheme, getSharedPanelCss } from "../theme";
 import type { BasicUiState } from "./logic";
 
@@ -52,72 +55,58 @@ export function mountBasicView(
   handlers: BasicViewHandlers,
   t: (key: PtrMessageKey) => string = (key) => MESSAGES_EN[key]
 ): BasicView {
-  const existing = doc.querySelector(`#${BASIC_HOST_ID}`);
-  if (existing) {
-    existing.remove();
-  }
-
-  const host = doc.createElement("div");
-  host.id = BASIC_HOST_ID;
-  markUiRoot(host, "ptr");
-
-  const shadow = host.attachShadow({ mode: "open" });
-  const styleEl = doc.createElement("style");
-  styleEl.textContent = getBasicCss();
-
-  const pill = doc.createElement("section");
-  pill.className = "ptr-panel ptr-basic-pill";
-
-  const translateBtn = doc.createElement("button");
-  translateBtn.type = "button";
-  translateBtn.className = "ptr-btn ptr-btn-primary";
-  translateBtn.setAttribute("data-basic-action", "translate");
-  translateBtn.textContent = t("translatePage");
-  translateBtn.addEventListener("click", () => {
-    handlers.onToggleTranslate?.();
+  const mounted = mountLitShadow({
+    css: getBasicCss(),
+    doc,
+    hostId: BASIC_HOST_ID,
   });
 
-  const settingsBtn = doc.createElement("button");
-  settingsBtn.type = "button";
-  settingsBtn.className = "ptr-btn";
-  settingsBtn.setAttribute("data-basic-action", "settings");
-  settingsBtn.textContent = t("basicOpenSettings");
-  settingsBtn.addEventListener("click", () => {
-    handlers.onOpenSettings?.();
-  });
+  const renderState = (state: BasicUiState): void => {
+    const isStudio = state.uiTier === "studio";
+    applyPtrTheme(mounted.host, state.themeMode);
+    mounted.host.hidden = isStudio;
 
-  const studioBtn = doc.createElement("button");
-  studioBtn.type = "button";
-  studioBtn.id = "ptr-basic-studio";
-  studioBtn.className = "ptr-btn";
-  studioBtn.textContent = t("studioMode");
-  studioBtn.setAttribute("aria-pressed", "false");
-  studioBtn.addEventListener("click", () => {
-    handlers.onToggleStudio();
-  });
+    mounted.render(html`
+      <section class="ptr-panel ptr-basic-pill">
+        <button
+          type="button"
+          class="ptr-btn ptr-btn-primary"
+          data-basic-action="translate"
+          aria-pressed=${state.translated ? "true" : "false"}
+          @click=${() => {
+            handlers.onToggleTranslate?.();
+          }}
+        >${state.translated ? t("restorePage") : t("translatePage")}</button>
+        <button
+          type="button"
+          class="ptr-btn"
+          data-basic-action="settings"
+          @click=${() => {
+            handlers.onOpenSettings?.();
+          }}
+        >${t("basicOpenSettings")}</button>
+        <button
+          type="button"
+          id="ptr-basic-studio"
+          class="ptr-btn"
+          aria-pressed=${isStudio ? "true" : "false"}
+          @click=${() => {
+            handlers.onToggleStudio();
+          }}
+        >${t("studioMode")}</button>
+      </section>
+    `);
+  };
 
-  pill.append(translateBtn, settingsBtn, studioBtn);
-  shadow.append(styleEl, pill);
-  (doc.body ?? doc.documentElement).append(host);
+  renderState({
+    themeMode: "system",
+    translated: false,
+    uiTier: "basic",
+  });
 
   return {
-    host,
-    render(state: BasicUiState): void {
-      applyPtrTheme(host, state.themeMode);
-      translateBtn.textContent = state.translated
-        ? t("restorePage")
-        : t("translatePage");
-      translateBtn.setAttribute(
-        "aria-pressed",
-        state.translated ? "true" : "false"
-      );
-
-      const isStudio = state.uiTier === "studio";
-      studioBtn.setAttribute("aria-pressed", isStudio ? "true" : "false");
-      host.hidden = isStudio;
-    },
-    destroy(): void {
-      host.remove();
-    },
+    host: mounted.host,
+    render: renderState,
+    destroy: mounted.destroy,
   };
 }
